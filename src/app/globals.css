@@ -1,0 +1,162 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base ──────────────────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    --font-manrope: 'Manrope', sans-serif;
+
+    /* Scrollbar */
+    --scrollbar-thumb: #3a3956;
+    --scrollbar-track: #070614;
+  }
+
+  * {
+    @apply border-black-700;
+  }
+
+  html {
+    @apply scroll-smooth;
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    @apply bg-black-900 text-white font-sans antialiased;
+    font-family: var(--font-manrope), 'Manrope', sans-serif;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #575d75;
+  }
+
+  /* Selection */
+  ::selection {
+    @apply bg-purple-600/30 text-white;
+  }
+
+  /* Focus ring */
+  :focus-visible {
+    @apply outline-none ring-2 ring-purple-500 ring-offset-2 ring-offset-black-900;
+  }
+
+  /* Headings default */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  /* Remove number input spinners */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+/* ─── Components ─────────────────────────────────────────────────────────── */
+@layer components {
+
+  /* Brand gradient text */
+  .text-gradient-brand {
+    background: linear-gradient(111deg, #fe673f 0%, #ff3600 20%, #8204ff 50%, #662dff 75%, #b092ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Glass card */
+  .glass-card {
+    @apply bg-black-800/60 backdrop-blur-md border border-black-600/50 rounded-3xl;
+  }
+
+  /* Glass card hover */
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300 hover:border-purple-600/40 hover:bg-black-800/80 hover:shadow-glow-purple;
+  }
+
+  /* Section container */
+  .section-container {
+    @apply mx-auto max-w-[1400px] px-5 sm:px-6 xl:px-8;
+  }
+
+  /* Demo mode badge */
+  .demo-badge {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-orange-600/15 border border-orange-600/30 px-3 py-1 text-12 font-semibold text-orange-500;
+  }
+
+  /* Status dot */
+  .status-dot-green  { @apply h-2 w-2 rounded-full bg-green-400; }
+  .status-dot-yellow { @apply h-2 w-2 rounded-full bg-yellow-400; }
+  .status-dot-red    { @apply h-2 w-2 rounded-full bg-red-400; }
+  .status-dot-gray   { @apply h-2 w-2 rounded-full bg-black-400; }
+
+  /* Pill nav item */
+  .nav-item {
+    @apply text-14 font-medium text-black-400 transition-colors duration-200 hover:text-white;
+  }
+  .nav-item-active {
+    @apply text-14 font-medium text-white;
+  }
+
+  /* Dashboard sidebar item */
+  .sidebar-item {
+    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-14 font-medium text-black-400 transition-all duration-200 hover:bg-black-800 hover:text-white;
+  }
+  .sidebar-item-active {
+    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-14 font-medium bg-purple-600/15 text-white border border-purple-600/30;
+  }
+
+  /* Input field */
+  .input-field {
+    @apply w-full rounded-xl border border-black-600 bg-black-800 px-4 py-3 text-14 text-white placeholder-black-400 transition-all duration-200 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500/50;
+  }
+
+  /* Table row hover */
+  .table-row-hover {
+    @apply transition-colors duration-150 hover:bg-black-800/50;
+  }
+}
+
+/* ─── Utilities ──────────────────────────────────────────────────────────── */
+@layer utilities {
+  .bg-gradient-brand-animate {
+    background-size: 200% 200%;
+    animation: gradientX 8s linear infinite;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  /* Hide scrollbar but keep scrollable */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Mask fade edges for scrollable content */
+  .mask-fade-x {
+    mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
+  }
+}

@@ -15,6 +15,8 @@ export interface Profile {
   full_name?: string | null;
   avatar_url?: string | null;
   role: UserRole;
+  /** Account status (migration 002). Absent on rows read before 002. */
+  status?: "active" | "suspended";
   created_at: string;
 }
 

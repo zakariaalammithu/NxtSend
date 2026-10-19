@@ -1,4 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash, timingSafeEqual } from "node:crypto";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * Constant-time secret comparison. Both values are hashed first so the
+ * comparison never leaks the secret's length and timingSafeEqual always
+ * receives equal-length buffers.
+ */
+function secretsMatch(provided: string, expected: string): boolean {
+  const providedHash = createHash("sha256").update(provided).digest();
+  const expectedHash = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(providedHash, expectedHash);
+}
+
+/**
+ * Simple in-memory rate limit for bootstrap attempts: at most
+ * RATE_LIMIT_MAX attempts per source IP per window. This is per-process
+ * memory (on serverless it resets with the instance and is not shared
+ * across instances) — it raises the cost of online guessing; the real
+ * protection remains removing ADMIN_BOOTSTRAP_SECRET after first use.
+ */
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const bootstrapAttempts = new Map<string, { count: number; windowStart: number }>();
+
+function isRateLimited(ip: string): boolean {
+  const entry = bootstrapAttempts.get(ip);
+  if (!entry) return false;
+  if (Date.now() - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+    bootstrapAttempts.delete(ip);
+    return false;
+  }
+  return entry.count >= RATE_LIMIT_MAX;
+}
+
+function recordAttempt(ip: string): void {
+  const now = Date.now();
+  const entry = bootstrapAttempts.get(ip);
+  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+    bootstrapAttempts.set(ip, { count: 1, windowStart: now });
+  } else {
+    entry.count += 1;
+  }
+}
 
 /**
  * Admin Bootstrap Endpoint
@@ -15,6 +60,17 @@ import { NextRequest, NextResponse } from "next/server";
  */
 export async function POST(request: NextRequest) {
   try {
+    // 0. Rate limit (counts every attempt, before any secret handling)
+    const clientIp =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    if (isRateLimited(clientIp)) {
+      return NextResponse.json(
+        { error: "Too many bootstrap attempts. Try again later." },
+        { status: 429 }
+      );
+    }
+    recordAttempt(clientIp);
+
     const body = await request.json();
     const { secret, email } = body as { secret?: string; email?: string };
 
@@ -27,7 +83,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!secret || secret !== bootstrapSecret) {
+    if (!secret || !secretsMatch(secret, bootstrapSecret)) {
       // Log the attempt without revealing details
       console.warn("[Bootstrap] Unauthorized bootstrap attempt from:", request.headers.get("x-forwarded-for") || "unknown");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

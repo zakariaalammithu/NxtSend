@@ -19,21 +19,22 @@ export const metadata: Metadata = {
 /* More-resources cards (verbatim from the mirror: aimfox.com/academy).    */
 /* The mirror links Help Center and API Docs to Aimfox subdomains          */
 /* (help.aimfox.com / docs.aimfox.com); Aimfox URLs are never carried      */
-/* over, so they map to the same app routes the app's own Footer uses      */
-/* (/help and /docs). Certified Experts maps to the app's /experts page,   */
-/* which the mirror card also targets.                                     */
+/* over, and the app has no /help or /docs routes, so both cards map to    */
+/* /contact — the same target the app's Footer uses for Help Center and   */
+/* API Docs. Certified Experts maps to the app's /experts page, which     */
+/* the mirror card also targets.                                          */
 /* ──────────────────────────────────────────────────────────────────────── */
 const resources = [
   {
     title: "Help Center",
     description:
       "Setup guides, troubleshooting, and answers to common questions.",
-    href: "/help",
+    href: "/contact",
   },
   {
     title: "API Docs",
     description: "Build on top of Aimfox with the public API.",
-    href: "/docs",
+    href: "/contact",
   },
   {
     title: "Certified Experts",

@@ -5,24 +5,66 @@ import Link from "next/link";
 import { Users, Target, CreditCard, DollarSign, Shield, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui";
 import { StatsCard } from "@/components/dashboard/StatsCard";
-import { MOCK_ADMIN_USERS } from "@/lib/db/mock/data";
 import { formatDate } from "@/lib/utils";
+import { getAdminRepository, type AdminOverview } from "@/lib/data";
 
 export default function AdminOverviewPage() {
+  const adminRepo = React.useMemo(() => getAdminRepository(), []);
+  const isDemo = adminRepo.mode === "demo";
+  const [overview, setOverview] = React.useState<AdminOverview | null>(null);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
+
+  // Aggregates come from the admin repository: computed from the demo
+  // dataset in demo mode, or from GET /api/admin/overview (server-side
+  // role check + service-role reads) in Supabase mode.
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await adminRepo.getOverview();
+        if (!cancelled) setOverview(data);
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(
+            err instanceof Error ? err.message : "Failed to load overview."
+          );
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [adminRepo]);
+
   return (
     <div className="space-y-7 pb-14">
       {/* Admin Demo Banner */}
-      <div className="rounded-2xl border border-rose-500/40 bg-rose-950/20 p-4 text-rose-200 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Shield className="h-5 w-5 text-rose-400 shrink-0" />
+      {isDemo ? (
+        <div className="rounded-2xl border border-rose-500/40 bg-rose-950/20 p-4 text-rose-200 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Shield className="h-5 w-5 text-rose-400 shrink-0" />
+            <p className="text-13">
+              <strong>Admin Panel</strong> &mdash; This is demo data. Connect Supabase to see real platform metrics.
+            </p>
+          </div>
+          <span className="demo-badge text-10 py-0.5 px-2.5">
+            Simulated Sandbox
+          </span>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-emerald-500/40 bg-emerald-950/20 p-4 text-emerald-200 flex items-center gap-3">
+          <Shield className="h-5 w-5 text-emerald-400 shrink-0" />
           <p className="text-13">
-            <strong>Admin Panel</strong> &mdash; This is demo data. Connect Supabase to see real platform metrics.
+            <strong>Admin Panel</strong> &mdash; Showing live platform data from Supabase.
           </p>
         </div>
-        <span className="demo-badge text-10 py-0.5 px-2.5">
-          Simulated Sandbox
-        </span>
-      </div>
+      )}
+
+      {loadError && (
+        <div className="rounded-2xl border border-rose-500/40 bg-rose-950/20 px-5 py-3 text-13 text-rose-200">
+          {loadError}
+        </div>
+      )}
 
       {/* Header */}
       <div>
@@ -34,41 +76,44 @@ export default function AdminOverviewPage() {
         </p>
       </div>
 
-      {/* Platform Stats Grid */}
+      {/* Platform Stats Grid — totals are computed from the repository's
+          dataset (demo sample data or live tables), not hardcoded. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4.5">
         <StatsCard
           label="Total Users"
-          value={128}
-          change={18}
-          changeType="up"
+          value={overview?.totalUsers ?? "—"}
           icon={Users}
-          sublabel="registered accounts"
-          isDemo={true}
+          sublabel={
+            overview
+              ? `${overview.activeUsers} active • ${overview.suspendedUsers} suspended`
+              : "registered accounts"
+          }
+          isDemo={isDemo}
         />
         <StatsCard
           label="Active Workspaces"
-          value={84}
-          change={12}
-          changeType="up"
+          value={overview?.totalWorkspaces ?? "—"}
           icon={Target}
           sublabel="multi-tenant orgs"
-          isDemo={true}
+          isDemo={isDemo}
         />
         <StatsCard
           label="Total Revenue"
           value="$0"
-          sublabel="Demo Mode (Stripe sandbox)"
+          sublabel="Billing not connected (Stripe)"
           icon={DollarSign}
           isDemo={true}
         />
         <StatsCard
           label="Active Subscriptions"
-          value={46}
-          change={8}
-          changeType="up"
+          value={overview?.activeSubscriptions ?? "—"}
           icon={CreditCard}
-          sublabel="paid workspace tiers"
-          isDemo={true}
+          sublabel={
+            overview
+              ? `of ${overview.totalSubscriptions} total subscriptions`
+              : "paid workspace tiers"
+          }
+          isDemo={isDemo}
         />
       </div>
 
@@ -135,7 +180,9 @@ export default function AdminOverviewPage() {
             <h3 className="text-16 font-semibold text-white">
               Recent Signups (Last 5 Users)
             </h3>
-            <p className="text-12 text-black-400">Mock platform accounts</p>
+            <p className="text-12 text-black-400">
+              {isDemo ? "Mock platform accounts" : "Most recently registered accounts"}
+            </p>
           </div>
           <Link
             href="/admin/users"
@@ -158,7 +205,7 @@ export default function AdminOverviewPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-black-700/50">
-              {MOCK_ADMIN_USERS.slice(0, 5).map((user) => (
+              {(overview?.recentUsers ?? []).map((user) => (
                 <tr key={user.id} className="table-row-hover">
                   <td className="py-3.5 px-5">
                     <div className="font-semibold text-white">{user.name}</div>

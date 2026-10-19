@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Mail, MapPin, Clock, CheckCircle2, Send, Linkedin, Twitter, Github, Youtube, MessageSquare } from "lucide-react";
+import { Mail, MapPin, Clock, CheckCircle2, Send, MessageSquare } from "lucide-react";
 
 const contactSchema = z.object({
   firstName: z.string().min(2, "First name must be at least 2 characters"),
@@ -18,6 +18,7 @@ type ContactFormData = z.infer<typeof contactSchema>;
 
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
     register,
@@ -36,10 +37,36 @@ export default function ContactPage() {
   });
 
   const onSubmit = async (data: ContactFormData) => {
-    console.log("Contact form submitted:", data);
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    setSubmitted(true);
-    reset();
+    // Real capture: POST /api/submissions stores the enquiry (see
+    // Admin → Submissions). The success panel below is only shown
+    // after the server confirms storage — previously this handler
+    // console.log'd the data and discarded it.
+    setSubmitError(null);
+    try {
+      const res = await fetch("/api/submissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: "contact",
+          name: `${data.firstName} ${data.lastName}`.trim(),
+          email: data.email,
+          subject: data.subject,
+          message: data.message,
+        }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `Request failed (${res.status})`);
+      }
+      setSubmitted(true);
+      reset();
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again."
+      );
+    }
   };
 
   return (
@@ -119,50 +146,10 @@ export default function ContactPage() {
                 </div>
               </div>
 
-              {/* Social Links */}
-              <div className="mt-8 pt-6 border-t border-black-700">
-                <h3 className="text-13 font-semibold uppercase tracking-wider text-black-400 mb-3">
-                  Follow & Connect
-                </h3>
-                <div className="flex items-center gap-3">
-                  <a
-                    href="https://linkedin.com"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex h-10 w-10 items-center justify-center rounded-xl border border-black-700 bg-black-800 text-black-300 hover:text-white hover:border-purple-500/50 transition-colors"
-                    aria-label="LinkedIn"
-                  >
-                    <Linkedin className="h-4 w-4" />
-                  </a>
-                  <a
-                    href="https://twitter.com"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex h-10 w-10 items-center justify-center rounded-xl border border-black-700 bg-black-800 text-black-300 hover:text-white hover:border-purple-500/50 transition-colors"
-                    aria-label="Twitter"
-                  >
-                    <Twitter className="h-4 w-4" />
-                  </a>
-                  <a
-                    href="https://github.com"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex h-10 w-10 items-center justify-center rounded-xl border border-black-700 bg-black-800 text-black-300 hover:text-white hover:border-purple-500/50 transition-colors"
-                    aria-label="GitHub"
-                  >
-                    <Github className="h-4 w-4" />
-                  </a>
-                  <a
-                    href="https://youtube.com"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex h-10 w-10 items-center justify-center rounded-xl border border-black-700 bg-black-800 text-black-300 hover:text-white hover:border-purple-500/50 transition-colors"
-                    aria-label="YouTube"
-                  >
-                    <Youtube className="h-4 w-4" />
-                  </a>
-                </div>
-              </div>
+              {/* Social links removed (Fix Batch 3): the icons linked to bare
+                  platform homepages (linkedin.com, twitter.com, …) and no
+                  verified NxtSend profiles exist yet. Re-add once real
+                  profile URLs exist. */}
             </div>
           </div>
 
@@ -275,6 +262,13 @@ export default function ContactPage() {
                       <p className="mt-1 text-12 text-red-400">{errors.message.message}</p>
                     )}
                   </div>
+
+                  {submitError && (
+                    <div className="rounded-xl border border-red-500/30 bg-red-600/10 p-3.5 text-13 text-red-300">
+                      Couldn&apos;t send your message: {submitError} Your text
+                      is still in the form — please try again.
+                    </div>
+                  )}
 
                   <div className="pt-2">
                     <button

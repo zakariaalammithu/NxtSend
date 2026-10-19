@@ -7,6 +7,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
+import { ensureDefaultWorkspace } from "@/lib/auth/workspace";
+import { recordPendingReferral } from "@/lib/referrals/capture";
 import { Eye, EyeOff, Loader2, AlertCircle, ArrowRight } from "lucide-react";
 
 const loginSchema = z.object({
@@ -18,6 +20,24 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function LoginForm() {
   const router = useRouter();
+
+  // Demo entry is offered ONLY when Supabase is not configured (demo mode).
+  // When auth is live, the bypass button is not rendered at all — previously
+  // it was always visible and, with a real backend, only bounced off the
+  // middleware back to /login.
+  const isDemoMode = React.useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    return (
+      !url ||
+      !key ||
+      url === "https://your-project.supabase.co" ||
+      url.includes("placeholder") ||
+      key === "your-anon-key" ||
+      key.includes("placeholder")
+    );
+  }, []);
+
   const [showPassword, setShowPassword] = React.useState(false);
   const [demoNotice, setDemoNotice] = React.useState<string | null>(null);
   const [serverError, setServerError] = React.useState<string | null>(null);
@@ -46,15 +66,57 @@ export default function LoginForm() {
     }
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      });
+      const { data: signInData, error } =
+        await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        });
 
       if (error) {
         setServerError(error.message);
         return;
       }
+
+      // Suspension enforcement (Stage 2b): an admin can suspend an account
+      // via /api/admin/users/status, which sets profiles.status. A
+      // suspended user must not get a usable session — check the profile
+      // row now and sign straight back out if suspended. (A session that
+      // already exists when the suspension lands stays valid until it
+      // expires or is refreshed against a status-aware check; admin API
+      // calls are blocked immediately by requireAdminApi.)
+      if (signInData.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("status")
+          .eq("id", signInData.user.id)
+          .single();
+
+        if (profile?.status === "suspended") {
+          await supabase.auth.signOut();
+          setServerError(
+            "This account has been suspended. Please contact support if you believe this is a mistake."
+          );
+          return;
+        }
+      }
+
+      // First authenticated load: users who signed up under email
+      // confirmation had no session at signup, so their default workspace
+      // could not be created then. Create it now (checked, non-fatal).
+      // full_name from metadata is used ONLY as a workspace display label,
+      // never for any role/authorization decision.
+      if (signInData.user) {
+        await ensureDefaultWorkspace(
+          supabase,
+          signInData.user.id,
+          (signInData.user.user_metadata?.full_name as string) ?? null
+        );
+      }
+
+      // Referral capture (Stage E): a user who signed up under email
+      // confirmation had no session at signup — record a stashed ?ref=
+      // now that they are signed in (best-effort, never blocks login).
+      await recordPendingReferral();
 
       router.push("/dashboard");
       router.refresh();
@@ -190,25 +252,29 @@ export default function LoginForm() {
           )}
         </button>
 
-        {/* Divider */}
-        <div className="relative my-6 text-center">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-black-600/70" />
-          </div>
-          <span className="relative bg-black-800 px-3 text-12 text-black-400 uppercase tracking-wider">
-            or
-          </span>
-        </div>
+        {/* Demo entry — demo mode only, clearly labelled */}
+        {isDemoMode && (
+          <>
+            {/* Divider */}
+            <div className="relative my-6 text-center">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-black-600/70" />
+              </div>
+              <span className="relative bg-black-800 px-3 text-12 text-black-400 uppercase tracking-wider">
+                or
+              </span>
+            </div>
 
-        {/* Demo Fast Login Option */}
-        <button
-          type="button"
-          onClick={() => router.push("/dashboard")}
-          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-black-700/60 hover:bg-black-700 border border-black-600 text-black-200 hover:text-white font-medium py-2.5 px-4 text-13 transition-all"
-        >
-          <span>Explore Demo as Alex Vance</span>
-          <ArrowRight className="h-3.5 w-3.5 text-purple-400" />
-        </button>
+            <button
+              type="button"
+              onClick={() => router.push("/dashboard")}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-black-700/60 hover:bg-black-700 border border-black-600 text-black-200 hover:text-white font-medium py-2.5 px-4 text-13 transition-all"
+            >
+              <span>Explore Demo as Alex Vance (Demo Mode)</span>
+              <ArrowRight className="h-3.5 w-3.5 text-purple-400" />
+            </button>
+          </>
+        )}
 
         {/* Sign up link */}
         <div className="text-center pt-2">

@@ -38,8 +38,8 @@ export default function DemoPage() {
       {/* ──────────────────────────────────────────────────────────────────── */}
       {/* HERO — "Discover how to automate LinkedIn Outreach" + demo video    */}
       {/* ──────────────────────────────────────────────────────────────────── */}
-      <section className="relative bg-black-900 px-2.5 pt-4 sm:px-4">
-        <div className="relative overflow-hidden rounded-[2.5rem] bg-white px-4 pt-12 pb-16 md:px-6 md:py-20">
+      <section className="relative bg-black-900 px-2.5 pt-4">
+        <div className="relative overflow-hidden rounded-5xl bg-white px-4 pt-12 pb-16 md:px-6 md:py-20 xl:rounded-8xl 2xl:px-40 2xl:py-28">
           <Image
             src="/images/demo/hero.webp"
             alt=""
@@ -48,13 +48,13 @@ export default function DemoPage() {
             className="object-cover"
           />
           <div className="relative z-10 flex flex-col items-center">
-            <h1 className="mb-4 max-w-3xl text-center text-36 font-semibold text-black-900 md:mb-6 md:text-54 2xl:text-64">
+            <h1 className="mb-4 max-w-[50rem] text-center text-36 font-semibold text-black-900 md:mb-6 md:text-54 2xl:text-64">
               Discover how to automate{" "}
               <span className="text-gradient-brand">LinkedIn Outreach</span>
             </h1>
             <Link
               href="/signup"
-              className="mb-10 inline-flex h-12 items-center justify-center rounded-full bg-black-900 px-7 text-15 font-semibold text-white transition-colors hover:bg-black-600 md:mb-12"
+              className="mb-6 inline-flex h-10.5 items-center justify-center rounded-full bg-black-900 px-7 text-15 font-semibold text-white transition-colors hover:bg-black-600 md:mb-9 2xl:mb-12"
             >
               Try for free
             </Link>

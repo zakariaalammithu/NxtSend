@@ -34,7 +34,7 @@ export function DemoHeroVideo() {
 
   return (
     <>
-      <div className="relative w-full max-w-4xl overflow-hidden rounded-3xl border border-white bg-black-100 shadow-2xl">
+      <div className="relative flex w-full max-w-[1200px] items-center justify-center overflow-hidden rounded-3xl border border-white bg-black-100 shadow-2xl backdrop-blur-sm md:rounded-7xl">
         <Image
           src="/images/demo/hero-video-thumbnail.webp"
           alt="Aimfox demo video"
@@ -53,7 +53,7 @@ export function DemoHeroVideo() {
             alt=""
             width={661}
             height={661}
-            className="size-26 transition-transform duration-300 group-hover:scale-105 xl:size-40"
+            className="size-26 transition-transform duration-300 group-hover:scale-105 xl:size-[10.375rem]"
           />
         </button>
       </div>

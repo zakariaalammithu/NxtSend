@@ -144,11 +144,13 @@ export default function ResetPasswordForm() {
                 )}
               </button>
             </div>
-            {errors.password?.message && (
-              <p className="mt-1.5 text-12 text-rose-400">
-                {errors.password.message}
-              </p>
-            )}
+            <div className="min-h-[22px]">
+              {errors.password?.message && (
+                <p className="mt-1.5 text-12 text-rose-400">
+                  {errors.password.message}
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Confirm Password */}
@@ -187,11 +189,13 @@ export default function ResetPasswordForm() {
                 )}
               </button>
             </div>
-            {errors.confirmPassword?.message && (
-              <p className="mt-1.5 text-12 text-rose-400">
-                {errors.confirmPassword.message}
-              </p>
-            )}
+            <div className="min-h-[22px]">
+              {errors.confirmPassword?.message && (
+                <p className="mt-1.5 text-12 text-rose-400">
+                  {errors.confirmPassword.message}
+                </p>
+              )}
+            </div>
           </div>
 
           <button

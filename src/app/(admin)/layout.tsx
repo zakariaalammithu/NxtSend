@@ -2,17 +2,33 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, CreditCard, Settings, Shield, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  LayoutDashboard, Users, CreditCard, Settings, Shield, ArrowLeft,
+  ChevronLeft, ChevronRight, LogOut, Target, Megaphone, UserSearch,
+  Database, Inbox, Bell, Globe, Share2, TrendingUp, Gauge, Receipt,
+  DollarSign, SlidersHorizontal, Mail, Table, Sparkles, Bot, Blocks,
+  Wand2, ListOrdered, Radio, MonitorSmartphone, Settings2, HeartPulse,
+  FlaskConical, Stethoscope, KeyRound, Siren,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
+import { ADMIN_NAV_GROUPS } from "@/lib/admin/nav";
 
-const ADMIN_NAV = [
-  { label: "Overview", href: "/admin", icon: LayoutDashboard },
-  { label: "Users", href: "/admin/users", icon: Users },
-  { label: "Subscriptions", href: "/admin/subscriptions", icon: CreditCard },
-  { label: "Platform Settings", href: "/admin/settings", icon: Settings },
-  { label: "Audit Log", href: "/admin/audit", icon: Shield },
-];
+/**
+ * Sidebar structure lives in src/lib/admin/nav.ts (pure data, unit
+ * tested against the brief's item list); this map binds its icon keys
+ * to lucide components.
+ */
+const NAV_ICONS: Record<string, LucideIcon> = {
+  LayoutDashboard, Users, CreditCard, Settings, Shield, Target,
+  Megaphone, UserSearch, Database, Inbox, Bell, Globe, Share2,
+  TrendingUp, Gauge, Receipt, DollarSign, SlidersHorizontal, Mail,
+  Table, Sparkles, Bot, Blocks, Wand2, ListOrdered, Radio,
+  MonitorSmartphone, Settings2, HeartPulse, FlaskConical, Stethoscope,
+  KeyRound, Siren,
+};
 
 export default function AdminLayout({
   children,
@@ -20,7 +36,20 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isCollapsed, setIsCollapsed] = React.useState(false);
+
+  const handleLogout = async () => {
+    // Real logout: terminate the Supabase session (clears the auth cookies)
+    // before navigating. In demo mode createClient() returns null and there
+    // is no session to end, so we simply navigate to /login.
+    const supabase = createClient();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    router.push("/login");
+    router.refresh();
+  };
 
   return (
     <div className="flex h-screen w-full bg-black-900 text-white overflow-hidden font-sans">
@@ -40,9 +69,12 @@ export default function AdminLayout({
               isCollapsed && "justify-center w-full"
             )}
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-rose-600 to-orange-500 shadow-glow-orange">
-              <Shield className="h-4 w-4 text-white" />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="NxtSend"
+              className="h-8 w-8 shrink-0 object-contain"
+            />
             {!isCollapsed && (
               <div className="flex flex-col">
                 <span className="text-16 font-bold tracking-tight text-white leading-tight">
@@ -88,34 +120,57 @@ export default function AdminLayout({
           </div>
         )}
 
-        {/* Navigation */}
-        <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-1">
-          {ADMIN_NAV.map((item) => {
-            const isActive =
-              item.href === "/admin"
-                ? pathname === "/admin"
-                : pathname?.startsWith(item.href);
+        {/* Navigation — grouped per the admin brief (src/lib/admin/nav.ts) */}
+        <div className="flex-1 overflow-y-auto px-2.5 py-3">
+          {ADMIN_NAV_GROUPS.map((group) => (
+            <div key={group.label} className="mb-4">
+              {!isCollapsed && (
+                <p className="px-3 pb-1.5 text-10 font-bold uppercase tracking-widest text-black-500">
+                  {group.label}
+                </p>
+              )}
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  // Items that are a path prefix of a sibling item
+                  // (e.g. /admin/settings vs /admin/settings/secrets)
+                  // highlight on exact match only.
+                  const hasChildItem = ADMIN_NAV_GROUPS.some((g) =>
+                    g.items.some(
+                      (other) =>
+                        other.href !== item.href &&
+                        other.href.startsWith(item.href + "/")
+                    )
+                  );
+                  const isActive =
+                    item.href === "/admin" || hasChildItem
+                      ? pathname === item.href
+                      : pathname === item.href ||
+                        pathname?.startsWith(item.href + "/");
+                  const Icon = NAV_ICONS[item.icon] ?? LayoutDashboard;
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  isActive
-                    ? "flex items-center gap-3 rounded-xl px-3 py-2.5 text-14 font-medium bg-rose-600/15 text-white border border-rose-600/30"
-                    : "sidebar-item",
-                  isCollapsed && "justify-center px-0 py-2.5"
-                )}
-                title={isCollapsed ? item.label : undefined}
-              >
-                <item.icon className="h-4 w-4 shrink-0 text-rose-400" />
-                {!isCollapsed && <span>{item.label}</span>}
-              </Link>
-            );
-          })}
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        isActive
+                          ? "flex items-center gap-3 rounded-xl px-3 py-2 text-13 font-medium bg-rose-600/15 text-white border border-rose-600/30"
+                          : "sidebar-item",
+                        isCollapsed && "justify-center px-0 py-2.5"
+                      )}
+                      title={isCollapsed ? item.label : undefined}
+                    >
+                      <Icon className="h-4 w-4 shrink-0 text-rose-400" />
+                      {!isCollapsed && <span>{item.label}</span>}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* Return to Dashboard shortcut */}
+        {/* Return to Dashboard shortcut + Log Out */}
         <div className="p-2.5 border-t border-black-700/60 space-y-2">
           <Link
             href="/dashboard"
@@ -128,6 +183,18 @@ export default function AdminLayout({
             <ArrowLeft className="h-3.5 w-3.5 text-purple-400 shrink-0" />
             {!isCollapsed && <span>Back to App</span>}
           </Link>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className={cn(
+              "flex w-full items-center gap-2.5 rounded-xl bg-black-800 hover:bg-black-700 border border-black-700 p-2 text-12 font-medium text-rose-300 hover:text-rose-200 transition-colors",
+              isCollapsed && "justify-center px-0"
+            )}
+            title="Log Out"
+          >
+            <LogOut className="h-3.5 w-3.5 shrink-0" />
+            {!isCollapsed && <span>Log Out</span>}
+          </button>
         </div>
       </aside>
 

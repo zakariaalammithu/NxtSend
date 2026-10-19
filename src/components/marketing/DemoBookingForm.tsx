@@ -20,8 +20,10 @@ import { ArrowRight, CheckCircle2 } from "lucide-react";
  * "Book now" label on the submit button.
  *
  * The form is clearly a request form: submitting it does not book a
- * calendar slot. Like the app's contact form, it is handled in-app
- * (there is no demo/contact API endpoint in the app yet).
+ * calendar slot. The request IS stored, though: it posts to
+ * POST /api/submissions (source "demo") and appears in
+ * Admin → Submissions — the success panel below is only shown after
+ * the server confirms storage.
  */
 
 const bookingSchema = z.object({
@@ -36,6 +38,7 @@ type BookingFormData = z.infer<typeof bookingSchema>;
 
 export function DemoBookingForm() {
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
     register,
@@ -54,12 +57,41 @@ export function DemoBookingForm() {
   });
 
   const onSubmit = async (data: BookingFormData) => {
-    // In-app handling only (same pattern as the contact form):
-    // no calendar slot is booked by submitting this form.
-    console.log("Demo booking request submitted:", data);
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    setSubmitted(true);
-    reset();
+    // Stored via POST /api/submissions (source "demo"). Still NOT a
+    // calendar booking — the stored request is what the team replies
+    // to by email, exactly as the copy below the form states.
+    setSubmitError(null);
+    const message =
+      data.message && data.message.trim().length >= 10
+        ? data.message.trim()
+        : `Demo booking request from ${data.company} (team size: ${data.teamSize}). Please contact me to arrange a personalized demo.`;
+    try {
+      const res = await fetch("/api/submissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: "demo",
+          name: data.name,
+          email: data.email,
+          company: data.company,
+          subject: "Demo booking request",
+          message,
+          meta: { team_size: data.teamSize },
+        }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `Request failed (${res.status})`);
+      }
+      setSubmitted(true);
+      reset();
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again."
+      );
+    }
   };
 
   return (
@@ -200,6 +232,13 @@ export function DemoBookingForm() {
               <p className="mt-1 text-12 text-red-400">{errors.message.message}</p>
             )}
           </div>
+
+          {submitError && (
+            <div className="rounded-xl border border-red-500/30 bg-red-600/10 p-3.5 text-13 text-red-300">
+              Couldn&apos;t send your request: {submitError} Your details are
+              still in the form — please try again.
+            </div>
+          )}
 
           <div className="pt-2">
             <button

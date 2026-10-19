@@ -23,7 +23,7 @@ export default function IntegrationsPage() {
       {/* the H1 sitting at its bottom; hero-large.webp on very wide screens) */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="px-2.5 pt-24 sm:pt-28">
-        <div className="relative flex h-[34.5rem] flex-col items-center overflow-hidden rounded-5xl bg-black-800 md:h-[32.5rem] xl:h-[34rem] xl:rounded-8xl">
+        <div className="relative flex h-[34.5rem] flex-col items-center overflow-hidden rounded-5xl bg-black-800 px-6 md:h-[32.5rem] xl:h-[34rem] xl:rounded-8xl">
           <Image
             src="/images/integrations/hero.webp"
             alt=""
@@ -39,7 +39,7 @@ export default function IntegrationsPage() {
             sizes="100vw"
             className="hidden object-cover min-[1920px]:block"
           />
-          <h1 className="relative z-10 mt-auto mb-0 max-w-[50rem] px-6 pb-9 text-center text-36 font-semibold text-white md:px-24 md:text-54 lg:mb-6 xl:text-64 xl:pb-10">
+          <h1 className="relative z-10 mt-auto mb-0 w-full max-w-[50rem] pb-9 text-center text-36 font-semibold text-white md:text-54 lg:mb-6 xl:text-64 xl:pb-10">
             Browse our expanding collection of integrations
           </h1>
         </div>

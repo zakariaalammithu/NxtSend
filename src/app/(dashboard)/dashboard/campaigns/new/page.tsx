@@ -20,6 +20,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { DemoBanner } from "@/components/ui";
+import { getCampaignsRepository, resolveWorkspaceId } from "@/lib/data";
 import type { CampaignType, StepType } from "@/types";
 
 interface SequenceStepDraft {
@@ -79,6 +80,59 @@ export default function NewCampaignWizardPage() {
   ]);
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
+
+  // AI drafting (POST /api/ai/draft): fills the step editor with a draft
+  // for human review — it never sends anything. The notice under each
+  // step shows the honest state (demo sample / not configured / error).
+  const [aiBusyStepId, setAiBusyStepId] = React.useState<string | null>(null);
+  const [aiNotice, setAiNotice] = React.useState<{
+    stepId: string;
+    text: string;
+  } | null>(null);
+
+  const handleAiDraft = async (step: SequenceStepDraft) => {
+    setAiBusyStepId(step.id);
+    setAiNotice(null);
+    try {
+      const res = await fetch("/api/ai/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channel: step.step_type === "email" ? "email" : "linkedin",
+          stepType: step.step_type,
+          campaignName: campaignName.trim() || undefined,
+          campaignGoal: campaignDescription.trim() || undefined,
+          existingContent: step.content,
+          lead: { firstName: "Alex", company: "Acme Inc", jobTitle: "VP of Sales" },
+        }),
+      });
+      const data = (await res.json()) as {
+        draft?: string | null;
+        message?: string;
+        error?: string;
+      };
+      if (data.draft) {
+        handleUpdateStep(step.id, "content", data.draft);
+        setAiNotice({
+          stepId: step.id,
+          text: `${data.message ?? "Draft inserted."} Review and edit before use.`,
+        });
+      } else {
+        setAiNotice({
+          stepId: step.id,
+          text: data.message ?? data.error ?? "AI drafting is unavailable right now.",
+        });
+      }
+    } catch {
+      setAiNotice({
+        stepId: step.id,
+        text: "AI drafting request failed (network error). Your text was not changed.",
+      });
+    } finally {
+      setAiBusyStepId(null);
+    }
+  };
 
   // Add step
   const handleAddStep = (type: StepType) => {
@@ -135,14 +189,46 @@ export default function NewCampaignWizardPage() {
     );
   };
 
-  // Final Submit
+  // Final Submit — persists the campaign and its steps through the data
+  // layer (Supabase tables when configured; the labelled demo store
+  // otherwise). "Launch" sets the stored lifecycle state to active; no
+  // sequence execution happens here — execution remains simulated until
+  // a provider-backed executor exists.
   const handleCreateCampaign = async () => {
     setIsSubmitting(true);
-    // Simulate campaign creation
-    setTimeout(() => {
-      setIsSubmitting(false);
+    setSubmitError(null);
+    try {
+      const workspaceId = await resolveWorkspaceId();
+      if (!workspaceId) {
+        setSubmitError(
+          "No workspace could be resolved for your account. Please sign in again."
+        );
+        setIsSubmitting(false);
+        return;
+      }
+      const repo = getCampaignsRepository();
+      await repo.createCampaign(workspaceId, {
+        name: campaignName.trim(),
+        type: campaignType,
+        status: "active",
+        // Note: the wizard's free-text description has no column in the
+        // campaigns schema, so it is not persisted (pre-existing gap,
+        // documented in STAGE2B_REPORT.md).
+        steps: steps.map((s) => ({
+          step_type: s.step_type,
+          delay_hours: s.delay_hours,
+          subject: s.subject,
+          content: s.content,
+          config: {},
+        })),
+      });
       router.push("/dashboard/campaigns");
-    }, 700);
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : "Failed to create the campaign."
+      );
+      setIsSubmitting(false);
+    }
   };
 
   const getStepIcon = (type: StepType) => {
@@ -504,6 +590,18 @@ export default function NewCampaignWizardPage() {
                         <label className="text-11 text-black-400">
                           Message Body (supports {"{{first_name}}"}, {"{{company}}"})
                         </label>
+                        <button
+                          type="button"
+                          onClick={() => handleAiDraft(step)}
+                          disabled={aiBusyStepId === step.id}
+                          className="inline-flex items-center gap-1 rounded-lg bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 px-2 py-1 text-11 font-medium text-purple-200 transition-colors disabled:opacity-50"
+                          title="Generate a draft with AI — you review and edit it before anything is used"
+                        >
+                          <Sparkles className="h-3 w-3" />
+                          <span>
+                            {aiBusyStepId === step.id ? "Drafting…" : "Draft with AI"}
+                          </span>
+                        </button>
                       </div>
                       <textarea
                         rows={3}
@@ -513,11 +611,22 @@ export default function NewCampaignWizardPage() {
                         }
                         className="input-field py-2 text-13 resize-none font-mono text-12 text-black-200"
                       />
+                      {aiNotice?.stepId === step.id && (
+                        <p className="mt-1.5 text-11 leading-relaxed text-black-400">
+                          {aiNotice.text}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
               ))}
             </div>
+
+            {submitError && (
+              <div className="rounded-xl border border-rose-500/40 bg-rose-950/20 px-4 py-3 text-13 text-rose-200">
+                {submitError}
+              </div>
+            )}
 
             <div className="flex items-center justify-between pt-4 border-t border-black-700">
               <button

@@ -25,18 +25,12 @@ export class NotImplementedError extends Error {
 }
 
 /**
- * Helper to determine if an environment variable holds a realistic non-placeholder value.
+ * Shared env check (src/lib/env.ts) — separates "operator supplied a
+ * value" from the .env.example placeholders.
  */
-function isConfigured(value: string | undefined): boolean {
-  if (!value) return false;
-  const trimmed = value.trim();
-  return (
-    trimmed.length > 0 &&
-    !trimmed.includes("placeholder") &&
-    !trimmed.startsWith("your-") &&
-    !trimmed.startsWith("sk_test_placeholder")
-  );
-}
+import { isConfiguredValue as isConfigured } from "@/lib/env";
+import { getEmailState } from "@/lib/email/state";
+import { getBillingState } from "@/lib/billing/state";
 
 // ----------------------------------------------------------------------------
 // Production Adapter Stubs
@@ -56,31 +50,59 @@ class LiveLinkedInStub implements LinkedInAdapter {
   }
 
   getStatus(): IntegrationStatus {
-    return "connected";
+    // Stage 2c honesty fix (was F10): this stub is only constructed
+    // when LinkedIn env vars exist, but every action throws — no
+    // authorized provider is integrated yet, so reporting "connected"
+    // would be false. "error" is the honest state until a real
+    // provider adapter replaces this stub.
+    return "error";
   }
 }
 
 class LiveEmailStub implements EmailAdapter {
   async sendEmail(): Promise<AdapterResult> {
-    throw new NotImplementedError("Real adapter not yet configured");
+    return {
+      success: false,
+      mode: "live",
+      message:
+        "This legacy adapter has no workspace context, so the mandatory suppression check cannot run. Use the workspace-scoped provider in src/lib/email (getEmailProvider().sendEmail) instead. No email was sent.",
+    };
   }
 
   getStatus(): IntegrationStatus {
-    return "connected";
+    const state = getEmailState();
+    if (state === "connected") return "connected";
+    if (state === "demo") return "demo";
+    if (state === "error") return "error";
+    return "disconnected";
   }
 }
 
 class LiveStripeStub implements StripeAdapter {
   async getSubscription(): Promise<AdapterResult> {
-    throw new NotImplementedError("Real adapter not yet configured");
+    return {
+      success: false,
+      mode: "live",
+      message:
+        "Subscription state is managed by the verified Stripe webhook (src/lib/billing). Read the subscriptions table / billing routes instead. Nothing was fabricated.",
+    };
   }
 
   async createCheckoutSession(): Promise<AdapterResult> {
-    throw new NotImplementedError("Real adapter not yet configured");
+    return {
+      success: false,
+      mode: "live",
+      message:
+        "Checkout requires an authenticated request context. Use POST /api/billing/checkout (src/lib/billing). No session was created.",
+    };
   }
 
   getStatus(): IntegrationStatus {
-    return "connected";
+    const state = getBillingState();
+    if (state === "connected") return "connected";
+    if (state === "demo") return "demo";
+    if (state === "error") return "error";
+    return "disconnected";
   }
 }
 

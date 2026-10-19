@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
+import MetaPixel from "@/components/analytics/MetaPixel";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -57,8 +58,8 @@ export const metadata: Metadata = {
     googleBot: { index: true, follow: true },
   },
   icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
+    icon: "/icon.png",
+    shortcut: "/icon.png",
     apple: "/apple-touch-icon.png",
   },
 };
@@ -72,6 +73,9 @@ export default function RootLayout({
     <html lang="en" className={manrope.variable}>
       <body className={`${manrope.className} antialiased`}>
         {children}
+        {/* Renders nothing unless NEXT_PUBLIC_META_PIXEL_ID is set AND
+            the visitor granted marketing consent (see SETUP.md). */}
+        <MetaPixel />
       </body>
     </html>
   );

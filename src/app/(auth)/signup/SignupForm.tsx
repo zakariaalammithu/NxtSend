@@ -7,6 +7,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
+import { ensureDefaultWorkspace } from "@/lib/auth/workspace";
+import { trackPixelEvent } from "@/components/analytics/MetaPixel";
+import {
+  recordPendingReferral,
+  stashReferralCodeFromUrl,
+} from "@/lib/referrals/capture";
 import { Eye, EyeOff, Loader2, AlertCircle, ArrowRight } from "lucide-react";
 
 const signupSchema = z
@@ -47,9 +53,42 @@ function getPasswordStrength(password: string): {
 
 export default function SignupForm() {
   const router = useRouter();
+  // Admin "Close signups" flag (System Settings / Emergency Controls).
+  // Read from the public settings endpoint; while it loads, the form
+  // renders as usual — when it reports closed, the form is replaced by
+  // a clear closed message and submission is blocked. If the endpoint
+  // is unreachable the form stays open (fail-open for availability;
+  // the flag is an operational control, not a security boundary).
+  const [signupsClosed, setSignupsClosed] = React.useState(false);
+
+  // Referral capture (Stage E): stash ?ref=<referrerId> so the record
+  // call can fire once an account session exists (here after signup,
+  // or in LoginForm when email confirmation delays the session).
+  React.useEffect(() => {
+    stashReferralCodeFromUrl();
+  }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/settings/public", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled && json.signups_open === false) setSignupsClosed(true);
+      } catch {
+        // Endpoint unreachable → leave the form open.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const [demoNotice, setDemoNotice] = React.useState<string | null>(null);
+  const [confirmationNotice, setConfirmationNotice] =
+    React.useState<string | null>(null);
   const [serverError, setServerError] = React.useState<string | null>(null);
 
   const {
@@ -74,6 +113,14 @@ export default function SignupForm() {
   const onSubmit = async (data: SignupFormData) => {
     setServerError(null);
     setDemoNotice(null);
+    setConfirmationNotice(null);
+
+    if (signupsClosed) {
+      setServerError(
+        "New signups are currently closed by the administrator. Please check back later."
+      );
+      return;
+    }
 
     const supabase = createClient();
 
@@ -100,15 +147,30 @@ export default function SignupForm() {
         return;
       }
 
-      // Auto-create initial workspace if user session is active
-      if (authData.user) {
-        const workspaceName = `${data.fullName}'s Workspace`;
-        await supabase.from("workspaces").insert({
-          name: workspaceName,
-          owner_id: authData.user.id,
-          plan: "free",
-        });
+      // Meta Pixel conversion (no-op unless a Pixel ID is configured AND
+      // the visitor consented; no PII is sent).
+      trackPixelEvent("CompleteRegistration");
+
+      // Email confirmation pending: signUp returned a user but NO session.
+      // A workspace insert now would be rejected by RLS (no auth.uid()), and
+      // pushing to /dashboard would just bounce back to /login. Show the
+      // verification notice instead — the workspace is created on the first
+      // authenticated sign-in (see LoginForm -> ensureDefaultWorkspace).
+      if (!authData.session) {
+        setConfirmationNotice(
+          `Account created. Please check ${data.email} for a verification link to activate your account. Your workspace will be created automatically when you first sign in.`
+        );
+        return;
       }
+
+      // Session is active: create the initial workspace (checked, non-fatal).
+      if (authData.user) {
+        await ensureDefaultWorkspace(supabase, authData.user.id, data.fullName);
+      }
+
+      // Referral capture: record a stashed ?ref= now that the session
+      // exists (best-effort, never blocks the redirect).
+      await recordPendingReferral();
 
       router.push("/dashboard");
       router.refresh();
@@ -116,6 +178,29 @@ export default function SignupForm() {
       setServerError("An unexpected error occurred during signup.");
     }
   };
+
+  if (signupsClosed) {
+    return (
+      <div className="w-full">
+        <div className="mb-6">
+          <h2 className="text-24 sm:text-28 font-bold tracking-tight text-white">
+            Signups are closed
+          </h2>
+          <p className="mt-1.5 text-14 text-black-300">
+            New account registration is currently paused by the
+            administrator. Existing users can still sign in.
+          </p>
+        </div>
+        <div className="rounded-xl border border-yellow-500/30 bg-yellow-600/10 p-4 text-13 text-yellow-200">
+          If you were invited to join a workspace, ask your workspace admin
+          to re-open signups or contact support.{" "}
+          <Link href="/login" className="font-semibold text-purple-400 hover:text-purple-300">
+            Go to sign in →
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
@@ -143,6 +228,14 @@ export default function SignupForm() {
           >
             Continue to Demo Dashboard <ArrowRight className="h-3 w-3" />
           </button>
+        </div>
+      )}
+
+      {/* Email confirmation notice */}
+      {confirmationNotice && (
+        <div className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-600/10 p-3.5 text-13 text-emerald-300 flex items-start gap-2.5">
+          <AlertCircle className="h-4.5 w-4.5 shrink-0 text-emerald-400 mt-0.5" />
+          <span>{confirmationNotice}</span>
         </div>
       )}
 
@@ -174,11 +267,13 @@ export default function SignupForm() {
               errors.fullName ? "border-rose-500 focus:border-rose-500" : ""
             }`}
           />
-          {errors.fullName?.message && (
-            <p className="mt-1.5 text-12 text-rose-400">
-              {errors.fullName.message}
-            </p>
-          )}
+          <div className="min-h-[22px]">
+            {errors.fullName?.message && (
+              <p className="mt-1.5 text-12 text-rose-400">
+                {errors.fullName.message}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Work Email */}
@@ -199,11 +294,13 @@ export default function SignupForm() {
               errors.email ? "border-rose-500 focus:border-rose-500" : ""
             }`}
           />
-          {errors.email?.message && (
-            <p className="mt-1.5 text-12 text-rose-400">
-              {errors.email.message}
-            </p>
-          )}
+          <div className="min-h-[22px]">
+            {errors.email?.message && (
+              <p className="mt-1.5 text-12 text-rose-400">
+                {errors.email.message}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Password */}
@@ -261,11 +358,13 @@ export default function SignupForm() {
             </div>
           )}
 
-          {errors.password?.message && (
-            <p className="mt-1.5 text-12 text-rose-400">
-              {errors.password.message}
-            </p>
-          )}
+          <div className="min-h-[22px]">
+            {errors.password?.message && (
+              <p className="mt-1.5 text-12 text-rose-400">
+                {errors.password.message}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Confirm Password */}
@@ -304,11 +403,13 @@ export default function SignupForm() {
               )}
             </button>
           </div>
-          {errors.confirmPassword?.message && (
-            <p className="mt-1.5 text-12 text-rose-400">
-              {errors.confirmPassword.message}
-            </p>
-          )}
+          <div className="min-h-[22px]">
+            {errors.confirmPassword?.message && (
+              <p className="mt-1.5 text-12 text-rose-400">
+                {errors.confirmPassword.message}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Terms Checkbox */}
@@ -336,11 +437,13 @@ export default function SignupForm() {
               </Link>
             </span>
           </label>
-          {errors.terms?.message && (
-            <p className="mt-1.5 text-12 text-rose-400">
-              {errors.terms.message}
-            </p>
-          )}
+          <div className="min-h-[22px]">
+            {errors.terms?.message && (
+              <p className="mt-1.5 text-12 text-rose-400">
+                {errors.terms.message}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Submit Button */}

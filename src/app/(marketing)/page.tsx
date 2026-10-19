@@ -5,7 +5,6 @@ import {
   ArrowRight,
   Check,
   Star,
-  Play,
   Linkedin,
   ShieldCheck,
   Headphones,
@@ -15,6 +14,7 @@ import {
 } from "lucide-react";
 import { HomeFaq } from "@/components/marketing/HomeFaq";
 import { TrustedLogoStrip } from "@/components/marketing/TrustedLogos";
+import { VideoTestimonialCard } from "@/components/marketing/VideoTestimonialCard";
 
 export const metadata: Metadata = {
   title: "NxtSend — Supercharge your LinkedIn pipeline. At scale.",
@@ -186,12 +186,44 @@ const wallTestimonials = [
   },
 ];
 
+/* Photos, video thumbnails and Vimeo IDs are each person's own assets,
+   shared with the Avatars/Demo wall (see VideoTestimonialCard.tsx). */
 const videoTestimonials = [
-  { name: "Bryan Seton", role: "Partner" },
-  { name: "Jay Feldman", role: "Founder" },
-  { name: "Dave Menjura", role: "CRO" },
-  { name: "Balsa Kosic", role: "COO" },
-  { name: "Roy Ripper", role: "CEO" },
+  {
+    name: "Bryan Seton",
+    role: "Partner",
+    photo: "/images/avatars/reviews/bryan-seton.jpg",
+    thumbnail: "/images/avatars/reviews/bryan-seton-thumb.webp",
+    videoId: "1118790353",
+  },
+  {
+    name: "Jay Feldman",
+    role: "Founder",
+    photo: "/images/avatars/reviews/jay-feldman.jpg",
+    thumbnail: "/images/avatars/reviews/jay-feldman-thumb.webp",
+    videoId: "1118790843",
+  },
+  {
+    name: "Dave Menjura",
+    role: "CRO",
+    photo: "/images/avatars/reviews/dave-menjura.jpg",
+    thumbnail: "/images/avatars/reviews/dave-menjura-thumb.webp",
+    videoId: "1118790539",
+  },
+  {
+    name: "Balsa Kosic",
+    role: "COO",
+    photo: "/images/avatars/reviews/balsa-kosic.jpg",
+    thumbnail: "/images/avatars/reviews/balsa-kosic-thumb.webp",
+    videoId: "1118790221",
+  },
+  {
+    name: "Roy Ripper",
+    role: "CEO",
+    photo: "/images/avatars/reviews/roy-ripper.jpg",
+    thumbnail: "/images/avatars/reviews/roy-ripper-thumb.webp",
+    videoId: "1118790702",
+  },
 ];
 
 /* ── FAQ (mirror section 7) ──────────────────────────────────────────────── */
@@ -302,17 +334,19 @@ export default function MarketingHomePage() {
             </div>
           </div>
 
-          <div className="mt-14 w-full max-w-5xl rounded-2xl border border-black-700/80 bg-black-800/40 p-2 sm:p-3 shadow-2xl backdrop-blur-xl">
-            <div className="overflow-hidden rounded-xl border border-black-700/60 shadow-inner">
-              <Image
-                src="/images/hero.webp"
-                alt="NxtSend LinkedIn outreach platform"
-                width={2000}
-                height={1031}
-                className="h-auto w-full"
-                priority
-              />
-            </div>
+          {/* Hero artwork — frameless, integrated into the hero block: the
+              image sits directly under the checkmarks at the full width of
+              the hero container, its edges fading into the section
+              background via a radial mask (no card, border or frame). */}
+          <div className="mt-8 w-full max-w-5xl">
+            <Image
+              src="/images/hero.webp"
+              alt="NxtSend LinkedIn outreach platform"
+              width={2000}
+              height={1031}
+              className="h-auto w-full [mask-image:radial-gradient(ellipse_72%_72%_at_50%_50%,black_58%,transparent_98%)]"
+              priority
+            />
           </div>
         </div>
       </section>
@@ -721,18 +755,7 @@ export default function MarketingHomePage() {
             ))}
 
             {videoTestimonials.map((v) => (
-              <div
-                key={v.name}
-                className="glass-card flex flex-col items-start justify-between p-8"
-              >
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-brand text-white shadow-glow-purple">
-                  <Play className="h-5 w-5 fill-white text-white" />
-                </span>
-                <div className="mt-10">
-                  <div className="text-16 font-bold text-white">{v.name}</div>
-                  <div className="text-13 text-black-400">{v.role}</div>
-                </div>
-              </div>
+              <VideoTestimonialCard key={v.name} testimonial={v} />
             ))}
           </div>
         </div>

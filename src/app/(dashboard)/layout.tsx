@@ -3,8 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Target, Linkedin, Mail, MessageSquare, Users, BarChart3, Puzzle, CreditCard, Settings, Bell, Search, LogOut, ChevronDown, ChevronLeft, ChevronRight, Zap, X, User, Shield, Check } from "lucide-react";
+import { LayoutDashboard, Target, Linkedin, Mail, MessageSquare, BarChart3, Puzzle, CreditCard, Settings, Bell, Search, LogOut, ChevronDown, ChevronLeft, ChevronRight, Zap, X, User, Shield, Check, Sparkles, History, Gift, Coins, ShoppingCart, ContactRound } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 
 interface NavSection {
   title: string;
@@ -22,6 +23,11 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
       { label: "Campaigns", href: "/dashboard/campaigns", icon: Target },
+      {
+        label: "AI Personalization",
+        href: "/dashboard/ai-personalization",
+        icon: Sparkles,
+      },
     ],
   },
   {
@@ -33,22 +39,54 @@ const NAV_SECTIONS: NavSection[] = [
         label: "Inbox",
         href: "/dashboard/inbox",
         icon: MessageSquare,
-        badge: 3,
+        // Badge is the live unread-conversation count, fetched from
+        // /api/inbox/unread-count (see below) — never hardcoded.
       },
     ],
   },
   {
     title: "TOOLS",
     items: [
-      { label: "Leads", href: "/dashboard/leads", icon: Users },
+      // The Leads area IS the CRM (contacts, lists/tags, CSV, dedupe).
+      { label: "CRM", href: "/dashboard/leads", icon: ContactRound },
       { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+      {
+        label: "Usage & History",
+        href: "/dashboard/usage",
+        icon: History,
+      },
+    ],
+  },
+  {
+    title: "ACCOUNT",
+    items: [
+      {
+        label: "Billing & Credits",
+        href: "/dashboard/billing",
+        icon: CreditCard,
+      },
+      { label: "Referral", href: "/dashboard/referral", icon: Gift },
+      { label: "Profile", href: "/dashboard/settings", icon: User },
+    ],
+  },
+  {
+    title: "CREDITS",
+    items: [
+      // NxtSend has no credit balance — plans carry monthly QUOTAS.
+      // These entries land on the billing page's quota panel / plans,
+      // which present quotas as quotas (see the billing page).
+      {
+        label: "Available Credits",
+        href: "/dashboard/billing#credits",
+        icon: Coins,
+      },
+      { label: "Buy Credits", href: "/dashboard/billing#plans", icon: ShoppingCart },
     ],
   },
   {
     title: "SETTINGS",
     items: [
       { label: "Integrations", href: "/dashboard/integrations", icon: Puzzle },
-      { label: "Billing", href: "/dashboard/billing", icon: CreditCard },
       { label: "Settings", href: "/dashboard/settings", icon: Settings },
     ],
   },
@@ -73,6 +111,68 @@ export default function DashboardLayout({
 
   // Demo banner state
   const [showDemoTopNotice, setShowDemoTopNotice] = React.useState(true);
+
+  // Admin platform-settings gate (System Settings / Emergency
+  // Controls): when an admin turns the demo banner OFF
+  // (demo_banner_enabled=false via GET /api/settings/public), the
+  // notice strip stays hidden. Default true preserves today's
+  // behaviour; if the endpoint is unreachable the banner shows.
+  const [demoBannerEnabled, setDemoBannerEnabled] = React.useState(true);
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/settings/public", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled && json.demo_banner_enabled === false) {
+          setDemoBannerEnabled(false);
+        }
+      } catch {
+        // Endpoint unreachable → keep the banner (fail-visible).
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Notice shown when middleware redirects a demo-mode /admin visit here
+  const [showAdminDemoNotice, setShowAdminDemoNotice] = React.useState(false);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("notice") === "admin-demo") {
+      setShowAdminDemoNotice(true);
+    }
+  }, []);
+
+  // Live inbox unread badge: conversations with unread inbound
+  // messages, derived server-side from persisted read state
+  // (messages.read_at). Refetched on navigation and whenever the
+  // inbox page announces a change.
+  const [inboxUnreadCount, setInboxUnreadCount] = React.useState<number>(0);
+  React.useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/inbox/unread-count");
+        if (!res.ok) return;
+        const data = (await res.json()) as { count?: number };
+        if (!cancelled && typeof data.count === "number") {
+          setInboxUnreadCount(data.count);
+        }
+      } catch {
+        // Badge is best-effort chrome; the inbox page itself surfaces errors.
+      }
+    };
+    load();
+    window.addEventListener("nxtsend:inbox-unread-changed", load);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("nxtsend:inbox-unread-changed", load);
+    };
+  }, [pathname]);
 
   // Mock workspace
   const currentWorkspace = "Alex Vance's Workspace";
@@ -101,8 +201,16 @@ export default function DashboardLayout({
     },
   ];
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Real logout: terminate the Supabase session (clears the auth cookies)
+    // before navigating. In demo mode createClient() returns null and there
+    // is no session to end, so we simply navigate to /login.
+    const supabase = createClient();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
     router.push("/login");
+    router.refresh();
   };
 
   return (
@@ -132,9 +240,12 @@ export default function DashboardLayout({
               isCollapsed && "justify-center w-full"
             )}
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-purple-600 to-orange-500 shadow-glow-purple">
-              <Zap className="h-4 w-4 text-white fill-white" />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="NxtSend"
+              className="h-8 w-8 shrink-0 object-contain"
+            />
             {!isCollapsed && (
               <span className="text-18 font-bold tracking-tight text-white whitespace-nowrap">
                 Nxt<span className="text-gradient-brand">Send</span>
@@ -253,11 +364,16 @@ export default function DashboardLayout({
                       {!isCollapsed && (
                         <span className="flex-1 truncate">{item.label}</span>
                       )}
-                      {!isCollapsed && item.badge !== undefined && (
-                        <span className="flex h-4.5 min-w-[18px] items-center justify-center rounded-full bg-purple-600 px-1.5 text-10 font-bold text-white shadow-glow-purple">
-                          {item.badge}
-                        </span>
-                      )}
+                      {!isCollapsed &&
+                        (item.href === "/dashboard/inbox"
+                          ? inboxUnreadCount > 0
+                          : item.badge !== undefined) && (
+                          <span className="flex h-4.5 min-w-[18px] items-center justify-center rounded-full bg-purple-600 px-1.5 text-10 font-bold text-white shadow-glow-purple">
+                            {item.href === "/dashboard/inbox"
+                              ? inboxUnreadCount
+                              : item.badge}
+                          </span>
+                        )}
                     </Link>
                   );
                 })}
@@ -452,8 +568,27 @@ export default function DashboardLayout({
 
         {/* Content Area */}
         <main className="flex-1 overflow-y-auto bg-black-900 flex flex-col">
+          {/* Admin-in-demo-mode notice (set by middleware redirect) */}
+          {showAdminDemoNotice && (
+            <div className="bg-rose-950/40 border-b border-rose-500/30 px-4 py-2.5 text-13 flex items-center justify-between gap-3 text-rose-200">
+              <p>
+                <strong>Admin Console is unavailable in Demo Mode</strong>{" "}
+                &mdash; it shows sample data only. Connect Supabase and sign in
+                with an admin account to use the real Admin Console.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowAdminDemoNotice(false)}
+                className="rounded-full p-1 text-rose-300/80 hover:text-white hover:bg-white/10 shrink-0"
+                aria-label="Dismiss admin demo notice"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
           {/* Dismissible Demo Mode Banner at top of content area */}
-          {showDemoTopNotice && (
+          {showDemoTopNotice && demoBannerEnabled && (
             <div className="bg-gradient-to-r from-orange-600/20 via-purple-600/20 to-orange-600/20 border-b border-orange-500/30 px-4 py-2.5 text-13 flex items-center justify-between gap-3 text-orange-200">
               <div className="flex items-center gap-2 overflow-hidden">
                 <span className="demo-badge text-10 py-0.5 px-2">DEMO</span>

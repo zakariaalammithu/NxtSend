@@ -211,7 +211,7 @@ function RequestIntegrationCard({ className = "" }: { className?: string }) {
         className="mx-auto h-56 w-auto xl:h-52"
       />
       <div className="flex flex-col gap-y-6 px-3 md:px-4 xl:px-2">
-        <p className="text-center text-24 font-semibold text-black md:text-left xl:text-20">
+        <p className="text-center text-24 font-semibold text-black-900 md:text-left xl:text-20">
           Have an idea for an Aimfox integration? Share it here
         </p>
         <Link

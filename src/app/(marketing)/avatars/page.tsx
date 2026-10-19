@@ -4,7 +4,6 @@ import type { Metadata } from "next";
 import {
   ArrowRight,
   Check,
-  ClipboardList,
   ShieldCheck,
   Headphones,
   Star,
@@ -12,6 +11,7 @@ import {
 import { AvatarsShowcase } from "@/components/marketing/AvatarsShowcase";
 import { AvatarsPricing } from "@/components/marketing/AvatarsPricing";
 import { AvatarsWall } from "@/components/marketing/AvatarsWall";
+import { AvatarsTrustedLogos } from "@/components/marketing/AvatarsTrustedLogos";
 
 export const metadata: Metadata = {
   title: "NxtSend Avatars – Rent LinkedIn accounts for outreach",
@@ -67,7 +67,7 @@ const steps = [
     number: "2",
     title: "Fill out the customization form",
     text: "Fill out the form we send - we’ll take care of the setup",
-    image: null,
+    image: "/images/avatars/step-2.svg",
   },
   {
     number: "3",
@@ -128,7 +128,7 @@ export default function AvatarsPage() {
         <p className="mx-auto mb-1.5 text-center text-sm font-bold text-white/60">
           Trusted by more than 10,000 outreach experts
         </p>
-        <div className="mx-auto mb-12 flex items-center justify-center gap-x-7 text-14 font-bold text-white/40">
+        <div className="mx-auto mb-12 flex items-center justify-center gap-x-7 text-14 font-bold text-white/40 md:mb-8">
           <span className="flex items-center gap-2">
             <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
             4.8 rating
@@ -137,6 +137,14 @@ export default function AvatarsPage() {
             <Star className="h-4 w-4 fill-orange-400 text-orange-400" />
             4.9 rating
           </span>
+        </div>
+
+        {/* Mirror: customer wordmark row under the ratings (the two
+            testimonial popups hang off oneaway / instantly on the mirror;
+            here the wordmarks are static and the two testimonials render
+            as cards below, as before) */}
+        <div className="mb-14">
+          <AvatarsTrustedLogos />
         </div>
 
         <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-6 text-left md:grid-cols-2">
@@ -188,7 +196,11 @@ export default function AvatarsPage() {
             </h2>
           </div>
 
-          <div className="relative mx-auto mt-20 flex max-w-5xl flex-col gap-y-14">
+          {/* Mirror layout: the 3 step cards stand side by side on xl
+              (each w-90, visual on top, text below); below xl they stack
+              as wide horizontal cards, exactly as the mirror's own
+              responsive classes do. */}
+          <div className="relative mx-auto mt-20 flex w-full max-w-[74.5rem] flex-col gap-y-16 px-6 md:px-2.5 xl:flex-row xl:justify-between xl:px-0">
             <Image
               src="/images/avatars/steps-bg.webp"
               alt=""
@@ -199,34 +211,32 @@ export default function AvatarsPage() {
             {steps.map((step) => (
               <div
                 key={step.number}
-                className="relative flex flex-col gap-8 rounded-[2.5rem] border border-white/10 bg-white/[0.03] px-3 pt-10 pb-9 shadow-[2px_4px_16px_0_rgba(247,247,247,0.06)_inset] backdrop-blur-md md:flex-row md:items-center"
+                className="relative flex flex-col gap-8 rounded-7xl border border-white/10 bg-white/[2.5%] px-3 pt-7 pb-9 shadow-[2px_4px_16px_0_rgba(247,247,247,0.06)_inset] backdrop-blur-md md:flex-row md:items-center md:py-0 xl:w-90 xl:flex-col xl:pt-7 xl:pb-9 xl:backdrop-blur-xl"
               >
-                <div className="absolute inset-x-0 -top-6 mx-auto flex h-12 w-16 items-center justify-center rounded-2xl border border-white/5 bg-white/5 text-14 font-medium text-white shadow-[0_0_0_2px_rgba(18,18,18,0.20)]">
+                <div className="absolute inset-x-0 -top-6.5 mx-auto flex h-13 w-17 items-center justify-center rounded-5xl border border-white/5 bg-white/5 text-14 font-medium text-white shadow-[0_0_0_2px_rgba(18,18,18,0.20),_2px_4px_16px_0_rgba(247,247,247,0.06)_inset]">
                   {step.number}
                 </div>
                 <div className="flex-1">
-                  {step.image ? (
-                    <Image
+                  {step.image?.endsWith(".svg") ? (
+                    /* Step 2's visual is the mirror's own inline-SVG form
+                       illustration, extracted verbatim to a static file
+                       (it is not a downloadable image asset in the mirror). */
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
                       src={step.image}
                       alt={step.title}
                       width={648}
                       height={648}
-                      className="mx-auto max-h-72 w-auto"
+                      className="mx-auto h-full max-h-[21rem] w-auto"
                     />
                   ) : (
-                    /* The mirror draws step 2's visual as a large inline
-                       SVG form illustration (not a downloadable asset);
-                       a form panel stands in for it — see AVATARS_MAP.md. */
-                    <div className="mx-auto flex max-h-72 w-full max-w-sm flex-col gap-3 rounded-3xl border border-white/10 bg-black-800/60 p-6">
-                      <span className="flex items-center gap-2 text-14 font-semibold text-white">
-                        <ClipboardList className="h-5 w-5 text-purple-400" />
-                        Customization form
-                      </span>
-                      <span className="h-9 rounded-xl bg-white/5" />
-                      <span className="h-9 rounded-xl bg-white/5" />
-                      <span className="h-9 rounded-xl bg-white/5" />
-                      <span className="h-10 rounded-xl bg-gradient-brand" />
-                    </div>
+                    <Image
+                      src={step.image!}
+                      alt={step.title}
+                      width={648}
+                      height={648}
+                      className="mx-auto h-full max-h-[21rem] w-auto"
+                    />
                   )}
                 </div>
                 <div className="flex flex-col gap-y-3 px-5 md:flex-1 md:px-0 xl:flex-none xl:px-5">

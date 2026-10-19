@@ -1,8 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { User, Lock, Bell, Users, AlertTriangle, Check, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { User, Lock, Bell, Users, AlertTriangle, Check, Plus, Trash2, Loader2 } from "lucide-react";
 import { DemoBanner, Badge, Modal } from "@/components/ui";
+import {
+  getUserSettingsRepository,
+  type UserSettingsData,
+} from "@/lib/data/user-settings";
+import { validatePasswordChange } from "@/lib/user-settings/core";
 
 interface Member {
   id: string;
@@ -13,29 +19,68 @@ interface Member {
 }
 
 export default function SettingsPage() {
+  const settingsRepo = React.useMemo(() => getUserSettingsRepository(), []);
+  const isDemo = settingsRepo.mode === "demo";
+
   const [activeTab, setActiveTab] = React.useState<
     "profile" | "password" | "notifications" | "team" | "danger"
   >("profile");
 
-  // Profile Form State
-  const [fullName, setFullName] = React.useState("Alex Vance");
-  const [email] = React.useState("alex@nxtsend.com");
-  const [bio, setBio] = React.useState(
-    "Head of Growth. Building multichannel outreach machines."
-  );
+  // Profile Form State — loaded from (and saved through) the
+  // user-settings repository: profiles.full_name + user_preferences
+  // in live mode, the labelled demo store in Demo Mode.
+  const [settingsData, setSettingsData] = React.useState<UserSettingsData | null>(null);
+  const [settingsError, setSettingsError] = React.useState<string | null>(null);
+  const [fullName, setFullName] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [bio, setBio] = React.useState("");
   const [profileSaved, setProfileSaved] = React.useState(false);
+  const [profileError, setProfileError] = React.useState<string | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = React.useState(false);
 
-  // Password Form State
-  const [currentPassword, setCurrentPassword] = React.useState("");
+  // Password Form State (live mode only — see the tab body; Supabase
+  // Auth does not re-verify the current password for a signed-in user)
   const [newPassword, setNewPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [passwordSaved, setPasswordSaved] = React.useState(false);
+  const [passwordError, setPasswordError] = React.useState<string | null>(null);
+  const [isSavingPassword, setIsSavingPassword] = React.useState(false);
 
-  // Notifications State
+  // Notifications State — persisted via the same repository.
   const [emailReplies, setEmailReplies] = React.useState(true);
   const [linkedinConnects, setLinkedinConnects] = React.useState(true);
   const [dailyDigest, setDailyDigest] = React.useState(false);
   const [bounceAlerts, setBounceAlerts] = React.useState(true);
+  const [prefsSaved, setPrefsSaved] = React.useState(false);
+  const [prefsError, setPrefsError] = React.useState<string | null>(null);
+  const [isSavingPrefs, setIsSavingPrefs] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await settingsRepo.getSettings();
+        if (cancelled) return;
+        setSettingsData(data);
+        setFullName(data.identity.full_name ?? "");
+        setEmail(data.identity.email);
+        setBio(data.bio);
+        setEmailReplies(data.preferences.notify_replies);
+        setLinkedinConnects(data.preferences.notify_connections);
+        setDailyDigest(data.preferences.daily_digest);
+        setBounceAlerts(data.preferences.bounce_alerts);
+      } catch (err) {
+        if (!cancelled) {
+          setSettingsError(
+            err instanceof Error ? err.message : "Failed to load your settings."
+          );
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [settingsRepo]);
 
   // Team Members
   const [members, setMembers] = React.useState<Member[]>([
@@ -70,19 +115,74 @@ export default function SettingsPage() {
   // Danger Modal
   const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setProfileSaved(true);
-    setTimeout(() => setProfileSaved(false), 2500);
+    setProfileError(null);
+    setProfileSaved(false);
+    setIsSavingProfile(true);
+    try {
+      const data = await settingsRepo.updateProfile({
+        full_name: fullName,
+        bio,
+      });
+      setSettingsData(data);
+      setProfileSaved(true);
+      setTimeout(() => setProfileSaved(false), 2500);
+    } catch (err) {
+      setProfileError(
+        err instanceof Error ? err.message : "Failed to save your profile."
+      );
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
-  const handleSavePassword = (e: React.FormEvent) => {
+  const handleSavePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setPasswordSaved(true);
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setTimeout(() => setPasswordSaved(false), 2500);
+    setPasswordError(null);
+    setPasswordSaved(false);
+    const validated = validatePasswordChange({ newPassword, confirmPassword });
+    if (!validated.ok) {
+      setPasswordError(validated.error);
+      return;
+    }
+    setIsSavingPassword(true);
+    try {
+      const result = await settingsRepo.changePassword(validated.value);
+      if (!result.ok) {
+        setPasswordError(result.error);
+        return;
+      }
+      setPasswordSaved(true);
+      setNewPassword("");
+      setConfirmPassword("");
+      setTimeout(() => setPasswordSaved(false), 2500);
+    } finally {
+      setIsSavingPassword(false);
+    }
+  };
+
+  const handleSavePreferences = async () => {
+    setPrefsError(null);
+    setPrefsSaved(false);
+    setIsSavingPrefs(true);
+    try {
+      const data = await settingsRepo.updatePreferences({
+        notify_replies: emailReplies,
+        notify_connections: linkedinConnects,
+        daily_digest: dailyDigest,
+        bounce_alerts: bounceAlerts,
+      });
+      setSettingsData(data);
+      setPrefsSaved(true);
+      setTimeout(() => setPrefsSaved(false), 2500);
+    } catch (err) {
+      setPrefsError(
+        err instanceof Error ? err.message : "Failed to save preferences."
+      );
+    } finally {
+      setIsSavingPrefs(false);
+    }
   };
 
   const handleInviteSubmit = (e: React.FormEvent) => {
@@ -108,7 +208,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-7 pb-14 max-w-4xl">
-      <DemoBanner feature="Workspace Settings" />
+      {isDemo && <DemoBanner feature="Workspace Settings" />}
 
       {/* Header */}
       <div>
@@ -116,12 +216,21 @@ export default function SettingsPage() {
           <h1 className="text-24 sm:text-28 font-bold tracking-tight text-white">
             Workspace Settings
           </h1>
-          <span className="demo-badge">Demo Mode</span>
+          {isDemo && <span className="demo-badge">Demo Mode</span>}
         </div>
         <p className="mt-1 text-14 text-black-300">
           Manage your personal profile, credentials, notifications, and team permissions.
+          Profile and notification changes are saved through your account
+          settings{isDemo ? " (demo store in this browser)" : ""}.
         </p>
       </div>
+
+      {settingsError && (
+        <div className="rounded-2xl border border-rose-500/40 bg-rose-950/20 px-5 py-3 text-13 text-rose-200 flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>{settingsError}</span>
+        </div>
+      )}
 
       {/* Settings Tabs Navigation */}
       <div className="flex items-center gap-1 border-b border-black-700/80 pb-px overflow-x-auto scrollbar-hide">
@@ -164,7 +273,12 @@ export default function SettingsPage() {
         <form onSubmit={handleSaveProfile} className="glass-card p-6 sm:p-8 space-y-6">
           <div className="flex items-center gap-4">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-purple-600 to-orange-500 text-white text-20 font-bold shadow-glow-purple">
-              AV
+              {(fullName || "U")
+                .split(" ")
+                .map((part) => part[0])
+                .slice(0, 2)
+                .join("")
+                .toUpperCase()}
             </div>
             <div>
               <h3 className="text-16 font-semibold text-white">Profile Picture</h3>
@@ -217,11 +331,19 @@ export default function SettingsPage() {
                 <span>Profile saved successfully!</span>
               </span>
             )}
+            {profileError && (
+              <span className="flex items-center gap-1.5 text-13 text-rose-400 font-medium">
+                <AlertTriangle className="h-4 w-4" />
+                <span>{profileError}</span>
+              </span>
+            )}
             <div className="ml-auto">
               <button
                 type="submit"
-                className="rounded-xl bg-purple-600 hover:bg-purple-500 px-6 py-2.5 text-14 font-semibold text-white shadow-glow-purple transition-all"
+                disabled={isSavingProfile}
+                className="rounded-xl bg-purple-600 hover:bg-purple-500 px-6 py-2.5 text-14 font-semibold text-white shadow-glow-purple transition-all disabled:opacity-50 inline-flex items-center gap-2"
               >
+                {isSavingProfile && <Loader2 className="h-4 w-4 animate-spin" />}
                 Save Changes
               </button>
             </div>
@@ -229,31 +351,65 @@ export default function SettingsPage() {
         </form>
       )}
 
-      {/* TAB 2: Password */}
-      {activeTab === "password" && (
+      {/* TAB 2: Password & Security */}
+      {activeTab === "password" && isDemo && (
+        <div className="glass-card p-6 sm:p-8 space-y-6">
+          <div>
+            <h3 className="text-16 font-semibold text-white">Password & Security</h3>
+            <p className="text-13 text-black-300 mt-0.5">
+              Session and credential security for your account.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-13 text-amber-200 flex items-start gap-2.5">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>
+              <strong className="text-white">Unavailable in Demo Mode.</strong>{" "}
+              The demo persona has no real account or password, so there is
+              nothing to change — and this page will not pretend otherwise.
+              Once Supabase is connected, this tab updates your password
+              through Supabase Auth, and password recovery runs through the{" "}
+              <Link href="/forgot-password" className="text-purple-300 hover:underline font-medium">
+                forgot-password flow
+              </Link>
+              .
+            </span>
+          </div>
+
+          <div className="space-y-2 text-13">
+            <p className="text-black-300">
+              <span className="text-black-500">Signed in as:</span>{" "}
+              {settingsData?.identity.email ?? email}
+            </p>
+            <p className="text-black-300">
+              <span className="text-black-500">Mode:</span> Demo Mode (no
+              session — the whole app runs on the labelled demo workspace)
+            </p>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "password" && !isDemo && (
         <form onSubmit={handleSavePassword} className="glass-card p-6 sm:p-8 space-y-6">
           <div>
             <h3 className="text-16 font-semibold text-white">Change Password</h3>
             <p className="text-13 text-black-300 mt-0.5">
-              Ensure your account is protected with a strong passphrase.
+              Updates your password through Supabase Auth for{" "}
+              {settingsData?.identity.email ?? email}. Forgot it instead? Use
+              the{" "}
+              <Link href="/forgot-password" className="text-purple-400 hover:underline">
+                password recovery flow
+              </Link>
+              .
             </p>
           </div>
 
           <div className="space-y-4">
-            <div>
-              <label className="block text-13 font-medium text-black-200 mb-1.5">
-                Current Password
-              </label>
-              <input
-                type="password"
-                required
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="••••••••"
-                className="input-field"
-              />
-            </div>
-
+            <p className="text-12 text-black-400">
+              You are already signed in, so Supabase Auth does not ask for
+              your current password here — sign out everywhere else from
+              your active sessions if you suspect a compromise.
+            </p>
             <div>
               <label className="block text-13 font-medium text-black-200 mb-1.5">
                 New Password
@@ -290,11 +446,19 @@ export default function SettingsPage() {
                 <span>Password updated!</span>
               </span>
             )}
+            {passwordError && (
+              <span className="flex items-center gap-1.5 text-13 text-rose-400 font-medium">
+                <AlertTriangle className="h-4 w-4" />
+                <span>{passwordError}</span>
+              </span>
+            )}
             <div className="ml-auto">
               <button
                 type="submit"
-                className="rounded-xl bg-purple-600 hover:bg-purple-500 px-6 py-2.5 text-14 font-semibold text-white shadow-glow-purple transition-all"
+                disabled={isSavingPassword}
+                className="rounded-xl bg-purple-600 hover:bg-purple-500 px-6 py-2.5 text-14 font-semibold text-white shadow-glow-purple transition-all disabled:opacity-50 inline-flex items-center gap-2"
               >
+                {isSavingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
                 Update Password
               </button>
             </div>
@@ -375,6 +539,32 @@ export default function SettingsPage() {
                 onChange={(e) => setBounceAlerts(e.target.checked)}
                 className="h-5 w-5 rounded border-black-600 bg-black-800 text-purple-600"
               />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t border-black-700">
+            {prefsSaved && (
+              <span className="flex items-center gap-1.5 text-13 text-emerald-400 font-medium">
+                <Check className="h-4 w-4" />
+                <span>Preferences saved!</span>
+              </span>
+            )}
+            {prefsError && (
+              <span className="flex items-center gap-1.5 text-13 text-rose-400 font-medium">
+                <AlertTriangle className="h-4 w-4" />
+                <span>{prefsError}</span>
+              </span>
+            )}
+            <div className="ml-auto">
+              <button
+                type="button"
+                onClick={handleSavePreferences}
+                disabled={isSavingPrefs}
+                className="rounded-xl bg-purple-600 hover:bg-purple-500 px-6 py-2.5 text-14 font-semibold text-white shadow-glow-purple transition-all disabled:opacity-50 inline-flex items-center gap-2"
+              >
+                {isSavingPrefs && <Loader2 className="h-4 w-4 animate-spin" />}
+                Save Preferences
+              </button>
             </div>
           </div>
         </div>

@@ -1,16 +1,48 @@
 "use client";
 
 import * as React from "react";
-import { Search, Shield, Trash2 } from "lucide-react";
+import { Search, Shield, Trash2, AlertTriangle } from "lucide-react";
 import { Badge, Modal } from "@/components/ui";
-import { MOCK_ADMIN_USERS, AdminUser } from "@/lib/db/mock/data";
 import { formatDate } from "@/lib/utils";
+import { getAdminRepository, type AdminUserRecord } from "@/lib/data";
 import type { UserRole } from "@/types";
 
+type AdminUser = AdminUserRecord;
+
 export default function AdminUsersPage() {
-  const [users, setUsers] = React.useState<AdminUser[]>(MOCK_ADMIN_USERS);
+  const adminRepo = React.useMemo(() => getAdminRepository(), []);
+  const isDemo = adminRepo.mode === "demo";
+
+  const [users, setUsers] = React.useState<AdminUser[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [actionError, setActionError] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [roleFilter, setRoleFilter] = React.useState<string>("all");
+
+  // Users load through the admin repository: the demo store in demo mode,
+  // or GET /api/admin/users in Supabase mode — a route that verifies the
+  // caller's admin role server-side before reading with the service role.
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await adminRepo.listUsers();
+        if (!cancelled) setUsers(rows);
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(
+            err instanceof Error ? err.message : "Failed to load users."
+          );
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [adminRepo]);
 
   // Role change modal state
   const [roleModalOpen, setRoleModalOpen] = React.useState(false);
@@ -35,6 +67,10 @@ export default function AdminUsersPage() {
     setRoleModalOpen(true);
   };
 
+  // NOTE: role changes are still local-state only (both modes). The
+  // server-enforced reference mutation is suspend/activate below; role
+  // changes should follow the same API-route pattern before they are
+  // relied on in production (see STAGE2B_REPORT.md).
   const handleConfirmRoleChange = () => {
     if (!targetUser) return;
     setUsers((prev) =>
@@ -45,16 +81,21 @@ export default function AdminUsersPage() {
     setRoleModalOpen(false);
   };
 
-  const handleToggleSuspend = (id: string) => {
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === id) {
-          const nextStatus = u.status === "active" ? "suspended" : "active";
-          return { ...u, status: nextStatus };
-        }
-        return u;
-      })
-    );
+  // Suspend / activate — the reference admin mutation. In Supabase mode it
+  // goes through POST /api/admin/users/status, which re-verifies the
+  // caller's admin role server-side and writes an audit_logs entry; in
+  // demo mode it updates only the browser's demo store.
+  const handleToggleSuspend = async (user: AdminUser) => {
+    const nextStatus = user.status === "active" ? "suspended" : "active";
+    setActionError(null);
+    try {
+      const updated = await adminRepo.setUserStatus(user.id, nextStatus);
+      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "Failed to change the user's status."
+      );
+    }
   };
 
   const handleDeleteUser = (id: string) => {
@@ -70,11 +111,30 @@ export default function AdminUsersPage() {
             User Management
           </h1>
           <span className="demo-badge">Admin Controls</span>
+          {isDemo && <span className="demo-badge">Demo Data</span>}
         </div>
         <p className="mt-1 text-14 text-black-300">
           Manage platform roles, tenant ownership, and security suspensions.
         </p>
+        {isDemo ? (
+          <p className="mt-1 text-12 text-orange-300/90">
+            Demo mode: this user list is sample data stored in your browser;
+            suspend/activate changes nothing on any server.
+          </p>
+        ) : (
+          <p className="mt-1 text-12 text-black-400">
+            Suspend/activate is enforced server-side. Role changes and user
+            deletion are not yet wired to the server (see project report).
+          </p>
+        )}
       </div>
+
+      {(loadError || actionError) && (
+        <div className="rounded-2xl border border-rose-500/40 bg-rose-950/20 px-5 py-3 text-13 text-rose-200 flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>{loadError ?? actionError}</span>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="glass-card p-4 flex flex-col sm:flex-row gap-3 items-center justify-between">
@@ -121,6 +181,13 @@ export default function AdminUsersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-black-700/50">
+              {isLoading && (
+                <tr>
+                  <td colSpan={6} className="py-10 px-4 text-center text-black-400">
+                    Loading users…
+                  </td>
+                </tr>
+              )}
               {filteredUsers.map((u) => {
                 const initials = u.name
                   .split(" ")
@@ -197,7 +264,7 @@ export default function AdminUsersPage() {
 
                         <button
                           type="button"
-                          onClick={() => handleToggleSuspend(u.id)}
+                          onClick={() => void handleToggleSuspend(u)}
                           className={`rounded-lg px-2.5 py-1 text-11 font-medium transition-colors ${
                             u.status === "suspended"
                               ? "bg-emerald-950/40 text-emerald-400 hover:bg-emerald-900/50"

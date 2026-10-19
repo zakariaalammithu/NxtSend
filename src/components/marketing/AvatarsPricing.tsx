@@ -1,145 +1,142 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { Check } from "lucide-react";
+import { Check, Gem } from "lucide-react";
 
 /**
- * Avatars pricing block (mirror: aimfox.com/avatars).
+ * Avatars pricing card (mirror: aimfox.com/avatars, card id "rental-card").
  *
- * Unlike /pricing, the avatars page shows a single wide "Outreach
- * avatar" card (card-bg-2 artwork) with the billing toggle repeated
- * inside the card's feature column. All copy and figures are verbatim
- * from the mirror: $387/month, "3 profiles included", "Made to scale"
- * features. The mirror's serialized state also carries a yearly price
- * (3870) that its static HTML never renders, so — exactly as on the
- * homepage and /pricing — the toggle switches selection state only and
- * no yearly figure is displayed. The mirror's "Grab your avatars"
- * button points at an Aimfox Calendly link; it maps to /demo, as the
- * "Schedule a call" button does on /pricing.
+ * Batch-2 restyle: the card follows the mirror's own construction — a
+ * WIDE aurora artwork card (card-bg-2 on small screens, the dark
+ * card-bg-3 aurora from md up, the same artwork family as the homepage
+ * pricing cards), price block on the left, "Made to scale" features and
+ * the small Monthly/Yearly toggle on the right. Content is verbatim
+ * from the mirror.
+ *
+ * The Monthly/Yearly toggle is state-only: the mirror download carries
+ * no rendered yearly price for this card, so nothing is invented.
  */
+
+const FEATURES = [
+  "Customization of profiles",
+  "Fast delivery to workspace",
+  "Replacement guarantee",
+] as const;
+
 export function AvatarsPricing() {
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
 
-  const toggle = (small: boolean) => (
-    <div
-      className={`inline-flex items-center gap-1 rounded-full border border-black-600 bg-black-800 ${
-        small ? "p-0.5" : "p-1"
-      }`}
-    >
-      <button
-        type="button"
-        onClick={() => setBilling("monthly")}
-        className={`rounded-full font-semibold transition-colors ${
-          small ? "px-4 py-1 text-14" : "px-5 py-1.5 text-16"
-        } ${
-          billing === "monthly"
-            ? "bg-gradient-brand text-white"
-            : "font-medium text-black-300"
-        }`}
-      >
-        Monthly
-      </button>
-      <button
-        type="button"
-        onClick={() => setBilling("yearly")}
-        className={`rounded-full font-semibold transition-colors ${
-          small ? "px-4 py-1 text-14" : "px-5 py-1.5 text-16"
-        } ${
-          billing === "yearly"
-            ? "bg-gradient-brand text-white"
-            : "font-medium text-black-300"
-        }`}
-      >
-        Yearly{" "}
-        <span className="ml-1 rounded-full bg-purple-500 px-1.5 py-0.5 text-12 font-medium text-white">
-          up to -25%
-        </span>
-      </button>
-    </div>
-  );
-
   return (
-    <div className="flex w-full max-w-5xl flex-col items-center gap-y-8">
-      {toggle(false)}
+    <div className="mx-auto flex w-full max-w-[61.25rem] flex-col gap-y-8">
+      <div className="relative overflow-hidden rounded-6xl border border-white/10 shadow-[0_1px_10px_0_rgba(255,255,255,0.50)_inset]">
+        {/* Mirror artwork: card-bg-2 (mobile) / card-bg-3 dark aurora (md+) */}
+        <Image
+          src="/images/pricing/card-bg-2.webp"
+          alt=""
+          fill
+          sizes="(max-width: 768px) 100vw, 980px"
+          className="object-cover md:hidden"
+        />
+        <Image
+          src="/images/pricing/card-bg-3.webp"
+          alt=""
+          fill
+          sizes="(max-width: 768px) 100vw, 980px"
+          className="hidden object-cover md:block"
+        />
 
-      {/* Outreach avatar card (mirror: single rental plan card) */}
-      <div
-        className="w-full rounded-[2.5rem] border border-white/10 bg-cover bg-no-repeat p-1.5 pb-10"
-        style={{
-          backgroundImage: "url(/images/pricing/card-bg-2.webp)",
-        }}
-      >
-        <div className="flex flex-col md:flex-row">
-          <div className="flex flex-col px-4 py-3 md:w-1/2 md:py-4">
-            <div className="mb-6 flex items-center gap-x-2 text-18 font-medium text-white">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 20 20"
-                className="size-5"
-                aria-hidden="true"
-              >
-                <path
-                  fill="currentColor"
-                  d="M13.743 3c.266 0 .53.064.77.188s.453.304.62.527l2.529 3.405c.233.32.353.718.337 1.124a1.77 1.77 0 0 1-.424 1.09l-6.51 7.405a.8.8 0 0 1-.26.193.74.74 0 0 1-.878-.193L3.425 9.333A1.77 1.77 0 0 1 3 8.244a1.8 1.8 0 0 1 .337-1.124l2.528-3.405c.168-.223.38-.403.62-.527.241-.123.504-.188.77-.188zm.51 5.454a.563.563 0 0 0-.839 0l-1.667 1.796a.674.674 0 0 0 0 .903c.231.25.607.25.838 0l1.667-1.796a.675.675 0 0 0 0-.903"
-                />
-              </svg>
-              <span>Outreach avatar</span>
+        <div className="relative flex flex-col p-6 pb-10 md:flex-row md:gap-x-4 md:p-8 md:py-9 xl:gap-x-7">
+          {/* Left: plan, price, CTA */}
+          <div className="flex flex-col md:w-1/2">
+            <div className="flex items-center gap-2 text-white">
+              <Gem className="h-5 w-5" aria-hidden="true" />
+              <span className="text-18 font-medium">Outreach avatar</span>
             </div>
-            <p className="mb-5 w-64 text-white/70">
+            <p className="mt-3 w-64 text-15 leading-relaxed text-white/70">
               Scale beyond your limits by renting and customizing LinkedIn
               profiles
             </p>
-            <div className="flex items-end gap-x-2.5">
-              <span className="text-48 font-medium text-white xl:text-54">
+            <div className="mt-8 flex flex-wrap items-center gap-x-2.5 gap-y-2">
+              <span className="text-48 font-medium leading-none text-white xl:text-54">
                 $387
               </span>
-              <div className="flex flex-col items-start gap-y-1.5 pb-2">
-                <span className="text-20 font-medium text-black-400">
-                  /month
-                </span>
-                <span className="rounded-full bg-black px-2 py-1 text-15 font-medium text-white">
-                  3 profiles included
-                </span>
-              </div>
+              <span className="self-end pb-1 text-15 font-semibold text-white/70">
+                /month
+              </span>
+              <span className="rounded-full bg-black-900 px-3 py-1 text-14 font-semibold text-white">
+                3 profiles included
+              </span>
             </div>
-
             <Link
-              href="/demo"
-              className="mt-8 flex h-12 w-fit items-center justify-center rounded-full bg-black-900 px-6 text-16 font-semibold text-white transition-colors hover:bg-black-600"
+              href="/signup"
+              className="mt-auto flex h-12.5 w-full items-center justify-center rounded-full bg-black-900 text-15 font-semibold text-white transition-colors hover:bg-black-800 md:mt-10"
             >
               Grab your avatars
             </Link>
           </div>
 
-          <div className="flex flex-1 flex-col gap-y-2 px-4 pt-6 md:pt-3">
-            {toggle(true)}
-            <div className="mt-4 flex flex-col text-white">
-              <p className="mb-4 text-18 font-bold md:mb-6">Made to scale</p>
-              <ul>
-                {[
-                  "3x Outreach seat included",
-                  "Customization of profiles",
-                  "Fast delivery to workspace",
-                  "Replacement guarantee",
-                ].map((feat, i) => (
-                  <li
-                    key={feat}
-                    className="mb-3 flex items-center text-15 font-medium last:mb-0"
-                  >
-                    <Check className="mr-3 h-4 w-4 shrink-0 text-white" />
-                    {i === 0 ? (
-                      <span className="rounded-xl bg-white/10 px-1.5 py-1">
-                        {feat}
-                      </span>
-                    ) : (
-                      <span>{feat}</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
+          {/* Right: toggle + features */}
+          <div className="mt-10 flex flex-col md:mt-0 md:flex-1">
+            <div className="flex md:justify-end">
+              <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-black-900/40 p-1 backdrop-blur-md">
+                <button
+                  type="button"
+                  onClick={() => setBilling("monthly")}
+                  aria-pressed={billing === "monthly"}
+                  className={`cursor-pointer rounded-full px-3 py-1 text-11 ${
+                    billing === "monthly"
+                      ? "bg-black-900 font-bold text-white ring-1 ring-white/20"
+                      : "font-semibold text-white/70"
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBilling("yearly")}
+                  aria-pressed={billing === "yearly"}
+                  className={`inline-flex cursor-pointer items-center gap-1 rounded-full px-3 py-1 text-11 ${
+                    billing === "yearly"
+                      ? "bg-black-900 font-bold text-white ring-1 ring-white/20"
+                      : "font-semibold text-white/70"
+                  }`}
+                >
+                  Yearly
+                  <span className="rounded-full bg-purple-600 px-1.5 py-px text-9 font-bold text-white">
+                    up to -25%
+                  </span>
+                </button>
+              </span>
             </div>
+
+            <div className="mt-6 text-15 font-bold text-white">
+              Made to scale
+            </div>
+            <ul className="mt-4 space-y-3">
+              <li className="flex items-center gap-2.5 text-15 text-white/85">
+                <Check
+                  className="h-4 w-4 shrink-0 text-white"
+                  aria-hidden="true"
+                />
+                <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-14 font-medium text-white">
+                  3x Outreach seat included
+                </span>
+              </li>
+              {FEATURES.map((feature) => (
+                <li
+                  key={feature}
+                  className="flex items-center gap-2.5 text-15 font-medium text-white/85"
+                >
+                  <Check
+                    className="h-4 w-4 shrink-0 text-white"
+                    aria-hidden="true"
+                  />
+                  {feature}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </div>

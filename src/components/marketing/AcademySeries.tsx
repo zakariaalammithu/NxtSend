@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { X } from "lucide-react";
+import { ArrowUpRight, X } from "lucide-react";
 
 /**
  * Academy hero + course series (mirror: aimfox.com/academy).
@@ -161,6 +161,36 @@ interface ActiveVideo {
   videoId: string;
 }
 
+/**
+ * "Latest videos" — a section live aimfox.com/academy added after the
+ * mirror download. Titles, YouTube IDs, order and card anatomy were
+ * extracted from the live page HTML on 2026-10-18 (the section sits
+ * between the module cards and "More resources"). On the live page the
+ * cards link out to youtube.com watch pages; here they open the same
+ * videos in this page's existing youtube-nocookie modal, per the
+ * no-outbound-links convention of this rebuild.
+ */
+const LATEST_VIDEOS: { youtubeId: string; title: string }[] = [
+  {
+    youtubeId: "4m2T7UUUTCU",
+    title: "I Built an AI Lead Qualifier for LinkedIn with Claude (Full Tutorial)",
+  },
+  {
+    youtubeId: "e6dDAWckGyI",
+    title:
+      "LinkedIn Reply Alerts in Slack + Claude Lead Scoring: Full Aimfox Tutorial (2026)",
+  },
+  {
+    youtubeId: "Ywodrj8SjnY",
+    title: "My LinkedIn Outbound Strategy for 2026 (Claude AI + Full Tutorial)",
+  },
+  {
+    youtubeId: "BvRSq7JrLVA",
+    title:
+      "The LinkedIn Outreach Strategy Getting 70% Acceptance Rate in 2026 (Aimfox Tutorial)",
+  },
+];
+
 export function AcademySeries() {
   const [active, setActive] = useState<ActiveVideo | null>(null);
 
@@ -293,6 +323,50 @@ export function AcademySeries() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ──────────────────────────────────────────────────────────────── */}
+      {/* LATEST VIDEOS (live-only section, added by Aimfox after the     */}
+      {/* mirror download — data extracted from the live page)           */}
+      {/* ──────────────────────────────────────────────────────────────── */}
+      <section className="mx-auto flex w-full max-w-[1492px] flex-col px-4 py-8 md:px-6 md:py-10 xl:px-24">
+        <div className="mx-auto mt-16 mb-12 flex w-full max-w-[40.5rem] flex-col items-center md:mt-20 xl:mt-28 xl:mb-20">
+          <h2 className="mb-6 text-center text-30 font-semibold text-white last:mb-0 md:text-36 xl:text-54">
+            Latest videos
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-4">
+          {LATEST_VIDEOS.map((video) => (
+            <button
+              key={video.youtubeId}
+              type="button"
+              onClick={() =>
+                setActive({ videoId: video.youtubeId, title: video.title })
+              }
+              aria-label={`Play video: ${video.title}`}
+              className="group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-3xl border border-white/10 text-left text-white transition-colors hover:bg-white/5"
+            >
+              {/* The live page hotlinks YouTube's thumbnail CDN; the same
+                  hqdefault thumbnails are self-hosted here, matching this
+                  rebuild's all-local imagery (public/images/academy/). */}
+              <Image
+                src={`/images/academy/latest-${video.youtubeId}.jpg`}
+                alt=""
+                width={480}
+                height={360}
+                className="aspect-video w-full object-cover"
+              />
+              <span className="relative flex flex-1 flex-col p-4">
+                <span className="mb-6 line-clamp-2 flex-1 text-16 font-bold">
+                  {video.title}
+                </span>
+                <span className="relative flex size-9 rounded-xl border border-black-700">
+                  <ArrowUpRight className="m-auto size-4 text-white/20 transition-colors group-hover:text-white" />
+                </span>
+              </span>
+            </button>
+          ))}
         </div>
       </section>
 

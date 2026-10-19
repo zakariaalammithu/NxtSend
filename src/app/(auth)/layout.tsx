@@ -1,6 +1,6 @@
 import * as React from "react";
 import Link from "next/link";
-import { Zap, CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
+import { CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
 
 export default function AuthLayout({
   children,
@@ -19,9 +19,12 @@ export default function AuthLayout({
         {/* Brand Logo at top */}
         <div className="relative z-10">
           <Link href="/" className="inline-flex items-center gap-2.5 group">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-purple-600 to-orange-500 shadow-glow-purple group-hover:scale-105 transition-transform">
-              <Zap className="h-5 w-5 text-white fill-white" />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="NxtSend"
+              className="h-10 w-10 object-contain group-hover:scale-105 transition-transform"
+            />
             <span className="text-22 font-extrabold tracking-tight text-white font-sans">
               Nxt<span className="text-gradient-brand">Send</span>
             </span>
@@ -96,9 +99,12 @@ export default function AuthLayout({
         {/* Mobile Header Logo */}
         <div className="lg:hidden mb-8 text-center">
           <Link href="/" className="inline-flex items-center gap-2 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-purple-600 to-orange-500">
-              <Zap className="h-4.5 w-4.5 text-white fill-white" />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="NxtSend"
+              className="h-9 w-9 object-contain"
+            />
             <span className="text-20 font-bold tracking-tight text-white font-sans">
               Nxt<span className="text-gradient-brand">Send</span>
             </span>

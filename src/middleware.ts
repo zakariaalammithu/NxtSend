@@ -18,14 +18,25 @@ export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // If Supabase is not configured, allow all routes (demo mode)
-  if (!supabaseUrl || supabaseUrl === "https://your-project.supabase.co" || !supabaseKey) {
-    // In demo mode, protect admin routes with a simple check
+  // If Supabase is not configured, the app runs in demo mode (same
+  // placeholder detection as isDemo() in src/lib/auth/helpers.ts).
+  const isDemoMode =
+    !supabaseUrl ||
+    !supabaseKey ||
+    supabaseUrl === "https://your-project.supabase.co" ||
+    supabaseUrl.includes("placeholder") ||
+    supabaseKey === "your-anon-key" ||
+    supabaseKey.includes("placeholder");
+
+  if (isDemoMode) {
+    // Demo mode: /dashboard stays open as the clearly-labelled demo, but the
+    // admin console is NOT public. Admin pages render sample data without a
+    // demo label, so instead of silently serving them we redirect to the
+    // dashboard with a visible notice (notice=admin-demo).
     if (ADMIN_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
-      // Allow in demo mode but add demo header
-      const resp = NextResponse.next();
-      resp.headers.set("x-demo-mode", "true");
-      return resp;
+      const redirectUrl = new URL("/dashboard", request.url);
+      redirectUrl.searchParams.set("notice", "admin-demo");
+      return NextResponse.redirect(redirectUrl);
     }
     return response;
   }

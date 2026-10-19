@@ -2,17 +2,22 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check, Linkedin } from "lucide-react";
+import Image from "next/image";
+import { Check, Linkedin, Zap, Briefcase, Gem } from "lucide-react";
 
 /**
  * Pricing page plan cards (mirror: aimfox.com/pricing).
+ *
+ * Layout and card treatment match the homepage pricing section: two
+ * artwork cards on top (Outreach seat $49, Agency $499) over the
+ * mirror's aurora backgrounds (public/images/pricing/card-bg-1/2.webp)
+ * and one wide artwork card below (Outreach avatar $387, card-bg-3).
  *
  * The mirror shows a Monthly / Yearly ("up to -25%") billing toggle, but
  * its static HTML only contains the monthly price set ($49 / $499 /
  * $387) — yearly figures are computed by JS on the live site and are not
  * present in the download. The toggle therefore switches selection
- * state only; no yearly prices are invented. Same approach as the
- * homepage pricing section (step 2).
+ * state only; no yearly prices are invented.
  */
 export function PricingCards() {
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
@@ -21,14 +26,14 @@ export function PricingCards() {
     <div>
       {/* Billing cycle toggle (mirror) */}
       <div className="flex justify-center">
-        <div className="inline-flex items-center gap-1 rounded-full border border-black-600 bg-black-800 p-1">
+        <div className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-black-800 p-1">
           <button
             type="button"
             onClick={() => setBilling("monthly")}
-            className={`rounded-full px-4 py-1.5 text-13 font-semibold transition-colors ${
+            className={`rounded-full px-4 py-1.5 text-13 transition-colors ${
               billing === "monthly"
-                ? "bg-gradient-brand text-white"
-                : "font-medium text-black-300"
+                ? "bg-black-900 font-bold text-white ring-1 ring-white/20"
+                : "font-semibold text-white/70"
             }`}
           >
             Monthly
@@ -36,68 +41,84 @@ export function PricingCards() {
           <button
             type="button"
             onClick={() => setBilling("yearly")}
-            className={`rounded-full px-4 py-1.5 text-13 font-semibold transition-colors ${
+            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-13 transition-colors ${
               billing === "yearly"
-                ? "bg-gradient-brand text-white"
-                : "font-medium text-black-300"
+                ? "bg-black-900 font-bold text-white ring-1 ring-white/20"
+                : "font-semibold text-white/70"
             }`}
           >
-            Yearly <span className="text-green-400">up to -25%</span>
+            Yearly
+            <span className="rounded-full bg-purple-600 px-2 py-0.5 text-10 font-bold text-white">
+              up to -25%
+            </span>
           </button>
         </div>
       </div>
 
-      <div className="mx-auto mt-14 grid max-w-6xl grid-cols-1 gap-6 sm:gap-8 md:grid-cols-3">
+      <div className="mx-auto mt-14 grid max-w-5xl grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Outreach seat */}
-        <div className="relative flex flex-col justify-between rounded-3xl border-2 border-purple-600 bg-black-800/90 p-8 shadow-glow-purple">
-          <div>
-            <h3 className="text-22 font-bold text-white">Outreach seat</h3>
-            <p className="mt-2 text-13 leading-relaxed text-black-400">
+        <div className="relative overflow-hidden rounded-[2rem] shadow-2xl ring-1 ring-white/10">
+          <Image
+            src="/images/pricing/card-bg-1.webp"
+            alt=""
+            fill
+            sizes="(max-width: 1024px) 100vw, 500px"
+            className="object-cover"
+          />
+          <div className="relative flex h-full flex-col p-8">
+            <div className="flex items-center gap-2 text-white">
+              <Zap className="h-5 w-5 fill-white" />
+              <h3 className="text-17 font-semibold">Outreach seat</h3>
+            </div>
+            <p className="mt-3 max-w-[260px] text-14 leading-relaxed text-white/70">
               Connect your LinkedIn profiles and start your outreach
             </p>
-            <div className="mt-6 flex items-baseline gap-1">
-              <span className="text-20 font-bold text-white">$</span>
-              <span className="text-44 font-extrabold text-white">49</span>
-              <span className="text-14 text-black-400">/ mo</span>
+            <div className="mt-7 flex flex-wrap items-end gap-x-2.5 gap-y-2">
+              <span className="text-54 font-semibold leading-none text-white">
+                $49
+              </span>
+              <span className="pb-1 text-15 text-white/60">/mo</span>
+              <span className="mb-1 rounded-full border border-purple-400/40 bg-purple-600/30 px-2.5 py-0.5 text-11 font-semibold text-purple-100">
+                per seat
+              </span>
             </div>
-            <div className="text-13 text-black-400">per seat</div>
 
             <Link
               href="/signup"
-              className="mt-6 flex h-12 w-full items-center justify-center rounded-xl bg-gradient-brand text-14 font-semibold text-white shadow-glow-purple transition-all duration-200 hover:scale-[1.02]"
+              className="mt-8 flex h-12 w-full items-center justify-center rounded-full border border-white/15 bg-white/10 text-15 font-semibold text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20"
             >
               Start your free trial
             </Link>
 
-            <div className="mt-8 border-t border-black-700/80 pt-6">
-              <div className="text-13 font-semibold text-white">
+            <div className="mt-9">
+              <div className="text-15 font-bold text-white">
                 For individuals and teams
               </div>
               <ul className="mt-4 space-y-3">
-                <li className="flex items-start gap-2.5 text-13 text-black-300">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-purple-400" />
+                <li className="flex items-start gap-2.5 text-14 text-white/85">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
                   <span>
                     Seamlessly connect{" "}
-                    <Linkedin className="inline h-3.5 w-3.5 text-purple-300" />{" "}
+                    <Linkedin className="inline h-3.5 w-3.5 text-white" />{" "}
                     accounts
                   </span>
                 </li>
-                <li className="flex items-start gap-2.5 text-13 text-black-300">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-purple-400" />
+                <li className="flex items-start gap-2.5 text-14 text-white/85">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
                   <span>
                     Launch inbound &amp; outbound campaigns
-                    <span className="mt-1 block text-12 text-black-500">
+                    <span className="mt-1 block text-12 leading-relaxed text-white/50">
                       Inbound campaigns are directed towards existing
                       connections, while outbound campaigns target new leads
                     </span>
                   </span>
                 </li>
-                <li className="flex items-start gap-2.5 text-13 text-black-300">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-purple-400" />
+                <li className="flex items-start gap-2.5 text-14 text-white/85">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
                   <span>Unified inbox access</span>
                 </li>
-                <li className="flex items-start gap-2.5 text-13 text-black-300">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-purple-400" />
+                <li className="flex items-start gap-2.5 text-14 text-white/85">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
                   <span>3rd party integrations</span>
                 </li>
               </ul>
@@ -106,29 +127,44 @@ export function PricingCards() {
         </div>
 
         {/* Agency */}
-        <div className="flex flex-col justify-between rounded-3xl border border-black-700 bg-black-800/50 p-8 transition-all duration-300 hover:border-black-600">
-          <div>
-            <h3 className="text-22 font-bold text-white">Agency</h3>
-            <p className="mt-2 text-13 leading-relaxed text-black-400">
+        <div className="relative overflow-hidden rounded-[2rem] shadow-2xl ring-1 ring-white/10">
+          <Image
+            src="/images/pricing/card-bg-2.webp"
+            alt=""
+            fill
+            sizes="(max-width: 1024px) 100vw, 500px"
+            className="object-cover"
+          />
+          <div className="relative flex h-full flex-col p-8">
+            <div className="flex items-center gap-2 text-white">
+              <Briefcase className="h-5 w-5" />
+              <h3 className="text-17 font-semibold">Agency</h3>
+            </div>
+            <p className="mt-3 max-w-[260px] text-14 leading-relaxed text-white/70">
               Built for agencies working with clients&apos; profiles.
             </p>
-            <div className="mt-6 text-13 text-black-400">From:</div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-20 font-bold text-white">$</span>
-              <span className="text-44 font-extrabold text-white">499</span>
-              <span className="text-14 text-black-400">/ 20 seats</span>
+            <div className="mt-7">
+              <div className="text-13 text-white/60">From:</div>
+              <div className="mt-1 flex flex-wrap items-end gap-x-2.5 gap-y-2">
+                <span className="text-54 font-semibold leading-none text-white">
+                  $499
+                </span>
+                <span className="pb-1 text-15 text-white/60">/20 seats</span>
+                <span className="mb-1 rounded-full border border-purple-400/40 bg-purple-600/30 px-2.5 py-0.5 text-11 font-semibold text-purple-100">
+                  +$20 per new seat
+                </span>
+              </div>
             </div>
-            <div className="text-13 text-black-400">+$20 per new seat</div>
 
             <Link
               href="/demo"
-              className="mt-6 flex h-12 w-full items-center justify-center rounded-xl border border-black-600 bg-black-700 text-14 font-semibold text-white transition-all duration-200 hover:bg-black-600"
+              className="mt-8 flex h-12 w-full items-center justify-center rounded-full border border-white/15 bg-white/10 text-15 font-semibold text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20"
             >
               Schedule a call
             </Link>
 
-            <div className="mt-8 border-t border-black-700/80 pt-6">
-              <div className="text-13 font-semibold text-white">
+            <div className="mt-9">
+              <div className="text-15 font-bold text-white">
                 Everything an agency needs
               </div>
               <ul className="mt-4 space-y-3">
@@ -140,9 +176,9 @@ export function PricingCards() {
                 ].map((feat) => (
                   <li
                     key={feat}
-                    className="flex items-start gap-2.5 text-13 text-black-300"
+                    className="flex items-start gap-2.5 text-14 text-white/85"
                   >
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-purple-400" />
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
                     <span>{feat}</span>
                   </li>
                 ))}
@@ -151,42 +187,88 @@ export function PricingCards() {
           </div>
         </div>
 
-        {/* Outreach avatar */}
-        <div className="flex flex-col justify-between rounded-3xl border border-black-700 bg-black-800/50 p-8 transition-all duration-300 hover:border-black-600">
-          <div>
-            <h3 className="text-22 font-bold text-white">Outreach avatar</h3>
-            <p className="mt-2 text-13 leading-relaxed text-black-400">
-              Scale beyond your limits by renting and customizing LinkedIn
-              profiles
-            </p>
-            <div className="mt-6 flex items-baseline gap-1">
-              <span className="text-20 font-bold text-white">$</span>
-              <span className="text-44 font-extrabold text-white">387</span>
-              <span className="text-14 text-black-400">/ month</span>
+        {/* Outreach avatar — wide card */}
+        <div className="relative overflow-hidden rounded-[2rem] shadow-2xl ring-1 ring-white/10 lg:col-span-2">
+          <Image
+            src="/images/pricing/card-bg-3.webp"
+            alt=""
+            fill
+            sizes="(max-width: 1024px) 100vw, 1024px"
+            className="object-cover"
+          />
+          <div className="relative grid gap-8 p-8 md:grid-cols-2">
+            <div>
+              <div className="flex items-center gap-2 text-white">
+                <Gem className="h-5 w-5" />
+                <h3 className="text-17 font-semibold">Outreach avatar</h3>
+              </div>
+              <p className="mt-3 max-w-[280px] text-14 leading-relaxed text-white/70">
+                Scale beyond your limits by renting and customizing LinkedIn
+                profiles
+              </p>
+              <div className="mt-7 flex flex-wrap items-end gap-x-2.5 gap-y-2">
+                <span className="text-54 font-semibold leading-none text-white">
+                  $387
+                </span>
+                <span className="pb-1 text-15 text-white/60">/month</span>
+                <span className="mb-1 rounded-full border border-purple-400/40 bg-purple-600/30 px-2.5 py-0.5 text-11 font-semibold text-purple-100">
+                  3 profiles included
+                </span>
+              </div>
+              <Link
+                href="/avatars"
+                className="mt-8 flex h-12 w-full items-center justify-center rounded-full border border-white/15 bg-white/10 text-15 font-semibold text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20"
+              >
+                Grab your avatars
+              </Link>
             </div>
-            <div className="text-13 text-black-400">3 profiles included</div>
 
-            <Link
-              href="/avatars"
-              className="mt-6 flex h-12 w-full items-center justify-center rounded-xl border border-black-600 bg-black-700 text-14 font-semibold text-white transition-all duration-200 hover:bg-black-600"
-            >
-              Grab your avatars
-            </Link>
-
-            <div className="mt-8 border-t border-black-700/80 pt-6">
-              <div className="text-13 font-semibold text-white">Made to scale</div>
+            <div className="md:pt-1">
+              <div className="flex md:justify-end">
+                <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-black-900/40 p-1 backdrop-blur-md">
+                  <span
+                    className={`rounded-full px-3 py-1 text-11 ${
+                      billing === "monthly"
+                        ? "bg-black-900 font-bold text-white ring-1 ring-white/20"
+                        : "font-semibold text-white/70"
+                    }`}
+                  >
+                    Monthly
+                  </span>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-11 ${
+                      billing === "yearly"
+                        ? "bg-black-900 font-bold text-white ring-1 ring-white/20"
+                        : "font-semibold text-white/70"
+                    }`}
+                  >
+                    Yearly
+                    <span className="rounded-full bg-purple-600 px-1.5 py-px text-9 font-bold text-white">
+                      up to -25%
+                    </span>
+                  </span>
+                </span>
+              </div>
+              <div className="mt-6 text-15 font-bold text-white">
+                Made to scale
+              </div>
               <ul className="mt-4 space-y-3">
+                <li className="flex items-start gap-2.5 text-14 text-white/85">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
+                  <span className="rounded-full border border-white/25 bg-white/10 px-2.5 py-0.5 text-13 font-medium text-white">
+                    3x Outreach seat included
+                  </span>
+                </li>
                 {[
-                  "3x Outreach seat included",
                   "Customization of profiles",
                   "Fast delivery to workspace",
                   "Replacement guarantee",
                 ].map((feat) => (
                   <li
                     key={feat}
-                    className="flex items-start gap-2.5 text-13 text-black-300"
+                    className="flex items-start gap-2.5 text-14 text-white/85"
                   >
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-purple-400" />
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
                     <span>{feat}</span>
                   </li>
                 ))}

@@ -5,10 +5,12 @@ import {
   ArrowRight,
   Check,
   Star,
-  Play,
   ShieldCheck,
   Headphones,
 } from "lucide-react";
+import { TrustedLogoStrip } from "@/components/marketing/TrustedLogos";
+import { AgencyPricing } from "@/components/marketing/AgencyPricing";
+import { VideoTestimonialCard } from "@/components/marketing/VideoTestimonialCard";
 
 export const metadata: Metadata = {
   title: "NxtSend Agency – Built for agencies. Made to scale.",
@@ -146,12 +148,44 @@ const wallTestimonials = [
   },
 ];
 
+/* Photos, video thumbnails and Vimeo IDs are each person's own assets,
+   shared with the Avatars/Demo wall (see VideoTestimonialCard.tsx). */
 const videoTestimonials = [
-  { name: "Bryan Seton", role: "Partner" },
-  { name: "Jay Feldman", role: "Founder" },
-  { name: "Dave Menjura", role: "CRO" },
-  { name: "Balsa Kosic", role: "COO" },
-  { name: "Roy Ripper", role: "CEO" },
+  {
+    name: "Bryan Seton",
+    role: "Partner",
+    photo: "/images/avatars/reviews/bryan-seton.jpg",
+    thumbnail: "/images/avatars/reviews/bryan-seton-thumb.webp",
+    videoId: "1118790353",
+  },
+  {
+    name: "Jay Feldman",
+    role: "Founder",
+    photo: "/images/avatars/reviews/jay-feldman.jpg",
+    thumbnail: "/images/avatars/reviews/jay-feldman-thumb.webp",
+    videoId: "1118790843",
+  },
+  {
+    name: "Dave Menjura",
+    role: "CRO",
+    photo: "/images/avatars/reviews/dave-menjura.jpg",
+    thumbnail: "/images/avatars/reviews/dave-menjura-thumb.webp",
+    videoId: "1118790539",
+  },
+  {
+    name: "Balsa Kosic",
+    role: "COO",
+    photo: "/images/avatars/reviews/balsa-kosic.jpg",
+    thumbnail: "/images/avatars/reviews/balsa-kosic-thumb.webp",
+    videoId: "1118790221",
+  },
+  {
+    name: "Roy Ripper",
+    role: "CEO",
+    photo: "/images/avatars/reviews/roy-ripper.jpg",
+    thumbnail: "/images/avatars/reviews/roy-ripper-thumb.webp",
+    videoId: "1118790702",
+  },
 ];
 
 export default function AgencyPage() {
@@ -222,6 +256,10 @@ export default function AgencyPage() {
             </div>
           </div>
 
+          {/* Trusted-by logo strip (batch 2 — same position/treatment as
+              the pricing page: under the hero ratings) */}
+          <TrustedLogoStrip />
+
           {/* Hero testimonials */}
           <div className="mt-10 grid w-full grid-cols-1 gap-6 text-left md:grid-cols-3">
             {heroTestimonials.map((t) => (
@@ -271,142 +309,175 @@ export default function AgencyPage() {
             </p>
           </div>
 
-          <div className="mx-auto mt-14 grid max-w-6xl grid-cols-1 gap-6 md:grid-cols-2">
-            {/* Fully whitelabel */}
-            <div className="relative overflow-hidden rounded-3xl border border-black-700 md:col-span-2">
+          {/* Bento grid — batch 2: rebuilt to the mirror's own card
+              compositions (mirror: agency.html "scale" bento). The mirror
+              lays the section on a white panel; the cards' internal
+              compositions (full-bleed artwork, title positions, Safety's
+              3D-visual panel + orange CTA panel) are the mirror's, while
+              the section keeps this site's dark theme. */}
+          <div className="mx-auto mt-14 grid w-full max-w-[73.75rem] gap-6 sm:gap-8">
+            {/* Fully whitelabel — title bottom-right, as in the mirror */}
+            <div className="relative h-[26rem] overflow-hidden rounded-7xl xl:h-[41.5rem]">
               <Image
                 src="/images/agency/whitelabel-bg.webp"
                 alt="Fully whitelabel. Completely yours."
-                width={2384}
-                height={1328}
-                className="h-64 w-full object-cover sm:h-80"
+                fill
+                sizes="(max-width: 1200px) 100vw, 1180px"
+                className="object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black-900/90 via-black-900/20 to-transparent" />
-              <h3 className="absolute bottom-0 left-0 p-8 text-28 sm:text-36 font-bold text-white tracking-tight">
-                Fully whitelabel. Completely yours.
-              </h3>
-            </div>
-
-            {/* Workspaces */}
-            <div className="relative overflow-hidden rounded-3xl border border-black-700">
-              <Image
-                src="/images/agency/workspaces-bg.webp"
-                alt="Workspaces"
-                width={1480}
-                height={1328}
-                className="h-72 w-full object-cover sm:h-96"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black-900/90 via-black-900/20 to-transparent" />
-              <div className="absolute bottom-0 left-0 p-8">
-                <h3 className="text-24 font-bold text-white">Workspaces</h3>
-                <p className="mt-2 max-w-md text-14 leading-relaxed text-black-200">
-                  Keep your clients separate, while keeping the overview &amp;
-                  control over their accounts.
-                </p>
-              </div>
-            </div>
-
-            {/* Account manager */}
-            <div className="relative overflow-hidden rounded-3xl border border-black-700">
-              <Image
-                src="/images/agency/account-manager-bg.webp"
-                alt="Account manager"
-                width={1568}
-                height={1440}
-                className="h-72 w-full object-cover sm:h-96"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black-900/90 via-black-900/20 to-transparent" />
-              <div className="absolute bottom-0 left-0 p-8">
-                <h3 className="text-24 font-bold text-white">Account manager</h3>
-                <p className="mt-2 max-w-md text-14 leading-relaxed text-black-200">
-                  Get a dedicated success manager + access to our Slack channel
-                  + migration help. All in one package.
-                </p>
-              </div>
-            </div>
-
-            {/* Safety */}
-            <div className="relative overflow-hidden rounded-3xl border border-black-700 md:col-span-2">
-              <Image
-                src="/images/agency/safety-bg.webp"
-                alt="Safety"
-                width={1152}
-                height={1560}
-                className="absolute inset-0 h-full w-full object-cover opacity-40"
-              />
-              <div className="relative z-10 flex flex-col items-start p-8 sm:p-12">
-                <Image
-                  src="/images/agency/safety-icon.webp"
-                  alt="Safety"
-                  width={2442}
-                  height={1224}
-                  className="h-14 w-auto"
-                />
-                <h3 className="mt-6 text-28 sm:text-32 font-bold text-white tracking-tight">
-                  Safety
+              <div className="absolute inset-0 flex justify-center p-8 md:p-16 xl:items-end xl:justify-end xl:p-14">
+                <h3 className="text-center text-30 font-bold text-white sm:text-36 xl:text-right xl:text-30">
+                  Fully whitelabel.
+                  <br />
+                  Completely yours.
                 </h3>
-                <p className="mt-3 max-w-xl text-15 leading-relaxed text-black-300">
-                  Multi-layer protection to keep your accounts safe &amp; secure
-                  at all times.
-                </p>
-                <div className="mt-6 flex flex-wrap gap-2">
-                  {[
-                    "Residential IP addresses",
-                    "Automated warmup",
-                    "Auto stick to Interaction limits",
-                    "Cloud-based & untraceable",
-                  ].map((chip) => (
-                    <span
-                      key={chip}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-black-600 bg-black-800/80 px-3.5 py-1.5 text-13 font-medium text-white"
-                    >
-                      <Check className="h-3.5 w-3.5 text-purple-400" />
-                      {chip}
-                    </span>
-                  ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-6 sm:gap-8 xl:flex-row">
+              {/* Workspaces — title at the top, as in the mirror */}
+              <div className="relative h-[26rem] grow overflow-hidden rounded-7xl xl:h-[41.5rem]">
+                <Image
+                  src="/images/agency/workspaces-bg.webp"
+                  alt="Workspaces"
+                  fill
+                  sizes="(max-width: 1280px) 100vw, 720px"
+                  className="object-cover object-center"
+                />
+                <div className="relative z-10 px-4 pt-14 text-center">
+                  <h3 className="text-30 font-bold text-white">Workspaces</h3>
+                  <p className="mx-auto mt-3 max-w-[18.25rem] text-15 text-white">
+                    Keep your clients separate, while keeping the overview
+                    &amp; control over their accounts.
+                  </p>
+                </div>
+              </div>
+
+              {/* Account manager — dark text on the light artwork (mirror) */}
+              <div className="relative h-[26rem] overflow-hidden rounded-7xl xl:h-[41.5rem] xl:w-[26.25rem] xl:shrink-0">
+                <Image
+                  src="/images/agency/account-manager-bg.webp"
+                  alt="Account manager"
+                  fill
+                  sizes="(max-width: 1280px) 100vw, 420px"
+                  className="object-cover object-center"
+                />
+                <div className="relative z-10 px-4 pt-14 text-center text-black-900">
+                  <h3 className="text-30 font-bold">Account manager</h3>
+                  <p className="mx-auto mt-3 max-w-[18.25rem] text-15">
+                    Get a dedicated success manager + access to our Slack
+                    channel + migration help. All in one package.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-6 sm:gap-8 xl:flex-row">
+              {/* Safety — tall card: header, 3D-visual panel with the
+                  feature chips, and the mirror's orange CTA panel */}
+              <div className="relative flex h-[38rem] flex-col overflow-hidden rounded-7xl sm:h-[59.5rem] xl:h-[41.5rem] xl:w-[26.25rem] xl:shrink-0">
+                <Image
+                  src="/images/agency/safety-bg.webp"
+                  alt=""
+                  fill
+                  sizes="(max-width: 1280px) 100vw, 420px"
+                  className="object-cover object-center"
+                />
+                <div className="relative z-10 flex h-full flex-col p-1 pt-14 xl:pt-14">
+                  <div className="px-4 text-center">
+                    <h3 className="text-30 font-bold text-white">Safety</h3>
+                    <p className="mx-auto mt-3 max-w-[18.25rem] text-15 text-white/80">
+                      Multi-layer protection to keep your accounts safe &amp;
+                      secure at all times.
+                    </p>
+                  </div>
+
+                  <div className="relative mt-auto flex items-end justify-center overflow-hidden rounded-7xl bg-[#10171D] p-4">
+                    <Image
+                      src="/images/agency/safety-icon.webp"
+                      alt="Safety"
+                      fill
+                      sizes="(max-width: 1280px) 100vw, 420px"
+                      className="object-cover object-center"
+                    />
+                    <div className="relative flex flex-row flex-wrap items-center justify-center gap-x-1.5 gap-y-2 pt-46">
+                      {[
+                        "Residential IP addresses",
+                        "Automated warmup",
+                        "Auto stick to Interaction limits",
+                        "Cloud-based & untraceable",
+                      ].map((chip) => (
+                        <span
+                          key={chip}
+                          className="rounded-full bg-[#60607D4D] px-2.5 py-1 text-12 font-semibold text-white"
+                        >
+                          {chip}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="relative mt-1 flex items-center justify-center overflow-hidden rounded-full p-4 py-10 shadow-[inset_0_0_20px_8px_rgba(255,255,255,0.58)] md:py-[3.375rem]">
+                    <Image
+                      src="/images/agency/safety-cta-bg.webp"
+                      alt=""
+                      fill
+                      sizes="(max-width: 1280px) 100vw, 420px"
+                      className="object-cover object-center"
+                    />
+                    {/* The mirror's CTA panel centres this exact pill
+                        artwork (extracted verbatim from the mirror HTML) */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/images/agency/safety-cta-pill.svg"
+                      alt="Safety — built into every account"
+                      className="relative h-8 w-auto"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Privacy — filled card (mirror): centred header, the
+                  comparison table artwork filling the card's lower half,
+                  privacy icon overlapping it */}
+              <div className="relative flex h-[38rem] grow flex-col justify-between overflow-hidden rounded-7xl border border-black-700/60 bg-black-900 px-4 pt-14 pb-4 sm:h-[48.5rem] xl:h-[41.5rem]">
+                <div className="px-4 text-center">
+                  <h3 className="text-30 font-bold text-white">Privacy</h3>
+                  <p className="mx-auto mt-3 max-w-[18.25rem] text-15 text-white/70">
+                    Connecting a client account does not grant you access to
+                    their profile, keeping your clients reassured that their
+                    accounts stay private.
+                  </p>
+                </div>
+                <div className="relative">
+                  <Image
+                    src="/images/agency/privacy-icon.webp"
+                    alt="Privacy illustration"
+                    width={1200}
+                    height={1192}
+                    className="absolute -top-24 right-10 z-10 h-[207px] w-[204px] object-cover md:-top-44 md:right-18 md:h-[347px] md:w-[344px]"
+                  />
+                  <div className="relative w-full overflow-hidden rounded-6xl">
+                    <Image
+                      src="/images/agency/privacy-table.webp"
+                      alt="Privacy feature comparison table"
+                      width={1200}
+                      height={611}
+                      className="hidden h-auto w-full md:block"
+                    />
+                    <Image
+                      src="/images/agency/privacy-table-mobile.webp"
+                      alt="Privacy feature comparison table"
+                      width={1092}
+                      height={1131}
+                      className="block h-auto w-full md:hidden"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Privacy */}
-          <div className="mx-auto mt-20 grid max-w-6xl grid-cols-1 items-center gap-10 lg:grid-cols-2">
-            <div>
-              <h3 className="text-28 sm:text-36 font-bold text-white tracking-tight">
-                Privacy
-              </h3>
-              <p className="mt-4 max-w-xl text-16 leading-relaxed text-black-300">
-                Connecting a client account does not grant you access to their
-                profile, keeping your clients reassured that their accounts
-                stay private.
-              </p>
-              <Image
-                src="/images/agency/privacy-icon.webp"
-                alt="Privacy illustration"
-                width={1200}
-                height={1192}
-                className="mt-8 w-full max-w-sm rounded-3xl"
-              />
-            </div>
-            <div className="rounded-2xl border border-black-700/80 bg-black-800/40 p-2 sm:p-3 shadow-2xl">
-              <div className="overflow-hidden rounded-xl border border-black-700/60">
-                <Image
-                  src="/images/agency/privacy-table.webp"
-                  alt="Privacy feature comparison table"
-                  width={1200}
-                  height={611}
-                  className="hidden h-auto w-full sm:block"
-                />
-                <Image
-                  src="/images/agency/privacy-table-mobile.webp"
-                  alt="Privacy feature comparison table"
-                  width={1092}
-                  height={1131}
-                  className="h-auto w-full sm:hidden"
-                />
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -425,22 +496,24 @@ export default function AgencyPage() {
             </p>
           </div>
 
-          <div className="mx-auto mt-14 grid max-w-6xl grid-cols-1 gap-6 md:grid-cols-3">
+          {/* Mirror card anatomy: tall full-bleed artwork (h-100),
+              centred narrow text block underneath */}
+          <div className="mx-auto mt-14 grid w-full max-w-[73.75rem] grid-cols-1 gap-6 sm:gap-8 md:grid-cols-3">
             {supportCards.map((card) => (
               <div
                 key={card.title}
-                className="glass-card-hover overflow-hidden p-0"
+                className="glass-card-hover flex h-full flex-col items-center justify-between overflow-hidden p-0"
               >
                 <Image
                   src={card.image}
                   alt={card.alt}
                   width={1200}
                   height={667}
-                  className="h-48 w-full object-cover"
+                  className="h-100 w-full object-cover"
                 />
-                <div className="p-8">
-                  <h3 className="text-20 font-bold text-white">{card.title}</h3>
-                  <p className="mt-3 text-14 leading-relaxed text-black-400">
+                <div className="mx-auto flex max-w-[15.25rem] flex-col gap-3 pt-4 pb-13 text-center 2xl:max-w-72">
+                  <h3 className="text-24 font-bold text-white">{card.title}</h3>
+                  <p className="text-15 font-medium text-black-300">
                     {card.text}
                   </p>
                 </div>
@@ -535,34 +608,35 @@ export default function AgencyPage() {
             <h2 className="text-36 sm:text-48 font-bold text-white tracking-tight">
               Integrates with your favorite tools
             </h2>
-            <div className="mt-8">
-              <Link
-                href="/integrations"
-                className="group inline-flex items-center gap-2 rounded-full border border-black-600 bg-black-800 px-7 py-3 text-15 font-semibold text-white transition-all hover:border-purple-500/50 hover:text-purple-300"
-              >
-                <span>View Integrations</span>
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </Link>
-            </div>
           </div>
 
-          <div className="mx-auto mt-14 max-w-5xl rounded-2xl border border-black-700/80 bg-black-800/40 p-2 sm:p-3 shadow-2xl">
-            <div className="overflow-hidden rounded-xl border border-black-700/60">
-              <Image
-                src="/images/home-integrations/integrations-desktop.webp"
-                alt="Integrates with your favorite tools"
-                width={2000}
-                height={838}
-                className="hidden h-auto w-full sm:block"
-              />
-              <Image
-                src="/images/home-integrations/integrations.webp"
-                alt="Integrates with your favorite tools"
-                width={1200}
-                height={1089}
-                className="h-auto w-full sm:hidden"
-              />
-            </div>
+          {/* Mirror order (batch 2, same as the homepage fix): borderless
+              artwork first, button below it */}
+          <div className="mx-auto mt-12 max-w-5xl">
+            <Image
+              src="/images/home-integrations/integrations-desktop.webp"
+              alt="Integrates with your favorite tools"
+              width={2000}
+              height={838}
+              className="hidden h-auto w-full sm:block"
+            />
+            <Image
+              src="/images/home-integrations/integrations.webp"
+              alt="Integrates with your favorite tools"
+              width={1200}
+              height={1089}
+              className="h-auto w-full sm:hidden"
+            />
+          </div>
+
+          <div className="mt-10 text-center">
+            <Link
+              href="/integrations"
+              className="group inline-flex items-center gap-2 rounded-full border border-black-600 bg-black-800 px-7 py-3 text-15 font-semibold text-white transition-all hover:border-purple-500/50 hover:text-purple-300"
+            >
+              <span>View Integrations</span>
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Link>
           </div>
         </div>
       </section>
@@ -576,66 +650,12 @@ export default function AgencyPage() {
             <h2 className="text-36 sm:text-48 font-bold text-white tracking-tight">
               Pricing that scales with your growth
             </h2>
-            <div className="mt-8 inline-flex items-center gap-1 rounded-full border border-black-600 bg-black-800 p-1">
-              <span className="rounded-full bg-gradient-brand px-4 py-1.5 text-13 font-semibold text-white">
-                Monthly
-              </span>
-              <span className="rounded-full px-4 py-1.5 text-13 font-medium text-black-300">
-                Yearly <span className="text-green-400">up to -25%</span>
-              </span>
-            </div>
           </div>
 
-          <div className="mx-auto mt-14 grid max-w-5xl grid-cols-1 gap-6 rounded-3xl border border-black-700 bg-black-800/50 p-8 sm:p-12 lg:grid-cols-2">
-            <div>
-              <h3 className="text-22 font-bold text-white">Agency</h3>
-              <p className="mt-2 text-14 leading-relaxed text-black-400">
-                Built for agencies working with clients&apos; profiles.
-              </p>
-              <div className="mt-6 text-13 text-black-400">From:</div>
-              <div className="flex items-baseline gap-1">
-                <span className="text-20 font-bold text-white">$</span>
-                <span className="text-48 font-extrabold text-white">499</span>
-                <span className="text-14 text-black-400">/20 seats</span>
-              </div>
-              <div className="text-13 text-black-400">+$20 per new seat</div>
-
-              <Link
-                href="/demo"
-                className="mt-8 flex h-12 w-full items-center justify-center rounded-xl bg-gradient-brand text-14 font-semibold text-white shadow-glow-purple transition-all duration-200 hover:scale-[1.02] sm:w-auto sm:px-8"
-              >
-                Schedule a call
-              </Link>
-            </div>
-
-            <div className="border-t border-black-700/80 pt-8 lg:border-l lg:border-t-0 lg:pl-12 lg:pt-0">
-              <div className="text-15 font-semibold text-white">
-                Everything an agency needs
-              </div>
-              <ul className="mt-5 space-y-3.5">
-                {[
-                  "Slack onboarding",
-                  "Full whitelabel",
-                  "Team collaboration",
-                  "Profile migration assistance",
-                ].map((feat) => (
-                  <li
-                    key={feat}
-                    className="flex items-start gap-2.5 text-14 text-black-300"
-                  >
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-purple-400" />
-                    <span>{feat}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/pricing"
-                className="mt-8 inline-flex items-center gap-2 text-15 font-semibold text-purple-400 transition-colors hover:text-purple-300"
-              >
-                <span>View all features</span>
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
+          {/* Wide artwork pricing card (batch 2) — the Monthly/Yearly
+              toggle lives inside the card, as in the mirror */}
+          <div className="mt-14">
+            <AgencyPricing />
           </div>
         </div>
       </section>
@@ -676,18 +696,7 @@ export default function AgencyPage() {
             ))}
 
             {videoTestimonials.map((v) => (
-              <div
-                key={v.name}
-                className="glass-card flex flex-col items-start justify-between p-8"
-              >
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-brand text-white shadow-glow-purple">
-                  <Play className="h-5 w-5 fill-white text-white" />
-                </span>
-                <div className="mt-10">
-                  <div className="text-16 font-bold text-white">{v.name}</div>
-                  <div className="text-13 text-black-400">{v.role}</div>
-                </div>
-              </div>
+              <VideoTestimonialCard key={v.name} testimonial={v} />
             ))}
           </div>
         </div>

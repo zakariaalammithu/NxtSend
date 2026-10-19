@@ -2,8 +2,6 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { TwitterXIcon, LinkedInIcon, GitHubIcon } from "./icons";
-
 interface FooterLink {
   label: string;
   href: string;
@@ -47,23 +45,9 @@ const FOOTER_COLUMNS: FooterColumn[] = [
   },
 ];
 
-const SOCIAL_LINKS = [
-  {
-    label: "Twitter / X",
-    href: "https://x.com/nxtsend",
-    icon: TwitterXIcon,
-  },
-  {
-    label: "LinkedIn",
-    href: "https://linkedin.com/company/nxtsend",
-    icon: LinkedInIcon,
-  },
-  {
-    label: "GitHub",
-    href: "https://github.com/nxtsend",
-    icon: GitHubIcon,
-  },
-];
+/* Social icons removed (Fix Batch 3): the X and GitHub profiles linked here
+   (x.com/nxtsend, github.com/nxtsend) return 404 — no verified NxtSend social
+   profiles exist yet. Re-add icons here once real profile URLs exist. */
 
 export function Footer() {
   const [logoError, setLogoError] = useState<boolean>(false);
@@ -91,7 +75,7 @@ export function Footer() {
                 <img
                   src="/logo.png"
                   alt="NxtSend"
-                  className="h-10 w-10 rounded-xl object-cover"
+                  className="h-10 w-10 object-contain"
                   onError={() => setLogoError(true)}
                 />
               ) : (
@@ -107,25 +91,6 @@ export function Footer() {
             <p className="mt-5 max-w-xs text-15 leading-relaxed text-black-400">
               Scale your outreach. Automate your growth.
             </p>
-
-            {/* Social icons */}
-            <div className="mt-7 flex items-center gap-3">
-              {SOCIAL_LINKS.map((social) => {
-                const Icon = social.icon;
-                return (
-                  <a
-                    key={social.label}
-                    href={social.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex h-10 w-10 items-center justify-center rounded-full border border-black-600 bg-black-900/60 text-black-300 transition-all duration-200 hover:border-purple-500/50 hover:text-white hover:shadow-glow-purple focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
-                    aria-label={social.label}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </a>
-                );
-              })}
-            </div>
           </div>
 
           {/* Link columns */}

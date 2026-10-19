@@ -33,25 +33,25 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       {
         label: "LinkedIn Automation",
-        href: "/features/linkedin",
+        href: "/",
         description: "Automated connection requests and message sequences",
         icon: LinkedInIcon,
       },
       {
         label: "Email Outreach",
-        href: "/features/email",
+        href: "/integrations",
         description: "Personalized email campaigns with follow-ups",
         icon: EmailIcon,
       },
       {
         label: "Unified Inbox",
-        href: "/features/inbox",
+        href: "/demo",
         description: "All conversations in one place",
         icon: InboxIcon,
       },
       {
         label: "Analytics",
-        href: "/features/analytics",
+        href: "/",
         description: "Track performance and optimize campaigns",
         icon: AnalyticsIcon,
       },
@@ -158,12 +158,17 @@ export function Header() {
             aria-label="NxtSend Home"
           >
             {!logoError ? (
-              <img
-                src="/logo.png"
-                alt="NxtSend"
-                className="h-7 w-auto object-contain"
-                onError={() => setLogoError(true)}
-              />
+              <span className="flex items-center gap-2.5">
+                <img
+                  src="/logo.png"
+                  alt="NxtSend"
+                  className="h-7 w-auto object-contain"
+                  onError={() => setLogoError(true)}
+                />
+                <span className="font-bold text-20 tracking-tight text-white">
+                  NxtSend
+                </span>
+              </span>
             ) : (
               <span className="flex items-center gap-2">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-brand text-white font-extrabold text-13 shadow-sm">
@@ -373,12 +378,17 @@ export function Header() {
             aria-label="NxtSend Home"
           >
             {!logoError ? (
-              <img
-                src="/logo.png"
-                alt="NxtSend"
-                className="h-7 w-auto object-contain"
-                onError={() => setLogoError(true)}
-              />
+              <span className="flex items-center gap-2.5">
+                <img
+                  src="/logo.png"
+                  alt="NxtSend"
+                  className="h-7 w-auto object-contain"
+                  onError={() => setLogoError(true)}
+                />
+                <span className="font-bold text-20 tracking-tight text-white">
+                  NxtSend
+                </span>
+              </span>
             ) : (
               <span className="flex items-center gap-2">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-brand text-white font-extrabold text-13 shadow-sm">

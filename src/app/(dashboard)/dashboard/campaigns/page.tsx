@@ -4,16 +4,59 @@ import * as React from "react";
 import Link from "next/link";
 import { Target, Plus, Search, MoreVertical, Play, Pause, Copy, Archive, Trash2, Edit, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
 import { DemoBanner, Badge } from "@/components/ui";
-import { MOCK_CAMPAIGNS } from "@/lib/db/mock/data";
 import { formatDate } from "@/lib/utils";
+import { getCampaignsRepository, resolveWorkspaceId } from "@/lib/data";
 import type { Campaign, CampaignStatus, CampaignType } from "@/types";
 
 export default function CampaignsListPage() {
-  const [campaigns, setCampaigns] = React.useState<Campaign[]>(MOCK_CAMPAIGNS);
+  const campaignsRepo = React.useMemo(() => getCampaignsRepository(), []);
+  const isDemo = campaignsRepo.mode === "demo";
+
+  const [workspaceId, setWorkspaceId] = React.useState<string | null>(null);
+  const [campaigns, setCampaigns] = React.useState<Campaign[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [actionError, setActionError] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [typeFilter, setTypeFilter] = React.useState<string>("all");
   const [actionMenuOpenId, setActionMenuOpenId] = React.useState<string | null>(null);
+
+  // Campaigns load through the repository layer (Supabase when configured,
+  // labelled demo store otherwise) and every lifecycle action persists
+  // through the same layer.
+  const refreshCampaigns = React.useCallback(
+    async (ws: string) => {
+      const rows = await campaignsRepo.listCampaigns(ws);
+      setCampaigns(rows);
+    },
+    [campaignsRepo]
+  );
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const ws = await resolveWorkspaceId();
+        if (cancelled) return;
+        setWorkspaceId(ws);
+        if (ws) {
+          const rows = await campaignsRepo.listCampaigns(ws);
+          if (!cancelled) setCampaigns(rows);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setActionError(
+            err instanceof Error ? err.message : "Failed to load campaigns."
+          );
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignsRepo]);
 
   // Filtered campaigns
   const filteredCampaigns = campaigns.filter((c) => {
@@ -23,43 +66,46 @@ export default function CampaignsListPage() {
     return matchesSearch && matchesStatus && matchesType;
   });
 
-  // Action handlers
-  const handleToggleStatus = (id: string) => {
-    setCampaigns((prev) =>
-      prev.map((c) => {
-        if (c.id === id) {
-          const nextStatus: CampaignStatus = c.status === "active" ? "paused" : "active";
-          return { ...c, status: nextStatus, updated_at: new Date().toISOString() };
-        }
-        return c;
-      })
-    );
+  // Action handlers — all persist through the repository; the list is
+  // refreshed from the store afterwards so what you see is what is saved.
+  const runAction = async (fn: () => Promise<void>) => {
+    setActionError(null);
     setActionMenuOpenId(null);
+    try {
+      await fn();
+      if (workspaceId) await refreshCampaigns(workspaceId);
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "That action failed. Please try again."
+      );
+    }
+  };
+
+  const handleToggleStatus = (c: Campaign) => {
+    if (!workspaceId) return;
+    const nextStatus: CampaignStatus = c.status === "active" ? "paused" : "active";
+    void runAction(() =>
+      campaignsRepo.setCampaignStatus(workspaceId, c.id, nextStatus)
+    );
   };
 
   const handleDuplicate = (c: Campaign) => {
-    const newCamp: Campaign = {
-      ...c,
-      id: `cmp_demo_${Date.now()}`,
-      name: `${c.name} (Copy)`,
-      status: "draft",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    setCampaigns((prev) => [newCamp, ...prev]);
-    setActionMenuOpenId(null);
+    if (!workspaceId) return;
+    void runAction(async () => {
+      await campaignsRepo.duplicateCampaign(workspaceId, c.id);
+    });
   };
 
   const handleArchive = (id: string) => {
-    setCampaigns((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, status: "archived" as CampaignStatus } : c))
+    if (!workspaceId) return;
+    void runAction(() =>
+      campaignsRepo.setCampaignStatus(workspaceId, id, "archived")
     );
-    setActionMenuOpenId(null);
   };
 
   const handleDelete = (id: string) => {
-    setCampaigns((prev) => prev.filter((c) => c.id !== id));
-    setActionMenuOpenId(null);
+    if (!workspaceId) return;
+    void runAction(() => campaignsRepo.deleteCampaign(workspaceId, id));
   };
 
   const getTypeBadge = (type: CampaignType) => {
@@ -102,7 +148,7 @@ export default function CampaignsListPage() {
             <h1 className="text-24 sm:text-28 font-bold tracking-tight text-white">
               Campaigns
             </h1>
-            <span className="demo-badge">Demo Data</span>
+            {isDemo && <span className="demo-badge">Demo Data</span>}
           </div>
           <p className="mt-1 text-14 text-black-300">
             Create and monitor automated sequences across LinkedIn & cold emails.
@@ -171,9 +217,19 @@ export default function CampaignsListPage() {
         </div>
       </div>
 
+      {actionError && (
+        <div className="rounded-2xl border border-rose-500/40 bg-rose-950/20 px-5 py-3 text-13 text-rose-200">
+          {actionError}
+        </div>
+      )}
+
       {/* Campaigns Table */}
       <div className="glass-card overflow-hidden">
-        {filteredCampaigns.length === 0 ? (
+        {isLoading ? (
+          <div className="p-12 text-center text-13 text-black-400">
+            Loading campaigns…
+          </div>
+        ) : filteredCampaigns.length === 0 ? (
           <div className="p-12 text-center space-y-3">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-black-800 border border-black-700 text-black-400">
               <Target className="h-6 w-6" />
@@ -276,7 +332,7 @@ export default function CampaignsListPage() {
 
                             <button
                               type="button"
-                              onClick={() => handleToggleStatus(camp.id)}
+                              onClick={() => handleToggleStatus(camp)}
                               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-black-200 hover:text-white hover:bg-black-700/50"
                             >
                               {camp.status === "active" ? (

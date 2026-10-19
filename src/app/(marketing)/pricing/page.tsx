@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { HomeFaq } from "@/components/marketing/HomeFaq";
 import { PricingCards } from "@/components/marketing/PricingCards";
+import { TrustedLogoStrip } from "@/components/marketing/TrustedLogos";
 
 export const metadata: Metadata = {
   title: "NxtSend Pricing – Transparent Plans for LinkedIn Automation",
@@ -325,6 +326,12 @@ export default function PricingPage() {
             </div>
           </div>
 
+          {/* Company logo strip (mirror: directly with the trusted line,
+              same component and position as the homepage) */}
+          <div className="mt-10 w-full">
+            <TrustedLogoStrip />
+          </div>
+
           <div className="mx-auto mt-12 grid w-full max-w-6xl grid-cols-1 gap-6 text-left md:grid-cols-3">
             {testimonials.map((t) => (
               <div
@@ -401,7 +408,7 @@ export default function PricingPage() {
                       $387 per profile / month
                     </p>
                     <Link
-                      href="/avatars"
+                      href="/signup"
                       className="mt-4 inline-flex h-9 items-center justify-center rounded-full border border-black-600 bg-black-700 px-4 text-13 font-semibold text-white transition-colors hover:bg-black-600"
                     >
                       Get an avatar

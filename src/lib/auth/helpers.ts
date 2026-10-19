@@ -25,13 +25,16 @@ export function isDemo(): boolean {
 
 /**
  * Fallback profile used when running in demo mode without Supabase connection.
+ *
+ * SECURITY: the demo profile is a plain "user", never an admin. The admin
+ * console is additionally gated in middleware while in demo mode.
  */
 const DEMO_USER_PROFILE: Profile = {
   id: "demo-user-001",
   email: "alex@nxtsend.com",
   full_name: "Alex Vance",
   avatar_url: null,
-  role: "admin",
+  role: "user",
   created_at: "2024-01-01T00:00:00.000Z",
 };
 
@@ -62,17 +65,23 @@ export async function getCurrentUser(): Promise<Profile | null> {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, email, full_name, avatar_url, role, created_at")
+    .select("id, email, full_name, avatar_url, role, status, created_at")
     .eq("id", user.id)
     .single();
 
   if (profileError || !profile) {
+    // SECURITY: role comes ONLY from the profiles row. Never fall back to
+    // the auth user's metadata — it is writable by the user themselves via
+    // the client SDK, so trusting it here was a privilege-escalation path
+    // (SAAS_AUDIT F3). The profile row is auto-created by the
+    // handle_new_user() trigger, so a missing row is an edge case:
+    // default to least privilege.
     return {
       id: user.id,
       email: user.email ?? "",
-      full_name: (user.user_metadata?.full_name as string) ?? null,
-      avatar_url: (user.user_metadata?.avatar_url as string) ?? null,
-      role: ((user.user_metadata?.role as UserRole) || "user"),
+      full_name: null,
+      avatar_url: null,
+      role: "user",
       created_at: user.created_at,
     };
   }

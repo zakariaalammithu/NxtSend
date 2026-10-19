@@ -334,20 +334,6 @@ export default function MarketingHomePage() {
             </div>
           </div>
 
-          {/* Hero artwork — frameless, integrated into the hero block: the
-              image sits directly under the checkmarks at the full width of
-              the hero container, its edges fading into the section
-              background via a radial mask (no card, border or frame). */}
-          <div className="mt-8 w-full max-w-5xl">
-            <Image
-              src="/images/hero.webp"
-              alt="NxtSend LinkedIn outreach platform"
-              width={2000}
-              height={1031}
-              className="h-auto w-full [mask-image:radial-gradient(ellipse_72%_72%_at_50%_50%,black_58%,transparent_98%)]"
-              priority
-            />
-          </div>
         </div>
       </section>
 

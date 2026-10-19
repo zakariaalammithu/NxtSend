@@ -10,36 +10,35 @@ import {
 import { AcademySeries } from "@/components/marketing/AcademySeries";
 
 export const metadata: Metadata = {
-  title: "NxtSend Academy – Level up your outreach",
+  title: { absolute: "NxtSend Academy – Learn LinkedIn outreach step by step" },
   description:
-    "Scale your LinkedIn outreach with NxtSend — AI-driven personalization, multi-account automation and a unified inbox for sales teams and growth agencies.",
+    "Work through the NxtSend Academy syllabus: account setup, audience targeting, message writing, follow-up sequences, inbox habits and reading your campaign results.",
 };
 
 /* ──────────────────────────────────────────────────────────────────────── */
-/* More-resources cards (verbatim from the mirror: aimfox.com/academy).    */
-/* The mirror links Help Center and API Docs to Aimfox subdomains          */
-/* (help.aimfox.com / docs.aimfox.com); Aimfox URLs are never carried      */
-/* over, and the app has no /help or /docs routes, so both cards map to    */
-/* /contact — the same target the app's Footer uses for Help Center and   */
-/* API Docs. Certified Experts maps to the app's /experts page, which     */
-/* the mirror card also targets.                                          */
+/* More-resources cards. The mirror page pointed two of these cards at   */
+/* its own help and documentation subdomains; those addresses are never */
+/* carried over, and this app has no separate help or docs routes, so   */
+/* both cards lead to /contact — the same target the app's Footer uses. */
+/* The mirror's third card promoted a directory of outside consultants; */
+/* it has been replaced with a direct route to the NxtSend team.        */
 /* ──────────────────────────────────────────────────────────────────────── */
 const resources = [
   {
     title: "Help Center",
     description:
-      "Setup guides, troubleshooting, and answers to common questions.",
+      "Guides for getting set up, answers to everyday questions, and help when something does not behave as expected.",
     href: "/contact",
   },
   {
     title: "API Docs",
-    description: "Build on top of Aimfox with the public API.",
+    description: "Connect your own tools to NxtSend and work with the public API.",
     href: "/contact",
   },
   {
-    title: "Certified Experts",
-    description: "Work with an outbound expert who knows Aimfox inside out.",
-    href: "/experts",
+    title: "Talk to our team",
+    description: "Questions the lessons do not cover? Send us a message and we will point you in the right direction.",
+    href: "/contact",
   },
 ];
 
@@ -61,11 +60,11 @@ function LinkIcon({ className }: { className?: string }) {
 export default function AcademyPage() {
   return (
     <div className="relative overflow-hidden bg-black-900">
-      {/* Hero + course series + video player (client component) */}
+      {/* Hero + course series (client component) */}
       <AcademySeries />
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* MORE RESOURCES (mirror: 3 cards under a centred heading)            */}
+      {/* MORE RESOURCES (3 cards under a centred heading)                    */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section>
         <div className="mx-auto flex w-full max-w-[1492px] flex-col px-4 py-8 md:px-6 md:py-10 xl:px-24">
@@ -102,19 +101,19 @@ export default function AcademyPage() {
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* START SCALING YOUR OUTREACH TODAY (mirror final CTA)                */}
+      {/* FINAL CTA                                                           */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-t border-black-700/80 bg-gradient-hero py-24">
         <div className="pointer-events-none absolute inset-0 bg-radial-glow opacity-30" />
         <div className="section-container relative z-10 text-center">
           <div className="mx-auto max-w-3xl rounded-3xl border border-purple-500/30 bg-black-800/80 p-8 shadow-glow-purple/20 backdrop-blur-2xl sm:p-14">
             <h2 className="text-36 sm:text-48 font-extrabold tracking-tight text-white">
-              Start scaling your outreach today
+              Ready to put the lessons into practice?
             </h2>
             <p className="mt-4 text-17 sm:text-20 text-black-300">
-              Master your LinkedIn outreach. Register now for simple and
-              intuitive campaign management and lead generation that delivers.
-              Your upgrade starts here
+              Open your workspace, connect an account and work through your
+              first campaign at your own pace — the Academy syllabus stays
+              here whenever you need to revisit a step.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link

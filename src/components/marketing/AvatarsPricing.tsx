@@ -6,23 +6,24 @@ import Link from "next/link";
 import { Check, Gem } from "lucide-react";
 
 /**
- * Avatars pricing card (mirror: aimfox.com/avatars, card id "rental-card").
+ * Avatars pricing card (layout provenance: aimfox.com/avatars mirror,
+ * card id "rental-card").
  *
- * Batch-2 restyle: the card follows the mirror's own construction — a
- * WIDE aurora artwork card (card-bg-2 on small screens, the dark
- * card-bg-3 aurora from md up, the same artwork family as the homepage
- * pricing cards), price block on the left, "Made to scale" features and
- * the small Monthly/Yearly toggle on the right. Content is verbatim
- * from the mirror.
+ * The card follows the mirror's construction — a WIDE aurora artwork
+ * card (card-bg-2 on small screens, the dark card-bg-3 aurora from md
+ * up, the same artwork family as the homepage pricing cards), price
+ * block on the left, features and the small Monthly/Yearly toggle on
+ * the right. Phase-2 branding: card copy rewritten originally for
+ * NxtSend; the price is unchanged ($387/mo, 3 profiles included).
  *
- * The Monthly/Yearly toggle is state-only: the mirror download carries
- * no rendered yearly price for this card, so nothing is invented.
+ * The Monthly/Yearly toggle is state-only: no yearly price is shown,
+ * so nothing is invented.
  */
 
 const FEATURES = [
-  "Customization of profiles",
-  "Fast delivery to workspace",
-  "Replacement guarantee",
+  "Profiles personalized to your brief",
+  "Setup and warm-up handled for you",
+  "Support if a profile needs attention",
 ] as const;
 
 export function AvatarsPricing() {
@@ -31,7 +32,7 @@ export function AvatarsPricing() {
   return (
     <div className="mx-auto flex w-full max-w-[61.25rem] flex-col gap-y-8">
       <div className="relative overflow-hidden rounded-6xl border border-white/10 shadow-[0_1px_10px_0_rgba(255,255,255,0.50)_inset]">
-        {/* Mirror artwork: card-bg-2 (mobile) / card-bg-3 dark aurora (md+) */}
+        {/* Artwork: card-bg-2 (mobile) / card-bg-3 dark aurora (md+) */}
         <Image
           src="/images/pricing/card-bg-2.webp"
           alt=""
@@ -52,11 +53,11 @@ export function AvatarsPricing() {
           <div className="flex flex-col md:w-1/2">
             <div className="flex items-center gap-2 text-white">
               <Gem className="h-5 w-5" aria-hidden="true" />
-              <span className="text-18 font-medium">Outreach avatar</span>
+              <span className="text-18 font-medium">Outreach Avatars</span>
             </div>
             <p className="mt-3 w-64 text-15 leading-relaxed text-white/70">
-              Scale beyond your limits by renting and customizing LinkedIn
-              profiles
+              Add prepared LinkedIn profiles you can personalize and run
+              alongside your existing accounts
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-x-2.5 gap-y-2">
               <span className="text-48 font-medium leading-none text-white xl:text-54">
@@ -73,7 +74,7 @@ export function AvatarsPricing() {
               href="/signup"
               className="mt-auto flex h-12.5 w-full items-center justify-center rounded-full bg-black-900 text-15 font-semibold text-white transition-colors hover:bg-black-800 md:mt-10"
             >
-              Grab your avatars
+              Get your avatars
             </Link>
           </div>
 
@@ -112,7 +113,7 @@ export function AvatarsPricing() {
             </div>
 
             <div className="mt-6 text-15 font-bold text-white">
-              Made to scale
+              Built to grow with you
             </div>
             <ul className="mt-4 space-y-3">
               <li className="flex items-center gap-2.5 text-15 text-white/85">
@@ -121,7 +122,7 @@ export function AvatarsPricing() {
                   aria-hidden="true"
                 />
                 <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-14 font-medium text-white">
-                  3x Outreach seat included
+                  3 outreach seats included
                 </span>
               </li>
               {FEATURES.map((feature) => (

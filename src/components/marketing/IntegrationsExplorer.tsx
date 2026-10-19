@@ -6,24 +6,22 @@ import Image from "next/image";
 import { ArrowUpRight, Search } from "lucide-react";
 
 /**
- * Integrations explorer (mirror: aimfox.com/integrations).
+ * Integrations explorer (layout/structure from the mirror:
+ * aimfox.com/integrations, downloaded as ZIP 2).
  *
- * Every category name, integration name, description and badge below is
- * copied verbatim from the downloaded mirror (ZIP 2,
- * "2. aimfox.com.integrations/www.aimfox.com/integrations.html") —
- * including the mirror's own spellings ("Hubspot", "code free
- * automations", "though LinkedIn"). The mirror renders all five
- * category sections; its category selector scrolls to a section and
- * highlights the one in view (scroll-spy), and its search box filters
- * the cards — both behaviours are reproduced here.
+ * Phase-2 branding (2026-10-19): all copy below was rewritten in
+ * NxtSend's own words — integration names, category names and badges
+ * are factual labels and are retained, and each description states
+ * what that tool does alongside NxtSend's campaigns, leads and inbox.
+ * The mirror's own "Aimfox" entry was removed entirely (D8): it
+ * described a session-sync/Chrome-extension product NxtSend does not
+ * have, so the directory now lists 18 integrations. The category
+ * selector scrolls to a section and highlights the one in view
+ * (scroll-spy), and the search box filters the cards.
  *
- * Link mapping (no Aimfox URLs are carried over):
- * - Cards: the mirror links each card to a per-integration detail page
- *   (aimfox.com/integrations/<slug>) that was not part of the download
- *   and does not exist in this app, so cards map to the app route
- *   /signup?integration=<slug>.
- * - "Request integration": the mirror points at Aimfox's external
- *   roadmap board (userback.io); here it maps to the app route /contact.
+ * Link mapping (no external URLs are carried over):
+ * - Cards map to the app route /signup?integration=<slug>.
+ * - "Request integration" maps to the app route /contact.
  */
 
 interface IntegrationItem {
@@ -42,58 +40,53 @@ const INTEGRATIONS: Record<string, IntegrationItem> = {
     slug: "instantly",
     name: "Instantly",
     description:
-      "Connect your Instantly workspace to Aimfox and sync emails with LinkedIn outreach",
+      "Pair Instantly with NxtSend to run email alongside LinkedIn outreach, with activity synced both ways",
     badge: "2-way sync",
     logo: `${LOGOS}/instantly.svg`,
   },
   clay: {
     slug: "clay",
     name: "Clay",
-    description: "Personalize your outbound by leveraging perfect data",
+    description:
+      "Use Clay-enriched prospect data to target and personalize NxtSend campaigns",
     logo: `${LOGOS}/clay.webp`,
   },
   n8n: {
     slug: "n8n",
     name: "n8n",
     description:
-      "Automate your outreach with powerful workflows - connect Aimfox to n8n",
+      "Connect NxtSend to n8n and build workflow automations around your outreach activity",
     badge: "2-way sync",
     logo: `${LOGOS}/n8n.svg`,
   },
   slack: {
     slug: "slack",
     name: "Slack",
-    description: "Get notified to your Slack workspace once a lead engages",
+    description:
+      "Send NxtSend alerts to Slack when a prospect replies or engages",
     logo: `${LOGOS}/slack.svg`,
   },
   smartlead: {
     slug: "smartlead",
     name: "Smartlead",
     description:
-      "Connect Aimfox to your Smartlead workspace and start with multichannel campaigns!",
+      "Link your Smartlead workspace to NxtSend and coordinate email with LinkedIn in multichannel campaigns",
     badge: "2-way sync",
     logo: `${LOGOS}/smartlead.svg`,
-  },
-  aimfox: {
-    slug: "aimfox",
-    name: "Aimfox",
-    description:
-      "Seamlessly sync your LinkedIn sessions with Aimfox without providing a password",
-    badge: "Chrome extensions",
-    logo: `${LOGOS}/aimfox.webp`,
   },
   zapier: {
     slug: "zapier",
     name: "Zapier",
     description:
-      "Automate your outreach by connecting Aimfox to thousands of apps on Zapier",
+      "Use Zapier to connect NxtSend with thousands of other apps and automate routine outreach tasks",
     badge: "2-way sync",
     logo: `${LOGOS}/zapier.svg`,
   },
   make: {
     slug: "make",
     name: "Make",
-    description: "Link Aimfox with Make to build custom, code free automations",
+    description:
+      "Build custom, no-code automations by connecting NxtSend with your tools in Make",
     badge: "2-way sync",
     logo: `${LOGOS}/make.svg`,
   },
@@ -101,20 +94,21 @@ const INTEGRATIONS: Record<string, IntegrationItem> = {
     slug: "pabbly",
     name: "Pabbly",
     description:
-      "Use Pabbly to link Aimfox to your favorite apps and streamline the flow",
+      "Use Pabbly Connect to pass NxtSend data to your other apps and keep workflows moving",
     badge: "2-way sync",
     logo: `${LOGOS}/pabbly.svg`,
   },
   "outbound-sync": {
     slug: "outbound-sync",
     name: "Outbound Sync",
-    description: "Integrate outbound with HubSpot and Salesforce",
+    description: "Keep outbound activity aligned across HubSpot and Salesforce",
     logo: `${LOGOS}/outbound-sync.png`,
   },
   hubspot: {
     slug: "hubspot",
-    name: "Hubspot",
-    description: "Send leads to your Hubspot workspace and never miss a deal",
+    name: "HubSpot",
+    description:
+      "Pass new NxtSend leads straight into HubSpot and keep every opportunity in view",
     badge: "2-way sync",
     logo: `${LOGOS}/hubspot.svg`,
   },
@@ -122,21 +116,23 @@ const INTEGRATIONS: Record<string, IntegrationItem> = {
     slug: "pipedrive",
     name: "Pipedrive",
     description:
-      "Sync your outreach efforts with your CRM and stay on top of opportunities",
+      "Sync NxtSend outreach with Pipedrive so your pipeline reflects the latest prospect activity",
     badge: "2-way sync",
     logo: `${LOGOS}/pipedrive.svg`,
   },
   close: {
     slug: "close",
     name: "Close",
-    description: "Close deals by converting interested deals into contacts",
+    description:
+      "Move engaged NxtSend prospects into Close as contacts ready to work",
     badge: "2-way sync",
     logo: `${LOGOS}/close.svg`,
   },
   salesforce: {
     slug: "salesforce",
     name: "Salesforce",
-    description: "Send qualified leads to Salesforce and keep it streamlined",
+    description:
+      "Send qualified NxtSend leads into Salesforce and keep follow-up organized",
     badge: "2-way sync",
     logo: `${LOGOS}/salesforce.svg`,
   },
@@ -144,45 +140,45 @@ const INTEGRATIONS: Record<string, IntegrationItem> = {
     slug: "masterinbox",
     name: "Masterinbox",
     description:
-      "Connect your mailboxes and LinkedIn inboxes through a single inbox manager",
+      "Bring email and LinkedIn replies together in one inbox view through Masterinbox",
     badge: "2-way sync",
     logo: `${LOGOS}/masterinbox.svg`,
   },
   emailbison: {
     slug: "emailbison",
     name: "EmailBison",
-    description: "The leading email sequencer for top-tier agencies",
+    description: "Pair EmailBison's email sequencing with NxtSend's LinkedIn campaigns",
     badge: "2-way sync",
     logo: `${LOGOS}/emailbison.jpg`,
   },
   weezly: {
     slug: "weezly",
     name: "Weezly",
-    description: "Send personalized videos at scale",
+    description: "Send personalized videos with Weezly",
     badge: "Coming soon",
     logo: `${LOGOS}/weezly.svg`,
   },
   trigify: {
     slug: "trigify",
     name: "Trigify",
-    description: "Connect with your leads at the perfect moment",
+    description: "Use Trigify signals to time outreach when leads are active",
     badge: "Coming soon",
     logo: `${LOGOS}/trigify.svg`,
   },
   rb2b: {
     slug: "rb2b",
     name: "RB2b",
-    description: "Reach out to your website visitors though LinkedIn",
+    description: "Identify website visitors with RB2B and follow up through LinkedIn",
     logo: `${LOGOS}/rb2b.svg`,
   },
 };
 
-/* ── Categories (mirror order; counts match the mirror's selector) ───────── */
+/* ── Categories (mirror order; Automations is one shorter after D8) ────── */
 const CATEGORIES: { title: string; slugs: string[] }[] = [
   { title: "Top Choice", slugs: ["instantly", "clay", "n8n", "slack", "smartlead"] },
   {
     title: "Automations",
-    slugs: ["aimfox", "n8n", "zapier", "make", "pabbly", "slack", "clay", "outbound-sync"],
+    slugs: ["n8n", "zapier", "make", "pabbly", "slack", "clay", "outbound-sync"],
   },
   { title: "CRM", slugs: ["hubspot", "pipedrive", "close", "salesforce"] },
   {
@@ -212,7 +208,7 @@ function RequestIntegrationCard({ className = "" }: { className?: string }) {
       />
       <div className="flex flex-col gap-y-6 px-3 md:px-4 xl:px-2">
         <p className="text-center text-24 font-semibold text-black-900 md:text-left xl:text-20">
-          Have an idea for an Aimfox integration? Share it here
+          Missing a tool you rely on? Tell us which integration to add next
         </p>
         <Link
           href="/contact"
@@ -333,7 +329,7 @@ export function IntegrationsExplorer() {
               <Search className="absolute left-3.5 h-5 w-5" />
               <input
                 type="text"
-                placeholder="Search Integrations"
+                placeholder="Find an integration"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="h-10 w-full rounded-xl bg-white/5 py-2.5 pr-3.5 pl-11 text-14 font-medium text-white transition-[background] placeholder:text-white hover:bg-white/10 focus:bg-black focus:outline-none focus:placeholder:text-white/20"
@@ -402,14 +398,14 @@ export function IntegrationsExplorer() {
         {totalVisible === 0 && (
           <div className="rounded-3xl border border-black-700 bg-black-800/40 px-6 py-12 text-center">
             <p className="text-16 text-black-300">
-              No integrations match &quot;{query}&quot;.
+              Nothing here matches &quot;{query}&quot; yet.
             </p>
             <button
               type="button"
               onClick={() => setQuery("")}
               className="mt-4 text-14 font-semibold text-purple-400 hover:underline"
             >
-              Clear search
+              Reset the search
             </button>
           </div>
         )}

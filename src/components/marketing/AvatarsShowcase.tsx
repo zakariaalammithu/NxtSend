@@ -1,60 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { X } from "lucide-react";
 
 /**
- * Avatars strategy video + "What you get" accordion
- * (mirror: aimfox.com/avatars — ZIP 4, "6. aimfox.com.avatars").
+ * Avatars strategy overview + "What you get" accordion
+ * (layout provenance: aimfox.com/avatars mirror, ZIP 4).
  *
- * On the mirror both blocks sit inside one large white rounded panel:
- * a video card ("LinkedIn strategy in 2026 with Aimfox") whose click
- * opens the Vimeo video stored in the mirror's serialized page state
- * (avatarsVideoId 1118790843 — LeadGen Jay on Aimfox Avatars), followed
- * by the "What you get" accordion whose left image switches with the
- * open item (the mirror's static render has "Based where you are"
- * open). All copy is verbatim from the mirror, including typos.
- * No Aimfox tracking scripts/IDs and no aimfox.com links are carried
- * over; the mirror's "Talk to sales" buttons point at an Aimfox
- * Calendly link and map to the app's /demo page, as on /pricing.
+ * Phase-2 branding: all copy rewritten originally for NxtSend. The
+ * mirror's strategy video card (hosted-video embed with a presenter
+ * photo and quote) is removed per owner-approved default D7 and
+ * replaced by a
+ * static strategy/overview section that reuses the kept abstract
+ * avatars artwork (strategy-bg + floating boxes). No video embed, no
+ * presenter framing and no delivery-time promise remain; the setup
+ * process is described generically (preparation, customization,
+ * warm-up, handover). The "Talk to sales" buttons map to /demo.
  */
-
-const STRATEGY_VIDEO = {
-  title: "LinkedIn strategy in 2026 with Aimfox",
-  videoId: "1118790843",
-};
-
-/** Play glyph, path copied from the mirror's own icon set. */
-function PlayIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="currentColor"
-      viewBox="0 0 256 256"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M240 128a15.74 15.74 0 0 1-7.6 13.51L88.32 229.65a16 16 0 0 1-16.2.3A15.86 15.86 0 0 1 64 216.13V39.87a15.86 15.86 0 0 1 8.12-13.82 16 16 0 0 1 16.2.3l144.08 88.14A15.74 15.74 0 0 1 240 128" />
-    </svg>
-  );
-}
-
-/** Quote glyph, path copied from the mirror's own icon set. */
-function QuoteIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="currentColor"
-      viewBox="0 0 256 256"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M116 72v88a48.05 48.05 0 0 1-48 48 8 8 0 0 1 0-16 32 32 0 0 0 32-32v-8H40a16 16 0 0 1-16-16V72a16 16 0 0 1 16-16h60a16 16 0 0 1 16 16m100-16h-60a16 16 0 0 0-16 16v64a16 16 0 0 0 16 16h60v8a32 32 0 0 1-32 32 8 8 0 0 0 0 16 48.05 48.05 0 0 0 48-48V72a16 16 0 0 0-16-16" />
-    </svg>
-  );
-}
 
 /* Accordion icons, paths copied from the mirror's own icon set. */
 const featureIcons = [
@@ -65,22 +28,22 @@ const featureIcons = [
 
 const features = [
   {
-    title: "Make them your own",
-    text: "Change the profile banner, switch the headline, adjust the company position. Make Avatars your own",
+    title: "Personalize every detail",
+    text: "Set the photo, banner, headline, roles and summary for each profile, so it reflects the persona and offer you want to present",
     image: "/images/avatars/feature-1.webp",
     imageWidth: 1200,
     imageHeight: 904,
   },
   {
-    title: "Based where you are",
-    text: "We offer US & Europe based avatars, other locations available on request",
+    title: "Matched to your market",
+    text: "Choose the region your profiles should appear in, with location and connection settings aligned to the audience you plan to contact",
     image: "/images/avatars/feature-2.webp",
     imageWidth: 1200,
     imageHeight: 1200,
   },
   {
-    title: "Delivery time",
-    text: "We aim to deliver Aimfox Avatars in 1-2 business days after you fill out the customization form",
+    title: "Prepared before handover",
+    text: "Each profile is set up, customized to your brief and warmed through early activity before it appears in your workspace, ready for campaigns",
     image: "/images/avatars/feature-3.webp",
     imageWidth: 1200,
     imageHeight: 1200,
@@ -88,37 +51,18 @@ const features = [
 ];
 
 export function AvatarsShowcase() {
-  const [videoOpen, setVideoOpen] = useState(false);
-  /* The mirror's static render has the second item open. */
+  /* The second item starts open. */
   const [activeFeature, setActiveFeature] = useState(1);
-
-  useEffect(() => {
-    if (!videoOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setVideoOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [videoOpen]);
 
   return (
     <section className="px-2.5">
       <div className="overflow-hidden rounded-5xl bg-white px-4 py-16 text-black-900 md:px-6 md:py-20 xl:rounded-8xl xl:px-10">
         {/* ────────────────────────────────────────────────────────────── */}
-        {/* LINKEDIN STRATEGY IN 2026 WITH AIMFOX (mirror: video card     */}
-        {/* over strategy-bg.webp, floating UI boxes, Jay quote card)     */}
+        {/* STRATEGY OVERVIEW (static section over strategy-bg.webp with  */}
+        {/* the floating UI boxes; replaces the removed video card)      */}
         {/* ────────────────────────────────────────────────────────────── */}
         <div className="relative mx-auto w-full max-w-[1400px]">
-          <button
-            type="button"
-            onClick={() => setVideoOpen(true)}
-            aria-label={`Play video: ${STRATEGY_VIDEO.title}`}
-            className="relative flex min-h-[560px] w-full cursor-pointer flex-col justify-between overflow-hidden rounded-[2.5rem] pt-16 text-left md:pt-24 xl:min-h-[560px]"
-          >
+          <div className="relative flex min-h-[560px] w-full flex-col justify-between overflow-hidden rounded-[2.5rem] pt-16 text-left md:pt-24 xl:min-h-[560px]">
             <Image
               src="/images/avatars/strategy-bg.webp"
               alt=""
@@ -128,21 +72,22 @@ export function AvatarsShowcase() {
             />
             <div className="relative z-10 mx-auto flex max-w-xl flex-col items-center px-6">
               <h3 className="text-center text-36 font-semibold text-white md:text-48">
-                LinkedIn strategy in 2026 with Aimfox
+                More outreach capacity, managed in one place
               </h3>
               <p className="mt-4 text-center text-14 text-white md:text-16">
-                Check out how LeadGen Jay is using Aimfox to scale his
-                LinkedIn outreach using Aimfox&apos;s Avatars
+                Avatars give your team additional profiles for campaigns,
+                market testing and follow-up — all run from the same
+                workspace as your own accounts.
               </p>
               <div className="mt-8 flex items-center gap-x-5">
                 <span className="hidden h-14 w-50 items-center justify-center rounded-full bg-white/15 text-16 font-semibold text-white backdrop-blur-2xl md:flex">
-                  Recent leads
+                  Campaigns
                 </span>
-                <span className="flex size-16 items-center justify-center rounded-full bg-white/15 backdrop-blur-2xl">
-                  <PlayIcon className="size-7 text-white" />
+                <span className="flex h-14 items-center justify-center rounded-full bg-white/15 px-6 text-16 font-semibold text-white backdrop-blur-2xl">
+                  Unified inbox
                 </span>
                 <span className="hidden h-14 w-50 items-center justify-center rounded-full bg-white/15 text-16 font-semibold text-white backdrop-blur-2xl md:flex">
-                  Outreach campaign
+                  Your own seats
                 </span>
               </div>
             </div>
@@ -163,31 +108,24 @@ export function AvatarsShowcase() {
             />
 
             <div className="relative z-10 m-4 flex items-start gap-x-3 self-stretch rounded-3xl bg-black/30 p-4 backdrop-blur-2xl md:absolute md:right-24 md:bottom-6 md:m-0 md:w-80 xl:right-40">
-              <Image
-                src="/images/avatars/strategy-jay.webp"
-                alt="LeadGen Jay"
-                width={1107}
-                height={1125}
-                className="size-14 shrink-0 rounded-2xl object-cover"
-              />
-              <div className="flex flex-col">
-                <p className="text-13 text-white xl:text-15">
-                  Linkedin will never be the same. This single tool has
-                  replaced all lead generation strategies.
-                </p>
-                <QuoteIcon className="mt-1 size-5 text-purple-500" />
-              </div>
+              <p className="text-13 text-white xl:text-15">
+                Use avatars to test a new segment, cover a second region,
+                or keep prospecting going while your own profile focuses on
+                replies.
+              </p>
             </div>
-          </button>
+          </div>
         </div>
 
         {/* ────────────────────────────────────────────────────────────── */}
-        {/* WHAT YOU GET (mirror: accordion with switching image)         */}
+        {/* WHAT YOU GET (accordion with switching image)                  */}
         {/* ────────────────────────────────────────────────────────────── */}
         <div className="mx-auto mt-20 grid w-full max-w-[1400px] gap-y-12 xl:grid-cols-[auto_max-content] xl:gap-x-6">
           <div className="flex flex-col items-center gap-y-6 xl:items-start">
             <div className="flex items-end justify-center gap-x-3">
-              <h2 className="text-36 font-semibold md:text-48">What you get</h2>
+              <h2 className="text-36 font-semibold md:text-48">
+                What comes with each avatar
+              </h2>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="36"
@@ -207,7 +145,7 @@ export function AvatarsShowcase() {
               href="/demo"
               className="flex h-12 items-center justify-center rounded-full bg-purple-600 px-6 text-16 font-semibold text-white transition-colors hover:bg-purple-800"
             >
-              Talk to sales
+              Talk to our team
             </Link>
           </div>
 
@@ -277,48 +215,6 @@ export function AvatarsShowcase() {
           </div>
         </div>
       </div>
-
-      {/* ──────────────────────────────────────────────────────────────── */}
-      {/* VIDEO PLAYER (mirror: clicking the strategy card opens the    */}
-      {/* video in an overlay player)                                   */}
-      {/* ──────────────────────────────────────────────────────────────── */}
-      {videoOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
-          onClick={() => setVideoOpen(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-label={STRATEGY_VIDEO.title}
-        >
-          <div
-            className="w-full max-w-4xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between gap-4">
-              <p className="text-16 font-semibold text-white">
-                {STRATEGY_VIDEO.title}
-              </p>
-              <button
-                type="button"
-                aria-label="Close video"
-                onClick={() => setVideoOpen(false)}
-                className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-white/20 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-            <div className="aspect-video w-full overflow-hidden rounded-2xl bg-black">
-              <iframe
-                src={`https://player.vimeo.com/video/${STRATEGY_VIDEO.videoId}?autoplay=1`}
-                title={STRATEGY_VIDEO.title}
-                className="size-full"
-                allow="autoplay; fullscreen; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
-          </div>
-        </div>
-      ) : null}
     </section>
   );
 }

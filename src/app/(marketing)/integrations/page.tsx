@@ -10,9 +10,9 @@ import {
 import { IntegrationsExplorer } from "@/components/marketing/IntegrationsExplorer";
 
 export const metadata: Metadata = {
-  title: "NxtSend Integrations – Connect Your Tech Stack for LinkedIn Outreach",
+  title: { absolute: "NxtSend Integrations – Connect Your Tech Stack for LinkedIn Outreach" },
   description:
-    "Seamlessly integrate your CRM, Zapier, Slack and other tools with NxtSend to automate LinkedIn campaigns, build leads and unlock your growth stack.",
+    "Connect NxtSend with the CRM, automation and messaging tools you already use — HubSpot, Salesforce, Slack, Zapier, Make and more — and keep lead data moving across your stack.",
 };
 
 export default function IntegrationsPage() {
@@ -40,7 +40,7 @@ export default function IntegrationsPage() {
             className="hidden object-cover min-[1920px]:block"
           />
           <h1 className="relative z-10 mt-auto mb-0 w-full max-w-[50rem] pb-9 text-center text-36 font-semibold text-white md:text-54 lg:mb-6 xl:text-64 xl:pb-10">
-            Browse our expanding collection of integrations
+            Connect NxtSend to the tools you already work with
           </h1>
         </div>
       </section>
@@ -58,12 +58,12 @@ export default function IntegrationsPage() {
         <div className="section-container relative z-10 text-center">
           <div className="mx-auto max-w-3xl rounded-3xl border border-purple-500/30 bg-black-800/80 p-8 shadow-glow-purple/20 backdrop-blur-2xl sm:p-14">
             <h2 className="text-36 sm:text-48 font-extrabold tracking-tight text-white">
-              Start scaling your outreach today
+              Put your whole outreach stack to work
             </h2>
             <p className="mt-4 text-17 sm:text-20 text-black-300">
-              Master your LinkedIn outreach. Register now for simple and
-              intuitive campaign management and lead generation that delivers.
-              Your upgrade starts here
+              Bring your CRM, automation and messaging tools into one flow,
+              so campaigns are easier to run and every lead is easier to
+              follow.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link

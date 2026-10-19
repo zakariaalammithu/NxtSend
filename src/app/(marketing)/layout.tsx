@@ -29,10 +29,10 @@ export const metadata: Metadata = {
       "Reach thousands of leads per day with NxtSend — AI-powered personalization, multi-account automation, and a unified inbox.",
     images: [
       {
-        url: "/images/hero.webp",
+        url: "/images/og-image.png",
         width: 1200,
         height: 630,
-        alt: "NxtSend Outreach Platform",
+        alt: "NxtSend dashboard — unified inbox",
       },
     ],
   },
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     title: "NxtSend — LinkedIn & Multichannel Outreach Platform",
     description:
       "Supercharge your LinkedIn pipeline with AI personalization and multi-account automation.",
-    images: ["/images/hero.webp"],
+    images: ["/images/og-image.png"],
   },
 };
 

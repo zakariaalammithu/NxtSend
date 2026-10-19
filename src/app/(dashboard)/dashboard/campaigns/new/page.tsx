@@ -104,7 +104,7 @@ export default function NewCampaignWizardPage() {
           campaignName: campaignName.trim() || undefined,
           campaignGoal: campaignDescription.trim() || undefined,
           existingContent: step.content,
-          lead: { firstName: "Alex", company: "Acme Inc", jobTitle: "VP of Sales" },
+          lead: { firstName: "Alex", company: "NorthPeak Labs", jobTitle: "VP of Sales" },
         }),
       });
       const data = (await res.json()) as {

@@ -70,7 +70,7 @@ export default function ContactPage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-black-900 pt-12 pb-24">
+    <div className="relative min-h-screen overflow-x-clip bg-black-900 pt-12 pb-24">
       {/* Glow Effects */}
       <div className="pointer-events-none absolute top-0 left-1/2 h-[450px] w-[800px] -translate-x-1/2 rounded-full bg-purple-600/15 blur-[140px]" />
 

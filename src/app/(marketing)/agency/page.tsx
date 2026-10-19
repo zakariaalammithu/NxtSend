@@ -4,187 +4,71 @@ import type { Metadata } from "next";
 import {
   ArrowRight,
   Check,
-  Star,
   ShieldCheck,
   Headphones,
 } from "lucide-react";
-import { TrustedLogoStrip } from "@/components/marketing/TrustedLogos";
 import { AgencyPricing } from "@/components/marketing/AgencyPricing";
-import { VideoTestimonialCard } from "@/components/marketing/VideoTestimonialCard";
 
 export const metadata: Metadata = {
-  title: "NxtSend Agency – Built for agencies. Made to scale.",
+  title: { absolute: "NxtSend Agency – Agency outreach that grows with your clients" },
   description:
-    "Built for agencies working with clients' profiles. Get 20+ premium seats, kept in separate workspaces, managed in a single unibox.",
+    "Run LinkedIn outreach for every client from separate workspaces, present it under your own brand, and handle replies together in one unified inbox.",
 };
 
-/* ── Hero testimonials (mirror: aimfox.com/agency) ───────────────────────── */
-const heroTestimonials = [
-  {
-    quote:
-      "Aimfox really gave us every single functionality we could think of. It has become an integral part of our GTM stack and an amzing source of new interested leads!",
-    name: "Jessica Looney",
-    title: "Enterprise AE",
-    company: "chargebee",
-    photo: "/images/testimonials/jessica-looney.jpeg",
-  },
-  {
-    quote:
-      "I always thought that LinekdIn outreach dosen't scale - until Aimfox proved me wrong. Such an amazing team behind the product. Super excited for what the future holds!",
-    name: "Marc Gaudett",
-    title: "Head of Partnerships",
-    company: "instantly",
-    photo: "/images/testimonials/marc-gaudett.jpeg",
-  },
-  {
-    quote:
-      "The thing that probably sets Aimfox apart the most from other LinkedIn outreach tools is the the option to rent LinkedIn profiles natively. For us this means that we can scale LinekdIn outbound at the same pace we scale email outbound.",
-    name: "Xavier C.",
-    title: "Founder",
-    company: "oneaway",
-    photo: "/images/testimonials/xavier-c..jpeg",
-  },
-];
-
-/* ── Support cards (mirror: "We've got your back") ───────────────────────── */
+/* ── Support cards (mirror: aimfox.com/agency) ───────────────────────────── */
 const supportCards = [
   {
     title: "Onboarding",
-    text: "We’ll work with you to get your accounts set up and ensure your success.",
+    text: "A specialist walks your team through account setup, workspace configuration and your first client campaign launch.",
     image: "/images/agency/support-onboarding.webp",
     alt: "Onboarding",
   },
   {
     title: "Advanced workflows",
-    text: "Access our library of advanced workflows to maximize results.",
+    text: "Apply ready-made sequence patterns designed for multi-client outreach work.",
     image: "/images/agency/support-workflows.webp",
     alt: "Advanced workflows",
   },
   {
-    title: "Support at every step",
-    text: "Your account manager helps resolve issues in real time.",
+    title: "Help when you need it",
+    text: "Your account manager answers questions and troubleshoots issues as they arise.",
     image: "/images/agency/support-help.webp",
-    alt: "Support at every step",
+    alt: "Help when you need it",
   },
 ];
 
-/* ── Testimonial wall (mirror: "Loved by agencies, sales teams & GTM experts") */
-const wallTestimonials = [
+/* ── How agencies run client campaigns (original process section,
+      replacing the removed review wall) ──────────────────────────────────── */
+const processSteps = [
   {
-    title: "Watch out Expandi! You have competition",
-    quote:
-      "I tried both Expandi and Aimfox—Expandi was unresponsive, while Aimfox impressed me with fast, helpful support.",
-    name: "Adrian D.",
-    role: "Head of Growth",
+    step: "Step 1",
+    title: "Create a workspace per client",
+    text: "Each client gets a dedicated space for their profiles, campaigns and conversations, so accounts, data and reporting never mix across your roster.",
   },
   {
-    title: "Event campaigns are a game changer!",
-    quote:
-      "Can't express how annoying it is to do Linkedin outreach manually. I'd give it up if not for Aimfox. I find Linkedin event campaigns most useful. Just paste the event link and get the leads on autopilot!",
-    name: "Oleg D.",
-    role: "CMO at Maildoso",
+    step: "Step 2",
+    title: "Connect or rent sender profiles",
+    text: "Attach a client's own LinkedIn profile, or add a rented avatar profile when a campaign needs extra sending capacity.",
   },
   {
-    title: "Awesome toolkit for LinkedIn outreach",
-    quote:
-      "I love how Aimfox combines a great UI with smart features that keep LinkedIn use safe, like geo-based IP and proxy selection.",
-    name: "Luca P.",
-    role: "Founder",
+    step: "Step 3",
+    title: "Build the campaign together",
+    text: "Set the audience, write the connection and follow-up sequence, and agree sending limits with your team before anything goes live.",
   },
   {
-    title: "The LinkedIn tool that makes life easier",
-    quote:
-      "I’ve tried many LinkedIn tools, but Aimfox stands out—it’s easy to set up, has great support, and just works. It’s been a game-changer for my lead generation.",
-    name: "Alex S.",
-    role: "Consulting",
+    step: "Step 4",
+    title: "Launch with safeguards in place",
+    text: "Campaigns run from the cloud with warm-up, activity limits and residential IP routing applied to every connected profile.",
   },
   {
-    title: "Unmatched customer support!",
-    quote: "The BEST cold outreach tool by far!!! Switched from Lemlist...",
-    name: "Tyrone D.",
-    role: "Coach",
+    step: "Step 5",
+    title: "Handle replies in one inbox",
+    text: "Every conversation from every client account lands in a shared unified inbox, where your team can assign, reply and follow up.",
   },
   {
-    title: "Scaling made easy and stellar support",
-    quote:
-      "I love using Aimfox with my SDR team—it helps us scale outreach, stay engaged beyond email, and with Ksenija’s ongoing support and expertise, it’s been an invaluable tool I highly recommend.",
-    name: "Charlotte Jackson",
-    role: "SDR Team Lead",
-  },
-  {
-    title: "The app is built on user feedback",
-    quote:
-      "I was a bit frustrated at first, but the team came through fast with a fix and totally turned things around—I’m genuinely impressed!",
-    name: "Nick Lazarev",
-    role: "Lead-Gen specialist",
-  },
-  {
-    title: "Only tool that let's you natively rent profiles",
-    quote:
-      "As an early adopter of Aimfox, I'm genuinely impressed with the platform's potential. It offers some truly unique features that set it apart from other LinkedIn automation tools I've tried.",
-    name: "Vinod Krisshna",
-    role: "Outbound Agency",
-  },
-  {
-    title: "Best customer support experience I ever had",
-    quote:
-      "It’s rare to find customer service this good—she was friendly, patient, and really knew her stuff. If you’re on the fence about AimFox, their customer service alone makes it worth it!",
-    name: "Jessica Presco",
-    role: "Customer support",
-  },
-  {
-    title: "Effective Tool for Generating Leads",
-    quote:
-      "I have tested other solutions, and Aimfox has been the most effective in helping me schedule more meetings with new leads. Switched from Doux-soup",
-    name: "Leandro G.",
-    role: "Lead Gen",
-  },
-  {
-    title: "Best value-for-money in class!",
-    quote:
-      "Aimfox is a genuine GAME CHANGER! And the price is a steal.. Switched from Dripify...",
-    name: "Roy R.",
-    role: "CEO and Founder",
-  },
-];
-
-/* Photos, video thumbnails and Vimeo IDs are each person's own assets,
-   shared with the Avatars/Demo wall (see VideoTestimonialCard.tsx). */
-const videoTestimonials = [
-  {
-    name: "Bryan Seton",
-    role: "Partner",
-    photo: "/images/avatars/reviews/bryan-seton.jpg",
-    thumbnail: "/images/avatars/reviews/bryan-seton-thumb.webp",
-    videoId: "1118790353",
-  },
-  {
-    name: "Jay Feldman",
-    role: "Founder",
-    photo: "/images/avatars/reviews/jay-feldman.jpg",
-    thumbnail: "/images/avatars/reviews/jay-feldman-thumb.webp",
-    videoId: "1118790843",
-  },
-  {
-    name: "Dave Menjura",
-    role: "CRO",
-    photo: "/images/avatars/reviews/dave-menjura.jpg",
-    thumbnail: "/images/avatars/reviews/dave-menjura-thumb.webp",
-    videoId: "1118790539",
-  },
-  {
-    name: "Balsa Kosic",
-    role: "COO",
-    photo: "/images/avatars/reviews/balsa-kosic.jpg",
-    thumbnail: "/images/avatars/reviews/balsa-kosic-thumb.webp",
-    videoId: "1118790221",
-  },
-  {
-    name: "Roy Ripper",
-    role: "CEO",
-    photo: "/images/avatars/reviews/roy-ripper.jpg",
-    thumbnail: "/images/avatars/reviews/roy-ripper-thumb.webp",
-    videoId: "1118790702",
+    step: "Step 6",
+    title: "Review, report, add seats",
+    text: "Check results workspace by workspace, share progress with clients under your brand, and add seats as new accounts join.",
   },
 ];
 
@@ -202,12 +86,13 @@ export default function AgencyPage() {
           <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
             <div className="text-center lg:text-left">
               <h1 className="text-44 sm:text-54 lg:text-64 font-extrabold tracking-tight text-white leading-[1.08]">
-                Built for agencies.{" "}
-                <span className="text-gradient-brand">Made to scale.</span>
+                Agency outreach that{" "}
+                <span className="text-gradient-brand">grows with your clients</span>
               </h1>
 
               <p className="mx-auto mt-6 max-w-xl text-17 sm:text-20 leading-relaxed text-black-300 lg:mx-0">
-                The perfect whitelabel partner for your LinkedIn outrech.
+                White-label LinkedIn campaign management for teams handling
+                many client accounts.
               </p>
 
               <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 lg:justify-start">
@@ -224,7 +109,7 @@ export default function AgencyPage() {
             <div className="relative overflow-hidden rounded-3xl border border-black-700/80 shadow-2xl">
               <Image
                 src="/images/agency/hero.webp"
-                alt="Agency plan"
+                alt="Agency plan artwork"
                 width={4096}
                 height={1497}
                 className="h-full w-full object-cover"
@@ -232,80 +117,29 @@ export default function AgencyPage() {
               />
               <Image
                 src="/images/agency/agency-plan.webp"
-                alt="Agency plan"
+                alt="Agency plan details"
                 width={1200}
                 height={1128}
                 className="absolute bottom-0 right-0 w-1/2 object-cover"
               />
             </div>
           </div>
-
-          <div className="mt-14 flex flex-col items-center gap-3">
-            <span className="text-14 font-semibold text-black-300">
-              Trusted by more than 10,000 outreach experts
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full border border-black-700 bg-black-800 px-3 py-1 text-12 font-semibold text-yellow-400">
-                <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-                4.8 rating
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full border border-black-700 bg-black-800 px-3 py-1 text-12 font-semibold text-orange-400">
-                <Star className="h-3.5 w-3.5 fill-orange-400 text-orange-400" />
-                4.9 rating
-              </span>
-            </div>
-          </div>
-
-          {/* Trusted-by logo strip (batch 2 — same position/treatment as
-              the pricing page: under the hero ratings) */}
-          <TrustedLogoStrip />
-
-          {/* Hero testimonials */}
-          <div className="mt-10 grid w-full grid-cols-1 gap-6 text-left md:grid-cols-3">
-            {heroTestimonials.map((t) => (
-              <div key={t.name} className="glass-card flex flex-col justify-between p-6">
-                <div>
-                  <span className="text-11 font-bold uppercase tracking-wider text-purple-400">
-                    Testimonial
-                  </span>
-                  <p className="mt-3 text-14 leading-relaxed text-black-200">
-                    {t.quote}
-                  </p>
-                </div>
-                <div className="mt-6 flex items-center gap-3 border-t border-black-700/70 pt-4">
-                  <Image
-                    src={t.photo}
-                    alt={t.name}
-                    width={44}
-                    height={44}
-                    className="h-11 w-11 rounded-full object-cover"
-                  />
-                  <div>
-                    <div className="text-14 font-bold text-white">{t.name}</div>
-                    <div className="text-12 text-black-400">
-                      {t.title} · <span className="text-purple-300">{t.company}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* 1. LINKEDIN OUTREACH THAT'S MEANT TO SCALE */}
+      {/* 1. LINKEDIN CAMPAIGNS BUILT TO GROW WITH YOU */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative border-t border-black-700/80 py-24 lg:py-32">
         <div className="section-container">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-36 sm:text-48 font-bold text-white tracking-tight">
-              LinkedIn outreach that&apos;s meant to scale
+              LinkedIn campaigns built to grow with you
             </h2>
             <p className="mt-5 text-16 sm:text-18 leading-relaxed text-black-300">
-              Maximize your clients&apos; results. Get 20+ premium seats, kept
-              in separate workspaces, managed in a single unibox. All at a fair
-              price.
+              Give every client a separate workspace, bring their profiles
+              together in a unified inbox, and manage the whole roster with
+              20 included seats.
             </p>
           </div>
 
@@ -320,16 +154,16 @@ export default function AgencyPage() {
             <div className="relative h-[26rem] overflow-hidden rounded-7xl xl:h-[41.5rem]">
               <Image
                 src="/images/agency/whitelabel-bg.webp"
-                alt="Fully whitelabel. Completely yours."
+                alt="Fully white-label. Entirely your brand."
                 fill
                 sizes="(max-width: 1200px) 100vw, 1180px"
                 className="object-cover"
               />
               <div className="absolute inset-0 flex justify-center p-8 md:p-16 xl:items-end xl:justify-end xl:p-14">
                 <h3 className="text-center text-30 font-bold text-white sm:text-36 xl:text-right xl:text-30">
-                  Fully whitelabel.
+                  Fully white-label.
                   <br />
-                  Completely yours.
+                  Entirely your brand.
                 </h3>
               </div>
             </div>
@@ -347,8 +181,8 @@ export default function AgencyPage() {
                 <div className="relative z-10 px-4 pt-14 text-center">
                   <h3 className="text-30 font-bold text-white">Workspaces</h3>
                   <p className="mx-auto mt-3 max-w-[18.25rem] text-15 text-white">
-                    Keep your clients separate, while keeping the overview
-                    &amp; control over their accounts.
+                    Each client stays in their own space, while your team
+                    keeps oversight of every account.
                   </p>
                 </div>
               </div>
@@ -365,8 +199,8 @@ export default function AgencyPage() {
                 <div className="relative z-10 px-4 pt-14 text-center text-black-900">
                   <h3 className="text-30 font-bold">Account manager</h3>
                   <p className="mx-auto mt-3 max-w-[18.25rem] text-15">
-                    Get a dedicated success manager + access to our Slack
-                    channel + migration help. All in one package.
+                    Work with a named account manager, reach the team in
+                    Slack, and get help moving profiles over.
                   </p>
                 </div>
               </div>
@@ -387,8 +221,8 @@ export default function AgencyPage() {
                   <div className="px-4 text-center">
                     <h3 className="text-30 font-bold text-white">Safety</h3>
                     <p className="mx-auto mt-3 max-w-[18.25rem] text-15 text-white/80">
-                      Multi-layer protection to keep your accounts safe &amp;
-                      secure at all times.
+                      Layered safeguards work in the background to protect
+                      every profile you manage.
                     </p>
                   </div>
 
@@ -402,10 +236,10 @@ export default function AgencyPage() {
                     />
                     <div className="relative flex flex-row flex-wrap items-center justify-center gap-x-1.5 gap-y-2 pt-46">
                       {[
-                        "Residential IP addresses",
-                        "Automated warmup",
-                        "Auto stick to Interaction limits",
-                        "Cloud-based & untraceable",
+                        "Residential IP routing",
+                        "Gradual account warm-up",
+                        "Automatic activity limits",
+                        "Cloud-hosted profile sessions",
                       ].map((chip) => (
                         <span
                           key={chip}
@@ -425,12 +259,12 @@ export default function AgencyPage() {
                       sizes="(max-width: 1280px) 100vw, 420px"
                       className="object-cover object-center"
                     />
-                    {/* The mirror's CTA panel centres this exact pill
-                        artwork (extracted verbatim from the mirror HTML) */}
+                    {/* The mirror's CTA panel centres this pill
+                        artwork (extracted from the mirror HTML) */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src="/images/agency/safety-cta-pill.svg"
-                      alt="Safety — built into every account"
+                      alt="Protection included with every profile"
                       className="relative h-8 w-auto"
                     />
                   </div>
@@ -444,9 +278,9 @@ export default function AgencyPage() {
                 <div className="px-4 text-center">
                   <h3 className="text-30 font-bold text-white">Privacy</h3>
                   <p className="mx-auto mt-3 max-w-[18.25rem] text-15 text-white/70">
-                    Connecting a client account does not grant you access to
-                    their profile, keeping your clients reassured that their
-                    accounts stay private.
+                    When a client connects an account, that connection alone
+                    never opens up their profile — clients stay in control of
+                    what remains private.
                   </p>
                 </div>
                 <div className="relative">
@@ -482,17 +316,17 @@ export default function AgencyPage() {
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* 2. WE'VE GOT YOUR BACK */}
+      {/* 2. SUPPORT FROM SETUP ONWARDS */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative border-t border-black-700/80 bg-black-800/30 py-24 lg:py-32">
         <div className="section-container">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-36 sm:text-48 font-bold text-white tracking-tight">
-              We&apos;ve got your back
+              Support from setup onwards
             </h2>
             <p className="mt-5 text-16 sm:text-18 leading-relaxed text-black-300">
-              Whether you need help with the setup, the tactics, or advanced
-              workflows, our team is there for you.
+              From first-time setup to campaign strategy and day-to-day
+              questions, real people are on hand to help you.
             </p>
           </div>
 
@@ -524,18 +358,18 @@ export default function AgencyPage() {
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* 3. LOOKING TO GROW? */}
+      {/* 3. GROWING YOUR CLIENT ROSTER? */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative border-t border-black-700/80 py-24 lg:py-32">
         <div className="section-container">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-36 sm:text-48 font-bold text-white tracking-tight">
-              Looking to grow?
+              Growing your client roster?
             </h2>
             <p className="mt-5 text-16 sm:text-18 leading-relaxed text-black-300">
-              Aimfox grows with you. Add seats to your agency plan or activate
-              Avatars - customizable LinkedIn accounts to scale further and
-              faster.
+              NxtSend expands alongside your agency. Add seats when new
+              clients sign, or bring in Avatars — rented LinkedIn profiles
+              that add sending capacity.
             </p>
             <div className="mt-8">
               <Link
@@ -561,7 +395,8 @@ export default function AgencyPage() {
               <div className="p-8">
                 <h3 className="text-22 font-bold text-white">Agency seats</h3>
                 <p className="mt-3 text-14 leading-relaxed text-black-400">
-                  You can add seats to you plan at any time at just $20 per seat
+                  Add seats to your plan whenever a new client comes on
+                  board — each one costs $20.
                 </p>
                 <span className="mt-6 inline-flex items-center rounded-full bg-black-700/80 border border-black-600 px-3.5 py-1.5 text-13 font-semibold text-purple-300">
                   +$20 per new seat
@@ -587,11 +422,11 @@ export default function AgencyPage() {
                   <ArrowRight className="h-5 w-5 text-purple-400 transition-transform group-hover:translate-x-1" />
                 </h3>
                 <p className="mt-3 text-14 leading-relaxed text-black-400">
-                  Pre-warmed LinkedIn profiles you rent to scale beyond
-                  LinkedIn limits
+                  Rented LinkedIn profiles, already warmed up, for campaigns
+                  that need more senders.
                 </p>
                 <span className="mt-6 inline-flex items-center rounded-full bg-black-700/80 border border-black-600 px-3.5 py-1.5 text-13 font-semibold text-purple-300">
-                  Account with a seat
+                  Profile plus a seat
                 </span>
               </div>
             </Link>
@@ -600,13 +435,13 @@ export default function AgencyPage() {
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* 4. INTEGRATES WITH YOUR FAVORITE TOOLS */}
+      {/* 4. WORKS ALONGSIDE YOUR EXISTING STACK */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative border-t border-black-700/80 bg-black-800/30 py-24 lg:py-32">
         <div className="section-container">
           <div className="text-center">
             <h2 className="text-36 sm:text-48 font-bold text-white tracking-tight">
-              Integrates with your favorite tools
+              Works alongside your existing stack
             </h2>
           </div>
 
@@ -615,14 +450,14 @@ export default function AgencyPage() {
           <div className="mx-auto mt-12 max-w-5xl">
             <Image
               src="/images/home-integrations/integrations-desktop.webp"
-              alt="Integrates with your favorite tools"
+              alt="NxtSend Integration Center — the tools connected to your workspace"
               width={2000}
               height={838}
               className="hidden h-auto w-full sm:block"
             />
             <Image
               src="/images/home-integrations/integrations.webp"
-              alt="Integrates with your favorite tools"
+              alt="NxtSend Integration Center — the tools connected to your workspace"
               width={1200}
               height={1089}
               className="h-auto w-full sm:hidden"
@@ -642,13 +477,13 @@ export default function AgencyPage() {
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* 5. PRICING THAT SCALES WITH YOUR GROWTH */}
+      {/* 5. PRICING THAT FITS AN EXPANDING AGENCY */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative border-t border-black-700/80 bg-black-800/40 py-24 lg:py-32">
         <div className="section-container">
           <div className="text-center">
             <h2 className="text-36 sm:text-48 font-bold text-white tracking-tight">
-              Pricing that scales with your growth
+              Pricing that fits an expanding agency
             </h2>
           </div>
 
@@ -661,61 +496,65 @@ export default function AgencyPage() {
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* 6. LOVED BY AGENCIES, SALES TEAMS & GTM EXPERTS */}
+      {/* 6. HOW AGENCIES RUN CLIENT CAMPAIGNS WITH NXTSEND */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative border-t border-black-700/80 bg-black-900 py-24 lg:py-32">
         <div className="pointer-events-none absolute right-10 top-1/2 h-[350px] w-[350px] -translate-y-1/2 rounded-full bg-purple-600/15 blur-[140px]" />
         <div className="section-container relative z-10">
-          <div className="text-center">
+          <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-36 sm:text-48 font-bold text-white tracking-tight">
-              Loved by agencies, sales teams &amp; GTM experts
+              How agencies run client campaigns with NxtSend
             </h2>
+            <p className="mt-5 text-16 sm:text-18 leading-relaxed text-black-300">
+              A repeatable way to take a client from signed agreement to live
+              outreach — the same steps, workspace by workspace, every time
+              a new account joins your roster.
+            </p>
           </div>
 
           <div className="mt-16 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {wallTestimonials.map((t) => (
-              <div key={t.title} className="glass-card-hover flex flex-col justify-between p-8">
-                <div>
-                  <div className="flex items-center gap-1 text-orange-500">
-                    {[...Array(5)].map((_, i) => (
-                      <Star key={i} className="h-4 w-4 fill-orange-500 text-orange-500" />
-                    ))}
-                  </div>
-                  <h3 className="mt-5 text-18 font-bold leading-snug text-white">
-                    {t.title}
-                  </h3>
-                  <p className="mt-3 text-14 leading-relaxed text-black-300">
-                    {t.quote}
-                  </p>
-                </div>
-                <div className="mt-8 border-t border-black-700/80 pt-5">
-                  <div className="text-15 font-bold text-white">{t.name}</div>
-                  <div className="text-12 text-black-400">{t.role}</div>
-                </div>
+            {processSteps.map((s) => (
+              <div key={s.step} className="glass-card-hover flex flex-col p-8">
+                <span className="text-11 font-bold uppercase tracking-wider text-purple-400">
+                  {s.step}
+                </span>
+                <h3 className="mt-5 text-18 font-bold leading-snug text-white">
+                  {s.title}
+                </h3>
+                <p className="mt-3 text-14 leading-relaxed text-black-300">
+                  {s.text}
+                </p>
               </div>
             ))}
+          </div>
 
-            {videoTestimonials.map((v) => (
-              <VideoTestimonialCard key={v.name} testimonial={v} />
-            ))}
+          <div className="glass-card mt-6 p-8 text-center">
+            <h3 className="text-18 font-bold text-white">
+              One place for the whole roster
+            </h3>
+            <p className="mx-auto mt-3 max-w-2xl text-14 leading-relaxed text-black-300">
+              Your team signs in once and moves between client workspaces as
+              work demands, while each client continues to see reporting and
+              communication presented under your agency&apos;s name.
+            </p>
           </div>
         </div>
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* 7. START SCALING YOUR OUTREACH TODAY */}
+      {/* 7. START YOUR NEXT CLIENT CAMPAIGN HERE */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-t border-black-700/80 bg-gradient-hero py-24 lg:py-32">
         <div className="pointer-events-none absolute inset-0 bg-radial-glow opacity-30" />
         <div className="section-container relative z-10 text-center">
           <div className="mx-auto max-w-3xl rounded-3xl border border-purple-500/30 bg-black-800/80 p-8 shadow-glow-purple/20 backdrop-blur-2xl sm:p-14">
             <h2 className="text-36 sm:text-48 font-extrabold text-white tracking-tight">
-              Start scaling your outreach today
+              Start your next client campaign here
             </h2>
             <p className="mt-4 text-17 sm:text-20 text-black-300">
-              Master your LinkedIn outreach. Register now for simple and
-              intuitive campaign management and lead generation that delivers.
-              Your upgrade starts here
+              Bring your clients&apos; LinkedIn outreach into one organized
+              workspace, with campaigns your team can set up, run and report
+              on together.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link
@@ -735,7 +574,8 @@ export default function AgencyPage() {
                 secure
               </span>
               <span className="flex items-center gap-1.5">
-                <Headphones className="h-3.5 w-3.5 text-green-400" /> 24/7 Support
+                <Headphones className="h-3.5 w-3.5 text-green-400" /> Support
+                included
               </span>
             </div>
           </div>

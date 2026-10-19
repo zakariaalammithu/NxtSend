@@ -7,36 +7,35 @@ import {
   ShieldCheck,
   Headphones,
 } from "lucide-react";
-import { AvatarsWall } from "@/components/marketing/AvatarsWall";
 import { DemoHeroVideo } from "@/components/marketing/DemoHeroVideo";
 import { DemoBookingForm } from "@/components/marketing/DemoBookingForm";
 
 export const metadata: Metadata = {
-  title: "Book a Demo – See NxtSend in Action",
+  title: { absolute: "Book a Demo – See NxtSend in Action" },
   description:
-    "Schedule a personalised demo of NxtSend and discover how your team can automate LinkedIn outreach, unify inboxes and boost leads in under 30 minutes.",
+    "Request a guided tour of NxtSend and see how your team can plan LinkedIn campaigns, manage replies in one inbox, and follow up without the manual work.",
 };
 
 /**
  * Demo page (mirror: aimfox.com/demo, ZIP 4 mirror).
  *
- * Sections follow the mirror in order: hero with demo video, the
- * webinar / book-a-call options under "All your conversations in one
- * place", the testimonial wall, and the standard final CTA.
+ * Sections follow the mirror in order: hero with a static product
+ * visual, the webinar / book-a-call options under a shared heading,
+ * the booking-request form, and the standard final CTA. The review
+ * wall that previously sat on this page has been removed — NxtSend
+ * does not reuse another product's reviews.
  *
- * Booking substitution: on the mirror, booking runs through Aimfox's
- * own Calendly (the "Book a call" card and the "Book a personalized
- * demo with Alex & Ksenija" block) and the webinar card links to
- * Aimfox's Zoom registration. None of those external services are
- * embedded or linked here — both cards lead to the app's own
- * booking-request form (DemoBookingForm, #book-a-demo). See
- * DEMO_MAP.md for the full mapping.
+ * Booking substitution: on the mirror, booking runs through an
+ * external calendar service and a webinar registration link. None of
+ * those external services are embedded or linked here — both cards
+ * lead to the app's own booking-request form (DemoBookingForm,
+ * #book-a-demo).
  */
 export default function DemoPage() {
   return (
-    <div className="relative min-h-screen bg-black-900">
+    <div className="relative min-h-screen overflow-x-clip bg-black-900">
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* HERO — "Discover how to automate LinkedIn Outreach" + demo video    */}
+      {/* HERO — headline + static product visual                             */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative bg-black-900 px-2.5 pt-4">
         <div className="relative overflow-hidden rounded-5xl bg-white px-4 pt-12 pb-16 md:px-6 md:py-20 xl:rounded-8xl 2xl:px-40 2xl:py-28">
@@ -49,9 +48,13 @@ export default function DemoPage() {
           />
           <div className="relative z-10 flex flex-col items-center">
             <h1 className="mb-4 max-w-[50rem] text-center text-36 font-semibold text-black-900 md:mb-6 md:text-54 2xl:text-64">
-              Discover how to automate{" "}
-              <span className="text-gradient-brand">LinkedIn Outreach</span>
+              See how NxtSend runs{" "}
+              <span className="text-gradient-brand">LinkedIn outreach</span>
             </h1>
+            <p className="mb-6 max-w-[38rem] text-center text-16 font-medium text-black-600 md:mb-9 2xl:mb-12">
+              Take a closer look at campaigns, inboxes and follow-ups —
+              and how they fit together in one workspace for your team.
+            </p>
             <Link
               href="/signup"
               className="mb-6 inline-flex h-10.5 items-center justify-center rounded-full bg-black-900 px-7 text-15 font-semibold text-white transition-colors hover:bg-black-600 md:mb-9 2xl:mb-12"
@@ -64,32 +67,38 @@ export default function DemoPage() {
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* ALL YOUR CONVERSATIONS IN ONE PLACE — webinar / book-a-call cards  */}
+      {/* EVERY CONVERSATION, ONE INBOX — webinar / book-a-call cards         */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative bg-black-900 py-24 lg:py-28">
         <div className="section-container">
           <div className="mx-auto mb-12 flex max-w-2xl flex-col items-center text-center">
             <h2 className="text-36 font-bold tracking-tight text-white sm:text-48">
-              All your conversations in one place
+              Every conversation, one inbox
             </h2>
+            <p className="mt-4 text-16 font-medium text-black-300">
+              Choose the format that suits where you are — a group session
+              for a first look, or a one-to-one call shaped around your
+              team.
+            </p>
           </div>
 
           <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 xl:grid-cols-2 xl:gap-10">
-            {/* Jump on a webinar */}
+            {/* Join a live webinar */}
             <div className="flex flex-col rounded-3xl bg-white p-6 md:p-8">
               <Image
-                src="/images/demo/webinar.webp"
+                src="/images/demo/hero.webp"
                 alt=""
                 width={404}
                 height={384}
-                className="mb-6 w-20 md:mb-8"
+                className="mb-6 w-20 rounded-2xl object-cover md:mb-8"
               />
               <h3 className="mb-4 text-24 font-bold text-black-900 md:text-30">
-                Jump on a webinar
+                Join a live webinar
               </h3>
               <p className="mb-6 text-16 font-medium text-black-600 md:mb-8">
-                For those that are exploring options and want to see a live
-                demo of Aimfox before launching their first campaign
+                Still comparing your options? Join a live product webinar
+                with our team and watch a campaign being set up, launched
+                and managed, with time for questions at the end.
               </p>
               <Link
                 href="#book-a-demo"
@@ -103,19 +112,19 @@ export default function DemoPage() {
             {/* Book a call */}
             <div className="flex flex-col rounded-3xl bg-white p-6 md:p-8">
               <Image
-                src="/images/demo/sales.webp"
+                src="/images/demo/hero.webp"
                 alt=""
                 width={402}
                 height={389}
-                className="mb-6 w-20 md:mb-8"
+                className="mb-6 w-20 rounded-2xl object-cover md:mb-8"
               />
               <h3 className="mb-4 text-24 font-bold text-black-900 md:text-30">
-                Book a call
+                Book a call with our sales team
               </h3>
               <p className="mb-6 text-16 font-medium text-black-600 md:mb-8">
-                If you and your team are looking to scale your LinkedIn
-                outreach and add multiple LinkedIn accounts to Aimfox, this
-                is for you!
+                Already planning to run outreach across several LinkedIn
+                accounts? Book a call with our sales team and we will talk
+                through your goals, your accounts and the setup that fits.
               </p>
               <Link
                 href="#book-a-demo"
@@ -130,7 +139,7 @@ export default function DemoPage() {
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* BOOKING REQUEST — the app's own form (mirror books via Calendly)   */}
+      {/* BOOKING REQUEST — the app's own form                                */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section
         id="book-a-demo"
@@ -143,21 +152,6 @@ export default function DemoPage() {
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* LOVED BY AGENCIES, SALES TEAMS & GTM EXPERTS (mirror wall)         */}
-      {/* ──────────────────────────────────────────────────────────────────── */}
-      <section className="relative border-t border-black-700/80 bg-black-900 py-24 lg:py-32">
-        <div className="pointer-events-none absolute top-1/2 right-10 h-[350px] w-[350px] -translate-y-1/2 rounded-full bg-purple-600/15 blur-[140px]" />
-        <div className="section-container relative z-10">
-          <div className="text-center">
-            <h2 className="text-36 font-bold tracking-tight text-white sm:text-48">
-              Loved by agencies, sales teams &amp; GTM experts
-            </h2>
-          </div>
-          <AvatarsWall />
-        </div>
-      </section>
-
-      {/* ──────────────────────────────────────────────────────────────────── */}
       {/* START SCALING YOUR OUTREACH TODAY                                  */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-t border-black-700/80 bg-gradient-hero py-24 lg:py-32">
@@ -165,12 +159,13 @@ export default function DemoPage() {
         <div className="section-container relative z-10 text-center">
           <div className="mx-auto max-w-3xl rounded-3xl border border-purple-500/30 bg-black-800/80 p-8 shadow-glow-purple/20 backdrop-blur-2xl sm:p-14">
             <h2 className="text-36 sm:text-48 font-extrabold text-white tracking-tight">
-              Start scaling your outreach today
+              Put your outreach on a steadier footing
             </h2>
             <p className="mt-4 text-17 sm:text-20 text-black-300">
-              Master your LinkedIn outreach. Register now for simple and
-              intuitive campaign management and lead generation that delivers.
-              Your upgrade starts here
+              Create your account, connect your first LinkedIn profile and
+              draft a campaign you can review before anything is sent.
+              Everything stays visible in one place, from first message to
+              final reply.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link

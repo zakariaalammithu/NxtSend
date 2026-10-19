@@ -58,7 +58,6 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
   { label: "Integrations", href: "/integrations" },
-  { label: "Experts", href: "/experts" },
   { label: "Academy", href: "/academy" },
   { label: "Pricing", href: "/pricing" },
   { label: "Agency", href: "/agency" },

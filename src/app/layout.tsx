@@ -42,7 +42,7 @@ export const metadata: Metadata = {
         url: "/images/og-image.png",
         width: 1200,
         height: 630,
-        alt: "NxtSend Platform",
+        alt: "NxtSend dashboard — unified inbox",
       },
     ],
   },

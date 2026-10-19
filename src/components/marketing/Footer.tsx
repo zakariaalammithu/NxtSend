@@ -18,7 +18,6 @@ const FOOTER_COLUMNS: FooterColumn[] = [
     title: "Product",
     links: [
       { label: "Integrations", href: "/integrations" },
-      { label: "Experts", href: "/experts" },
       { label: "Avatars", href: "/avatars" },
       { label: "Agency", href: "/agency" },
       { label: "Pricing", href: "/pricing" },
@@ -28,7 +27,6 @@ const FOOTER_COLUMNS: FooterColumn[] = [
     title: "Resources",
     links: [
       { label: "Academy", href: "/academy" },
-      { label: "Experts", href: "/experts" },
       { label: "Help Center", href: "/contact" },
       { label: "API Docs", href: "/contact" },
       { label: "Roadmap", href: "/contact" },
@@ -37,7 +35,6 @@ const FOOTER_COLUMNS: FooterColumn[] = [
   {
     title: "Company",
     links: [
-      { label: "Reviews", href: "/#testimonials" },
       { label: "Book a Demo", href: "/demo" },
       { label: "Affiliate Program", href: "/contact" },
       { label: "Partnership Guidelines", href: "/contact" },

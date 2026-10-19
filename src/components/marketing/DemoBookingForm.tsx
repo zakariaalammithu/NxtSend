@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,13 +10,11 @@ import { ArrowRight, CheckCircle2 } from "lucide-react";
 /**
  * Demo booking block (mirror: aimfox.com/demo).
  *
- * On the mirror, booking a demo happens through Aimfox's own Calendly
- * ("Book a personalized demo with Alex & Ksenija" / "Book now", and the
- * "Book a call" card's Calendly link). Aimfox's Calendly is NOT embedded
- * or linked here. Instead this is the app's own booking-request form,
- * headed by the mirror's host block — Alex & Ksenija's photos and the
- * "Book a personalized demo with Alex & Ksenija" line, with the mirror's
- * "Book now" label on the submit button.
+ * On the mirror, booking a demo happens through an external calendar
+ * service. That service is NOT embedded or linked here. Instead this
+ * is the app's own booking-request form, headed by a generic team
+ * block — no named hosts and no individual photos — with a plain
+ * request label on the submit button.
  *
  * The form is clearly a request form: submitting it does not book a
  * calendar slot. The request IS stored, though: it posts to
@@ -96,32 +93,16 @@ export function DemoBookingForm() {
 
   return (
     <div className="glass-card mx-auto max-w-3xl p-8 sm:p-10">
-      {/* Host block (mirror: "Book a personalized demo with Alex & Ksenija") */}
-      <div className="mb-8 flex flex-col items-start gap-5 border-b border-black-700/80 pb-8 sm:flex-row sm:items-center">
-        <div className="flex shrink-0 items-center">
-          <Image
-            src="/images/demo/alex.webp"
-            alt="Alex"
-            width={844}
-            height={844}
-            className="size-14 rounded-full border-2 border-black-900 object-cover sm:size-16"
-          />
-          <Image
-            src="/images/demo/ksenija.webp"
-            alt="Ksenija"
-            width={844}
-            height={844}
-            className="-ml-2 size-14 rounded-full border-2 border-black-900 object-cover sm:size-16"
-          />
-        </div>
+      {/* Intro block — generic team heading, no named hosts */}
+      <div className="mb-8 flex flex-col items-start gap-5 border-b border-black-700/80 pb-8">
         <div>
           <h3 className="text-22 font-bold text-white">
-            Book a personalized demo with Alex &amp; Ksenija
+            Request a personal walkthrough with our team
           </h3>
           <p className="mt-1.5 text-13 leading-relaxed text-black-400">
-            Send a booking request with the form below. This doesn&apos;t
-            book a calendar slot — we&apos;ll reply by email to arrange a
-            time for your demo.
+            Use the form below to send us a booking request. Sending it
+            does not reserve a calendar slot — our team will reply by
+            email to agree a time that works for you.
           </p>
         </div>
       </div>
@@ -132,12 +113,12 @@ export function DemoBookingForm() {
             <CheckCircle2 className="h-8 w-8" />
           </div>
           <h4 className="text-24 font-bold text-white">
-            Thanks! Your request has been received.
+            Thank you — your request is with us.
           </h4>
           <p className="mx-auto mt-3 max-w-md text-15 text-black-300">
-            No calendar slot has been booked yet. We&apos;ll get back to
-            you by email to arrange a time for your personalized demo with
-            Alex &amp; Ksenija.
+            Nothing has been added to a calendar yet. A member of our
+            team will email you shortly to arrange a time for your
+            walkthrough.
           </p>
           <button
             type="button"
@@ -188,7 +169,7 @@ export function DemoBookingForm() {
               </label>
               <input
                 type="text"
-                placeholder="Acme Growth"
+                placeholder="Your company name"
                 {...register("company")}
                 className={`input-field ${errors.company ? "border-red-500" : ""}`}
               />
@@ -224,7 +205,7 @@ export function DemoBookingForm() {
             </label>
             <textarea
               rows={4}
-              placeholder="Tell us about your current outreach and what you'd like to see in the demo..."
+              placeholder="Tell us how your team does outreach today and what you would like us to cover..."
               {...register("message")}
               className={`input-field resize-none ${errors.message ? "border-red-500" : ""}`}
             />
@@ -250,7 +231,7 @@ export function DemoBookingForm() {
                 <span>Sending request...</span>
               ) : (
                 <>
-                  <span>Book now</span>
+                  <span>Send booking request</span>
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </>
               )}

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import ForgotPasswordForm from "./ForgotPasswordForm";
 
 export const metadata: Metadata = {
-  title: "Forgot Password | NxtSend",
+  title: "Forgot Password",
   description: "Reset your NxtSend account password",
 };
 

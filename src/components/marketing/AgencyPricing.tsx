@@ -13,7 +13,8 @@ import { ArrowRight, Briefcase, Check } from "lucide-react";
  * aurora from md up (same artwork family as the homepage / avatars
  * pricing cards). Left: plan, "From:" price block and the frosted
  * "Schedule a call" pill; right: the small Monthly/Yearly toggle and
- * the feature list. All copy verbatim from the mirror.
+ * the feature list. Copy rewritten originally for NxtSend in Phase-2
+ * Stage 2; prices and structure are unchanged.
  *
  * The toggle is state-only: the mirror download carries no rendered
  * yearly price for this card, so nothing is invented. The mirror's
@@ -22,10 +23,10 @@ import { ArrowRight, Briefcase, Check } from "lucide-react";
  */
 
 const FEATURES = [
-  "Slack onboarding",
-  "Full whitelabel",
-  "Team collaboration",
-  "Profile migration assistance",
+  "Guided onboarding over Slack",
+  "Complete white-label setup",
+  "Shared access for your team",
+  "Help migrating existing profiles",
 ] as const;
 
 export function AgencyPricing() {
@@ -58,7 +59,7 @@ export function AgencyPricing() {
               <span className="text-18 font-medium">Agency</span>
             </div>
             <p className="mt-3 w-64 text-15 leading-relaxed text-white/70">
-              Built for agencies working with clients&apos; profiles.
+              For agencies managing outreach across client accounts.
             </p>
             <div className="mt-8">
               <span className="text-15 font-medium text-white/70">From:</span>
@@ -116,7 +117,7 @@ export function AgencyPricing() {
             </div>
 
             <div className="mt-6 text-18 font-bold text-white">
-              Everything an agency needs
+              What the plan includes
             </div>
             <ul className="mt-4 space-y-3">
               {FEATURES.map((feature) => (

@@ -71,7 +71,8 @@ export function PricingCards() {
               <h3 className="text-17 font-semibold">Outreach seat</h3>
             </div>
             <p className="mt-3 max-w-[260px] text-14 leading-relaxed text-white/70">
-              Connect your LinkedIn profiles and start your outreach
+              Link your own LinkedIn accounts and run outreach from one
+              workspace
             </p>
             <div className="mt-7 flex flex-wrap items-end gap-x-2.5 gap-y-2">
               <span className="text-54 font-semibold leading-none text-white">
@@ -87,39 +88,40 @@ export function PricingCards() {
               href="/signup"
               className="mt-8 flex h-12 w-full items-center justify-center rounded-full border border-white/15 bg-white/10 text-15 font-semibold text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20"
             >
-              Start your free trial
+              Try NxtSend free
             </Link>
 
             <div className="mt-9">
               <div className="text-15 font-bold text-white">
-                For individuals and teams
+                Made for solo senders and small teams
               </div>
               <ul className="mt-4 space-y-3">
                 <li className="flex items-start gap-2.5 text-14 text-white/85">
                   <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
                   <span>
-                    Seamlessly connect{" "}
+                    Connect your{" "}
                     <Linkedin className="inline h-3.5 w-3.5 text-white" />{" "}
-                    accounts
+                    accounts in a few clicks
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5 text-14 text-white/85">
                   <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
                   <span>
-                    Launch inbound &amp; outbound campaigns
+                    Run campaigns to new prospects and existing connections
                     <span className="mt-1 block text-12 leading-relaxed text-white/50">
-                      Inbound campaigns are directed towards existing
-                      connections, while outbound campaigns target new leads
+                      Outbound reaches people you have not connected with
+                      yet, while inbound focuses on contacts already in
+                      your network
                     </span>
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5 text-14 text-white/85">
                   <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
-                  <span>Unified inbox access</span>
+                  <span>Every reply in one unified inbox</span>
                 </li>
                 <li className="flex items-start gap-2.5 text-14 text-white/85">
                   <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
-                  <span>3rd party integrations</span>
+                  <span>Connect the tools you already use</span>
                 </li>
               </ul>
             </div>
@@ -141,7 +143,8 @@ export function PricingCards() {
               <h3 className="text-17 font-semibold">Agency</h3>
             </div>
             <p className="mt-3 max-w-[260px] text-14 leading-relaxed text-white/70">
-              Built for agencies working with clients&apos; profiles.
+              Run outreach for multiple clients without juggling separate
+              logins.
             </p>
             <div className="mt-7">
               <div className="text-13 text-white/60">From:</div>
@@ -160,19 +163,19 @@ export function PricingCards() {
               href="/demo"
               className="mt-8 flex h-12 w-full items-center justify-center rounded-full border border-white/15 bg-white/10 text-15 font-semibold text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20"
             >
-              Schedule a call
+              Talk to our team
             </Link>
 
             <div className="mt-9">
               <div className="text-15 font-bold text-white">
-                Everything an agency needs
+                What agencies get included
               </div>
               <ul className="mt-4 space-y-3">
                 {[
-                  "Slack onboarding",
-                  "Full whitelabel",
-                  "Team collaboration",
-                  "Profile migration assistance",
+                  "Onboarding help over Slack",
+                  "White-label the client experience",
+                  "Work together across client accounts",
+                  "Help moving existing profiles over",
                 ].map((feat) => (
                   <li
                     key={feat}
@@ -203,8 +206,8 @@ export function PricingCards() {
                 <h3 className="text-17 font-semibold">Outreach avatar</h3>
               </div>
               <p className="mt-3 max-w-[280px] text-14 leading-relaxed text-white/70">
-                Scale beyond your limits by renting and customizing LinkedIn
-                profiles
+                Add ready-to-use LinkedIn profiles when your own accounts
+                reach their limits
               </p>
               <div className="mt-7 flex flex-wrap items-end gap-x-2.5 gap-y-2">
                 <span className="text-54 font-semibold leading-none text-white">
@@ -219,7 +222,7 @@ export function PricingCards() {
                 href="/avatars"
                 className="mt-8 flex h-12 w-full items-center justify-center rounded-full border border-white/15 bg-white/10 text-15 font-semibold text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20"
               >
-                Grab your avatars
+                Explore avatars
               </Link>
             </div>
 
@@ -250,19 +253,19 @@ export function PricingCards() {
                 </span>
               </div>
               <div className="mt-6 text-15 font-bold text-white">
-                Made to scale
+                Built to add capacity
               </div>
               <ul className="mt-4 space-y-3">
                 <li className="flex items-start gap-2.5 text-14 text-white/85">
                   <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
                   <span className="rounded-full border border-white/25 bg-white/10 px-2.5 py-0.5 text-13 font-medium text-white">
-                    3x Outreach seat included
+                    Includes 3 Outreach seats
                   </span>
                 </li>
                 {[
-                  "Customization of profiles",
-                  "Fast delivery to workspace",
-                  "Replacement guarantee",
+                  "Profiles tailored to your niche",
+                  "Delivered straight into your workspace",
+                  "Replacement guarantee included",
                 ].map((feat) => (
                   <li
                     key={feat}

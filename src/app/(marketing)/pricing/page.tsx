@@ -1,51 +1,20 @@
 import Link from "next/link";
-import Image from "next/image";
 import type { Metadata } from "next";
 import {
   ArrowRight,
   Check,
   X,
-  Star,
   ShieldCheck,
   Headphones,
 } from "lucide-react";
 import { HomeFaq } from "@/components/marketing/HomeFaq";
 import { PricingCards } from "@/components/marketing/PricingCards";
-import { TrustedLogoStrip } from "@/components/marketing/TrustedLogos";
 
 export const metadata: Metadata = {
-  title: "NxtSend Pricing – Transparent Plans for LinkedIn Automation",
+  title: { absolute: "NxtSend Pricing – Transparent Plans for LinkedIn Automation" },
   description:
-    "Explore NxtSend pricing plans designed for agencies, growth teams and solo founders — start with a free CRM, pay only for outreach seats when you scale.",
+    "Compare NxtSend plans for solo senders, teams and agencies. Start with a 14-day free trial, pay per outreach seat, add rented avatar profiles, or run clients from an agency workspace.",
 };
-
-/* ── Testimonials (mirror: aimfox.com/pricing — same 3 as homepage hero) ── */
-const testimonials = [
-  {
-    quote:
-      "Aimfox really gave us every single functionality we could think of. It has become an integral part of our GTM stack and an amzing source of new interested leads!",
-    name: "Jessica Looney",
-    title: "Enterprise AE",
-    company: "chargebee",
-    photo: "/images/testimonials/jessica-looney.jpeg",
-  },
-  {
-    quote:
-      "I always thought that LinekdIn outreach dosen't scale - until Aimfox proved me wrong. Such an amazing team behind the product. Super excited for what the future holds!",
-    name: "Marc Gaudett",
-    title: "Head of Partnerships",
-    company: "instantly",
-    photo: "/images/testimonials/marc-gaudett.jpeg",
-  },
-  {
-    quote:
-      "The thing that probably sets Aimfox apart the most from other LinkedIn outreach tools is the the option to rent LinkedIn profiles natively. For us this means that we can scale LinekdIn outbound at the same pace we scale email outbound.",
-    name: "Xavier C.",
-    title: "Founder",
-    company: "oneaway",
-    photo: "/images/testimonials/xavier-c..jpeg",
-  },
-];
 
 /* ── Feature comparison (mirror: aimfox.com/pricing table) ──────────────── */
 /* Cell values: "check" = included, "x" = not included, otherwise literal  */
@@ -66,141 +35,141 @@ interface CompareGroup {
 
 const comparisonGroups: CompareGroup[] = [
   {
-    title: "Highlights",
+    title: "Everyday essentials",
     rows: [
-      { name: "Outreach with rental profiles", cells: ["x", "check", "x"] },
-      { name: "Profile viewing", cells: ["check", "check", "check"] },
+      { name: "Outreach using rented profiles", cells: ["x", "check", "x"] },
+      { name: "Viewing prospect profiles", cells: ["check", "check", "check"] },
       {
-        name: "Connection requests",
-        note: "In order to send notes with connection requests, you need to have a Premium or Sales Navigator licence",
+        name: "Connection invitations",
+        note: "Sending a note with a connection invitation requires a Premium or Sales Navigator licence on the profile",
         cells: ["200/week", "100/week", "200/week"],
       },
       {
-        name: "Messaging sequences",
+        name: "Multi-step message sequences",
         cells: ["Unlimited", "Unlimited", "Unlimited"],
       },
-      { name: "Custom variables", cells: ["check", "check", "check"] },
+      { name: "Personalisation variables", cells: ["check", "check", "check"] },
       {
-        name: "Message requests",
+        name: "Messaging requests",
         cells: ["200/week", "150/week", "200/week"],
       },
       {
-        name: "Reactions to posts",
-        note: "Alongside the “like” option, we also let you choose from “love”, “insightful”, “funny”, “celebrate” and “support”.",
+        name: "Reacting to posts",
+        note: "Beyond a standard like, pick from love, insightful, funny, celebrate and support reactions for each post you engage with",
         cells: ["check", "check", "check"],
       },
       {
-        name: "Free InMails",
-        note: "Free InMail can be sent to Open profiles and limits very on each account. Usually the go from 100 to 800 free InMails per month",
+        name: "Free InMails for open profiles",
+        note: "Free InMails can go to open profiles, and the monthly allowance depends on the account — typically between 100 and 800 per month",
         cells: ["check", "check", "check"],
       },
-      { name: "Skill endorsements", cells: ["check", "check", "check"] },
+      { name: "Endorsing skills", cells: ["check", "check", "check"] },
       {
-        name: "Voice notes",
-        note: "Can be sent both from the campaigns and unibox",
-        cells: ["check", "check", "check"],
-      },
-      {
-        name: "Attachments",
-        note: "Can be sent both from the campaigns and unibox",
+        name: "Voice messages",
+        note: "Send them within campaigns or from the unified inbox",
         cells: ["check", "check", "check"],
       },
       {
-        name: "Videos",
-        note: "Can be sent both from the campaigns and unibox",
+        name: "File attachments",
+        note: "Share files through campaign steps or the unified inbox",
         cells: ["check", "check", "check"],
       },
       {
-        name: "Reporting & Analytics",
-        note: "Get detailed reports for your workspace and campaign performance",
+        name: "Video messages",
+        note: "Include videos in campaign steps or the unified inbox",
         cells: ["check", "check", "check"],
       },
-    ],
-  },
-  {
-    title: "Campaign types",
-    rows: [
-      { name: "LinkedIn search", cells: ["check", "check", "check"] },
       {
-        name: "Sales Navigator",
-        note: "In order to use Sales Navigator campaigns you need to have an active Sales Navigator subscription on Linkedin for at least one profile connected to your workspace",
-        cells: ["check", "check", "check"],
-      },
-      { name: "Post engagers", cells: ["check", "check", "check"] },
-      { name: "Event attendees", cells: ["check", "check", "check"] },
-      { name: "Group members", cells: ["check", "check", "check"] },
-      { name: "Custom List", cells: ["check", "check", "check"] },
-      { name: "1st degree filtering", cells: ["check", "check", "check"] },
-    ],
-  },
-  {
-    title: "Safety and security",
-    rows: [
-      {
-        name: "Local IP addresses",
-        note: "We have over 70 countries in our IP address pool. We guarantee top quality.",
-        cells: ["check", "check", "check"],
-      },
-      { name: "Bring-your-own IPs", cells: ["check", "check", "check"] },
-      { name: "Passwordless login", cells: ["check", "check", "check"] },
-      {
-        name: "Inbox privacy settings",
-        note: "Allow access only to conversations generated through Aimfox",
-        cells: ["check", "check", "check"],
-      },
-      { name: "Hard-coded limits", cells: ["check", "check", "check"] },
-      { name: "Warmup", cells: ["check", "check", "check"] },
-    ],
-  },
-  {
-    title: "Performance optimization",
-    rows: [
-      { name: "Target’s Time Zone", cells: ["check", "check", "check"] },
-      { name: "Global Analytics", cells: ["check", "check", "check"] },
-      { name: "A/B Testing", cells: ["check", "check", "check"] },
-      { name: "Tagging and Labeling", cells: ["check", "check", "check"] },
-      { name: "User blacklist", cells: ["check", "check", "check"] },
-      { name: "Company blacklist", cells: ["check", "check", "check"] },
-      { name: "Custom variables", cells: ["check", "check", "check"] },
-      { name: "Auto-translation", cells: ["check", "check", "check"] },
-      {
-        name: "Sales Navigator lead distribution",
-        note: "Allow access only to conversations generated through Aimfox",
+        name: "Analytics & reporting",
+        note: "See workspace-level reporting alongside results for every campaign you run",
         cells: ["check", "check", "check"],
       },
     ],
   },
   {
-    title: "Full whitelabel",
+    title: "Campaign starting points",
+    rows: [
+      { name: "Standard LinkedIn search", cells: ["check", "check", "check"] },
+      {
+        name: "Sales Navigator search",
+        note: "Running these campaigns requires an active Sales Navigator subscription on LinkedIn for at least one profile linked to your workspace",
+        cells: ["check", "check", "check"],
+      },
+      { name: "People who engaged with a post", cells: ["check", "check", "check"] },
+      { name: "Event participant lists", cells: ["check", "check", "check"] },
+      { name: "Members of LinkedIn groups", cells: ["check", "check", "check"] },
+      { name: "Your own uploaded list", cells: ["check", "check", "check"] },
+      { name: "Filtering for 1st-degree connections", cells: ["check", "check", "check"] },
+    ],
+  },
+  {
+    title: "Protection & account safety",
     rows: [
       {
-        name: "Dashboard branding",
+        name: "Region-matched IP addresses",
+        note: "Choose IP locations across a wide range of countries, matched to where each profile normally operates",
+        cells: ["check", "check", "check"],
+      },
+      { name: "Use your own IP addresses", cells: ["check", "check", "check"] },
+      { name: "Password-free sign-in", cells: ["check", "check", "check"] },
+      {
+        name: "Controls for inbox privacy",
+        note: "Limit inbox access to conversations that started through NxtSend campaigns",
+        cells: ["check", "check", "check"],
+      },
+      { name: "Built-in activity caps", cells: ["check", "check", "check"] },
+      { name: "Gradual account warm-up", cells: ["check", "check", "check"] },
+    ],
+  },
+  {
+    title: "Tuning campaign performance",
+    rows: [
+      { name: "Sending in the prospect's time zone", cells: ["check", "check", "check"] },
+      { name: "Workspace-wide analytics", cells: ["check", "check", "check"] },
+      { name: "A/B split testing", cells: ["check", "check", "check"] },
+      { name: "Tags & labels for organisation", cells: ["check", "check", "check"] },
+      { name: "Person blocklist", cells: ["check", "check", "check"] },
+      { name: "Company blocklist", cells: ["check", "check", "check"] },
+      { name: "Reusable custom variables", cells: ["check", "check", "check"] },
+      { name: "Automatic message translation", cells: ["check", "check", "check"] },
+      {
+        name: "Distributing Sales Navigator leads",
+        note: "Distribute leads across profiles connected to your workspace",
+        cells: ["check", "check", "check"],
+      },
+    ],
+  },
+  {
+    title: "White-label branding",
+    rows: [
+      {
+        name: "Your branding on the dashboard",
         cells: ["x", "Not Applicable", "check"],
       },
       {
-        name: "Connection flow branding",
+        name: "Branded account-connection flow",
         cells: ["x", "Not Applicable", "check"],
       },
-      { name: "Master view", cells: ["x", "Not Applicable", "check"] },
+      { name: "Central master view", cells: ["x", "Not Applicable", "check"] },
       {
-        name: "Brand-neutral login extention",
-        cells: ["x", "Not Applicable", "check"],
-      },
-      {
-        name: "Branded email flows",
+        name: "Unbranded login extension",
         cells: ["x", "Not Applicable", "check"],
       },
       {
-        name: "Branded knowledge base",
+        name: "Emails sent under your brand",
+        cells: ["x", "Not Applicable", "check"],
+      },
+      {
+        name: "Help centre with your branding",
         cells: ["x", "Not Applicable", "check"],
       },
     ],
   },
   {
-    title: "Team Collaboration",
+    title: "Working as a team",
     rows: [
-      { name: "Unlimited team members", cells: ["check", "check", "check"] },
-      { name: "Permissions settings", cells: ["check", "check", "check"] },
+      { name: "No cap on team members", cells: ["check", "check", "check"] },
+      { name: "Role & permission controls", cells: ["check", "check", "check"] },
     ],
   },
 ];
@@ -210,49 +179,50 @@ const comparisonGroups: CompareGroup[] = [
 /* the pricing mirror lazy-loads its answers and ships none in its HTML)   */
 const faqs = [
   {
-    question: "Can I rent LinkedIn outreach profiles directly through Aimfox?",
+    question: "Can I rent LinkedIn profiles for outreach inside NxtSend?",
     answer:
-      "Yes. You can rent LinkedIn profiles directly through the app. The experience is seamless and delivery is instant. We keep it simple and effective!",
+      "Yes — avatar profiles can be rented without leaving the app. Ordering takes a few clicks, profiles are added directly to your workspace, and you can start planning outreach around them straight away.",
   },
   {
     question:
-      "I’m not interested in renting profiles, can I just add my own profiles?",
+      "What if I would rather use my own LinkedIn profiles instead of renting?",
     answer:
-      "Absolutely. Aimfox is a full-fledged LinkedIn outreach tool and you can add an unlimited number of LinkedIn profiles to your workspace. LinkedIn profile rental is optional.",
+      "That works too. Renting is entirely optional — NxtSend is a complete outreach platform on its own, and you can connect as many of your own LinkedIn profiles to a workspace as you need.",
   },
   {
-    question: "Is there a free trial?",
-    answer: "Yes, there's a 14-day free trial for the LinkedIn Outreach plan.",
+    question: "Is a free trial available?",
+    answer:
+      "Yes — every LinkedIn Outreach plan starts with a 14-day free trial.",
   },
   {
-    question: "Can I try rental LinkedIn accounts for free?",
+    question: "Can rental profiles be tried out at no cost?",
     answer:
-      "Sadly, this is not an option, you have to pay upfront. However, the good thing is that we offer a 48h money back guarantee, in case you’re not satisfied!",
+      "Not at the moment — rented profiles are paid for in advance. To keep the risk low, each rental is covered by a money-back guarantee for the first 48 hours if it is not right for you.",
   },
   {
-    question: "Can I message 1st connections?",
+    question: "Can existing connections be messaged too?",
     answer:
-      "Yes you can! We give you 7 different campaign options for your 1st connections, with a plethora of advanced filters and selection criteria.",
+      "Yes — seven campaign types are built for first-degree connections, with detailed filters and criteria to help you pick exactly who receives them.",
   },
   {
-    question: "Do I need to share the LinkedIn password for my account?",
+    question: "Do I have to give you my LinkedIn password to connect an account?",
     answer:
-      "You don’t. When connecting a LinkedIn account to Aimfox you have an option to use our Google Chrome Extension to sync an existing LinkedIn session from your browser with Aimfox. No password required. Alternatively, you can always connect using your credentials.",
+      "No. Connecting a profile never means handing your password to NxtSend — the app does not ask for, store or reuse LinkedIn passwords. You link the account by following the connection steps inside your workspace instead.",
   },
   {
-    question: "Do you support Sales Navigator?",
+    question: "Does NxtSend work alongside Sales Navigator?",
     answer:
-      "Yes! We are the only tool on the market that has a native Sales Navigator integration. This means that you can manage your Sales Navigator through Aimfox and even export and share leads with other connected LinkedIn profiles. With Aimfox, your team only needs one Sales Navigator licence.",
+      "Yes. You can run campaigns built on Sales Navigator searches inside NxtSend, and leads can be exported and shared with the other profiles linked to your workspace. One active Sales Navigator subscription, on at least one connected profile, is enough for the team to use them.",
   },
   {
-    question: "What are the white-labeling options with Aimfox?",
+    question: "What white-label options are available for agencies?",
     answer:
-      "We don’t provide a full whitelabel. However, we give you options to whitelabel parts of the app such as LinkedIn account connection flow, reporting, etc. This is intended to support agencies. A full whitelabel is in the pipeline!",
+      "A fully white-labelled product is not something we offer today. What agencies can brand today includes selected parts of the experience — the LinkedIn connection flow and client reporting among them — so client-facing surfaces carry your identity where it counts.",
   },
   {
-    question: "Do you provide proxies, or do I have to bring my own?",
+    question: "Are proxies included, or should I supply my own?",
     answer:
-      "You can access, for free, our pool of top-notch proxies from over 60 countries! If you prefer to bring your own, that's also an option!",
+      "Both routes are open: a proxy pool is included at no extra cost, and you are free to connect your own proxies if you prefer.",
   },
 ];
 
@@ -277,93 +247,31 @@ export default function PricingPage() {
         <div className="section-container relative z-10">
           <div className="mx-auto max-w-3xl text-center">
             <h1 className="text-40 sm:text-54 font-extrabold tracking-tight text-white">
-              Pricing that scales with your growth
+              Pricing that grows as your outreach does
             </h1>
             <p className="mt-4 text-16 sm:text-18 leading-relaxed text-black-300">
-              Get full access to all core features. Choose a plan that fits
-              your team, upgrade or cancel anytime.
+              Every plan includes the core platform. Choose the setup that
+              fits your team today, and upgrade, downgrade or cancel whenever
+              things change.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-13 text-black-400">
               <div className="flex items-center gap-1.5 rounded-full border border-black-700/80 bg-black-800/60 px-3.5 py-1.5 backdrop-blur-sm">
                 <Check className="h-3.5 w-3.5 text-purple-400" />
-                <span>14-day free trial</span>
+                <span>Free 14-day trial</span>
               </div>
               <div className="flex items-center gap-1.5 rounded-full border border-black-700/80 bg-black-800/60 px-3.5 py-1.5 backdrop-blur-sm">
                 <Check className="h-3.5 w-3.5 text-purple-400" />
-                <span>No credit card required</span>
+                <span>No card required</span>
               </div>
               <div className="flex items-center gap-1.5 rounded-full border border-black-700/80 bg-black-800/60 px-3.5 py-1.5 backdrop-blur-sm">
                 <Check className="h-3.5 w-3.5 text-purple-400" />
-                <span>2 minute setup</span>
+                <span>Ready in minutes</span>
               </div>
             </div>
           </div>
 
           <div className="mt-12">
             <PricingCards />
-          </div>
-        </div>
-      </section>
-
-      {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* TRUSTED BY + TESTIMONIALS */}
-      {/* ──────────────────────────────────────────────────────────────────── */}
-      <section className="relative border-t border-black-700/80 bg-black-800/40 py-24">
-        <div className="section-container">
-          <div className="flex flex-col items-center gap-3 text-center">
-            <span className="text-14 font-semibold text-black-300">
-              Trusted by more than 10,000 outreach experts
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full border border-black-700 bg-black-800 px-3 py-1 text-12 font-semibold text-yellow-400">
-                <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-                4.8 rating
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full border border-black-700 bg-black-800 px-3 py-1 text-12 font-semibold text-orange-400">
-                <Star className="h-3.5 w-3.5 fill-orange-400 text-orange-400" />
-                4.9 rating
-              </span>
-            </div>
-          </div>
-
-          {/* Company logo strip (mirror: directly with the trusted line,
-              same component and position as the homepage) */}
-          <div className="mt-10 w-full">
-            <TrustedLogoStrip />
-          </div>
-
-          <div className="mx-auto mt-12 grid w-full max-w-6xl grid-cols-1 gap-6 text-left md:grid-cols-3">
-            {testimonials.map((t) => (
-              <div
-                key={t.name}
-                className="glass-card flex flex-col justify-between p-6"
-              >
-                <div>
-                  <span className="text-11 font-bold uppercase tracking-wider text-purple-400">
-                    Testimonial
-                  </span>
-                  <p className="mt-3 text-14 leading-relaxed text-black-200">
-                    {t.quote}
-                  </p>
-                </div>
-                <div className="mt-6 flex items-center gap-3 border-t border-black-700/70 pt-4">
-                  <Image
-                    src={t.photo}
-                    alt={t.name}
-                    width={44}
-                    height={44}
-                    className="h-11 w-11 rounded-full object-cover"
-                  />
-                  <div>
-                    <div className="text-14 font-bold text-white">{t.name}</div>
-                    <div className="text-12 text-black-400">
-                      {t.title} ·{" "}
-                      <span className="text-purple-300">{t.company}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
@@ -379,7 +287,7 @@ export default function PricingPage() {
                 <tr className="border-b border-black-700 bg-black-900/80 align-top text-white">
                   <th className="w-2/5 p-5 sm:p-6">
                     <p className="text-14 font-medium text-black-400">
-                      Preferred billing cycle
+                      Choose how you pay
                     </p>
                     <div className="mt-4 inline-flex items-center gap-1 rounded-full border border-black-600 bg-black-800 p-1">
                       <span className="rounded-full bg-gradient-brand px-4 py-1.5 text-13 font-semibold text-white">
@@ -399,7 +307,7 @@ export default function PricingPage() {
                       href="/signup"
                       className="mt-4 inline-flex h-9 items-center justify-center rounded-full border border-black-600 bg-black-700 px-4 text-13 font-semibold text-white transition-colors hover:bg-black-600"
                     >
-                      Start free trial
+                      Try it free
                     </Link>
                   </th>
                   <th className="w-[20%] p-5 sm:p-6">
@@ -411,7 +319,7 @@ export default function PricingPage() {
                       href="/signup"
                       className="mt-4 inline-flex h-9 items-center justify-center rounded-full border border-black-600 bg-black-700 px-4 text-13 font-semibold text-white transition-colors hover:bg-black-600"
                     >
-                      Get an avatar
+                      Rent an avatar
                     </Link>
                   </th>
                   <th className="w-[20%] p-5 sm:p-6">
@@ -423,7 +331,7 @@ export default function PricingPage() {
                       href="/demo"
                       className="mt-4 inline-flex h-9 items-center justify-center rounded-full border border-black-600 bg-black-700 px-4 text-13 font-semibold text-white transition-colors hover:bg-black-600"
                     >
-                      Schedule a call
+                      Book a call
                     </Link>
                   </th>
                 </tr>
@@ -472,7 +380,7 @@ export default function PricingPage() {
           <div className="mx-auto max-w-4xl">
             <div className="mb-12 text-center">
               <h2 className="text-36 sm:text-48 font-bold tracking-tight text-white">
-                Frequently asked questions
+                Answers to common questions
               </h2>
             </div>
             <HomeFaq items={faqs} />
@@ -488,12 +396,12 @@ export default function PricingPage() {
         <div className="section-container relative z-10 text-center">
           <div className="mx-auto max-w-3xl rounded-3xl border border-purple-500/30 bg-black-800/80 p-8 shadow-glow-purple/20 backdrop-blur-2xl sm:p-14">
             <h2 className="text-36 sm:text-48 font-extrabold tracking-tight text-white">
-              Start scaling your outreach today
+              Start building a bigger LinkedIn pipeline
             </h2>
             <p className="mt-4 text-17 sm:text-20 text-black-300">
-              Master your LinkedIn outreach. Register now for simple and
-              intuitive campaign management and lead generation that delivers.
-              Your upgrade starts here
+              Bring your campaigns, replies and leads into one place, and run
+              LinkedIn outreach that is easier to manage and easier to grow.
+              Create your account to begin.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link
@@ -506,15 +414,16 @@ export default function PricingPage() {
             </div>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-12 text-black-400">
               <span className="flex items-center gap-1.5">
-                <Check className="h-3.5 w-3.5 text-green-400" /> No credit card
+                <Check className="h-3.5 w-3.5 text-green-400" /> No card
+                required
               </span>
               <span className="flex items-center gap-1.5">
-                <ShieldCheck className="h-3.5 w-3.5 text-green-400" /> Safe
-                &amp; secure
+                <ShieldCheck className="h-3.5 w-3.5 text-green-400" /> Secure
+                by design
               </span>
               <span className="flex items-center gap-1.5">
-                <Headphones className="h-3.5 w-3.5 text-green-400" /> 24/7
-                Support
+                <Headphones className="h-3.5 w-3.5 text-green-400" /> Support
+                around the clock
               </span>
             </div>
           </div>

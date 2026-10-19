@@ -1,40 +1,25 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowUpRight, X } from "lucide-react";
 
 /**
  * Academy hero + course series (mirror: aimfox.com/academy).
  *
- * Every heading, module title, description, lesson title and duration
- * below is copied verbatim from the downloaded mirror (ZIP 3,
- * "4. aimfox.com.academy/www.aimfox.com/academy.html"), including the
- * lesson video IDs from the mirror's serialized page state — in the
- * mirror, clicking the hero play button or a lesson opens that lesson's
- * video in a player overlay, reproduced here with a privacy-enhanced
- * (youtube-nocookie) embed. No Aimfox tracking scripts/IDs and no
- * aimfox.com links are carried over.
+ * The mirror page built this series around recorded lessons for the
+ * mirror product. Those recordings are not carried over. What remains
+ * is the same shape — three modules, ten topics in order — rewritten
+ * as a NxtSend syllabus: the hero is a static visual, lessons are
+ * listed as curriculum items with no players, and a note on the page
+ * states plainly that NxtSend Academy video lessons are in production.
  *
- * In the mirror, the right-hand panel of each module card is an animated
- * iframe served from aimfox.com (/academy/module-N-animation.html) —
- * neither the animation pages nor module 1's still image
- * (/images/academy/module-1.webp) are part of the download, so the panel
- * shows the module's own still image where the mirror download contains
- * it (modules 2 and 3) and the card's glow gradient alone for module 1.
+ * The right-hand panel of each module card shows the module's own
+ * still image where the download contains one (modules 2 and 3) and
+ * the card's glow gradient alone for module 1.
  */
-
-const HERO_VIDEO = {
-  title: "Welcome to Aimfox Academy",
-  videoId: "VHpm6VjEVZ8",
-};
 
 interface AcademyLesson {
   number: number;
   title: string;
-  duration: string;
-  videoId: string;
+  description: string;
 }
 
 interface AcademyModule {
@@ -50,203 +35,130 @@ interface AcademyModule {
 
 const modules: AcademyModule[] = [
   {
-    title: "Getting Started",
+    title: "Foundations and account setup",
     description:
-      "Connect your LinkedIn account, get familiar with the dashboard, and set safe sending limits before you launch anything.",
+      "Connect your LinkedIn profile, find your way around the workspace, and choose daily limits that keep your activity steady and safe.",
     image: null,
     glow: "rgba(0,170,255,0.35)",
     tint: "rgba(0,170,255,0.16)",
     lessons: [
       {
         number: 1,
-        title: "How to connect your LinkedIn account to Aimfox",
-        duration: "3–4 min",
-        videoId: "GVdt5vaSYx8",
+        title: "Linking your LinkedIn profile to NxtSend",
+        description:
+          "What to check before you connect, and how to confirm the link is active.",
       },
       {
         number: 2,
-        title: "Aimfox dashboard walkthrough: where everything is",
-        duration: "4–5 min",
-        videoId: "AY7w2rvKOFk",
+        title: "Finding your way around the workspace",
+        description:
+          "A tour of campaigns, inbox, contacts and settings, and where each task lives.",
       },
       {
         number: 3,
-        title: "How to set your daily limits and safety settings",
-        duration: "2–3 min",
-        videoId: "48TcFYaMFmQ",
+        title: "Choosing daily limits and safety preferences",
+        description:
+          "How limits work, why pacing matters, and how to pick a sensible starting point.",
       },
     ],
   },
   {
-    title: "Building Your First Campaign",
+    title: "Planning and launching a campaign",
     description:
-      "Define your audience, write outreach that gets replies, and launch your first campaign end to end.",
+      "Define who you want to reach, write messages in your own voice, and build a sequence that is ready to launch.",
     image: "/images/academy/module-2.webp",
     glow: "rgba(255,110,26,0.35)",
     tint: "rgba(255,110,26,0.16)",
     lessons: [
       {
         number: 4,
-        title: "How to define your target audience and set search filters",
-        duration: "4–5 min",
-        videoId: "9iqwa8BtM4Q",
+        title: "Defining your audience and refining search filters",
+        description:
+          "Using role, company and location filters to build a focused prospect list.",
       },
       {
         number: 5,
-        title: "How to write a connection request that gets accepted",
-        duration: "3–4 min",
-        videoId: "ixny-b5gRaw",
+        title: "Writing an opening message people want to answer",
+        description:
+          "Keeping connection notes short, specific and personal, without sounding scripted.",
       },
       {
         number: 6,
-        title: "How to build your follow-up message sequence",
-        duration: "4–5 min",
-        videoId: "gUB8eChLVac",
+        title: "Building a follow-up sequence that stays polite",
+        description:
+          "Spacing your follow-ups, varying the wording, and knowing when to stop.",
       },
       {
         number: 7,
-        title: "How to launch your first campaign (full walkthrough)",
-        duration: "5–6 min",
-        videoId: "WUqMcLUs-Ko",
+        title: "Launching your first campaign, step by step",
+        description:
+          "A final check of audience, messages and limits before you press start.",
       },
     ],
   },
   {
-    title: "Managing Replies and Results",
+    title: "Handling replies and improving results",
     description:
-      "Handle incoming replies, read your analytics, and troubleshoot campaigns that aren't converting.",
+      "Manage new replies, read your results clearly, and diagnose campaigns that have stalled.",
     image: "/images/academy/module-3.webp",
     glow: "rgba(0,170,255,0.35)",
     tint: "rgba(0,170,255,0.16)",
     lessons: [
       {
         number: 8,
-        title: "How to manage your inbox and handle replies in Aimfox",
-        duration: "3–4 min",
-        videoId: "Mhdid4yuJE0",
+        title: "Keeping on top of your inbox and new replies",
+        description:
+          "Sorting conversations, replying promptly, and moving interested prospects forward.",
       },
       {
         number: 9,
-        title: "How to read your campaign analytics",
-        duration: "3–4 min",
-        videoId: "Y8YjR0lb3xo",
+        title: "Reading campaign results without guesswork",
+        description:
+          "The key figures to watch, and what changes they usually point to.",
       },
       {
         number: 10,
-        title: "How to troubleshoot a campaign that is not performing",
-        duration: "3–4 min",
-        videoId: "HFnRgsx_iWc",
+        title: "Diagnosing a campaign that has slowed down",
+        description:
+          "Working through audience, message and timing checks to find the likely cause.",
       },
     ],
   },
 ];
 
-/** Play-circle glyph, path copied from the mirror's own icon set. */
-function PlayCircleIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="currentColor"
-      viewBox="0 0 256 256"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M128 24a104 104 0 1 0 104 104A104.11 104.11 0 0 0 128 24m0 192a88 88 0 1 1 88-88 88.1 88.1 0 0 1-88 88m48.24-94.78-64-40A8 8 0 0 0 100 88v80a8 8 0 0 0 12.24 6.78l64-40a8 8 0 0 0 0-13.56M116 153.57v-51.14L156.91 128Z" />
-    </svg>
-  );
-}
-
-interface ActiveVideo {
-  title: string;
-  videoId: string;
-}
-
-/**
- * "Latest videos" — a section live aimfox.com/academy added after the
- * mirror download. Titles, YouTube IDs, order and card anatomy were
- * extracted from the live page HTML on 2026-10-18 (the section sits
- * between the module cards and "More resources"). On the live page the
- * cards link out to youtube.com watch pages; here they open the same
- * videos in this page's existing youtube-nocookie modal, per the
- * no-outbound-links convention of this rebuild.
- */
-const LATEST_VIDEOS: { youtubeId: string; title: string }[] = [
-  {
-    youtubeId: "4m2T7UUUTCU",
-    title: "I Built an AI Lead Qualifier for LinkedIn with Claude (Full Tutorial)",
-  },
-  {
-    youtubeId: "e6dDAWckGyI",
-    title:
-      "LinkedIn Reply Alerts in Slack + Claude Lead Scoring: Full Aimfox Tutorial (2026)",
-  },
-  {
-    youtubeId: "Ywodrj8SjnY",
-    title: "My LinkedIn Outbound Strategy for 2026 (Claude AI + Full Tutorial)",
-  },
-  {
-    youtubeId: "BvRSq7JrLVA",
-    title:
-      "The LinkedIn Outreach Strategy Getting 70% Acceptance Rate in 2026 (Aimfox Tutorial)",
-  },
-];
-
 export function AcademySeries() {
-  const [active, setActive] = useState<ActiveVideo | null>(null);
-
-  useEffect(() => {
-    if (!active) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setActive(null);
-    };
-    document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [active]);
-
   return (
     <>
       {/* ──────────────────────────────────────────────────────────────── */}
-      {/* HERO (mirror: dark rounded banner over the intro video          */}
-      {/* thumbnail, play button opens the video, copy bottom-left)       */}
+      {/* HERO (dark rounded banner, static artwork, copy bottom-left)    */}
       {/* ──────────────────────────────────────────────────────────────── */}
       <section className="px-2.5 pt-24 sm:pt-28">
         <div className="relative h-[548px] overflow-hidden rounded-5xl bg-black-900 p-2.5 md:h-[648px] md:p-4 xl:h-[700px] xl:rounded-8xl">
           <div className="relative flex size-full items-end overflow-hidden rounded-4xl">
             <Image
-              src="/images/academy/hero-video.jpg"
-              alt="Welcome to Aimfox Academy"
+              src="/images/academy/module-2.webp"
+              alt="NxtSend Academy course artwork"
               width={1280}
               height={720}
               priority
               className="absolute inset-0 size-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black-900/95 via-black-900/20 to-transparent" />
-            <button
-              type="button"
-              aria-label="Play video: Welcome to Aimfox Academy"
-              onClick={() => setActive(HERO_VIDEO)}
-              className="absolute left-1/2 top-[38%] size-20 -translate-x-1/2 -translate-y-1/2 cursor-pointer md:size-28"
-            >
-              <PlayCircleIcon className="size-full text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)] transition-transform hover:scale-105" />
-            </button>
-            <div className="pointer-events-none relative flex max-w-160 flex-col items-start p-8 md:p-14 xl:p-16">
+            <div className="relative flex max-w-160 flex-col items-start p-8 md:p-14 xl:p-16">
               <span className="mb-2 text-13 font-semibold uppercase tracking-wide text-white/60">
-                Aimfox Academy
+                NxtSend Academy
               </span>
               <h1 className="mb-4 text-36 font-semibold text-white md:text-54">
-                Level up your outreach
+                Build stronger outreach, one lesson at a time
               </h1>
               <p className="mb-6 text-white/80 md:text-18">
-                Guides, videos, and resources to help you scale your LinkedIn
-                outreach faster.
+                A structured path through setting up NxtSend, finding the
+                right audience, and running campaigns you can keep
+                improving.
               </p>
               <Link
                 href="#series-1"
-                className="pointer-events-auto flex h-10.5 shrink-0 items-center justify-center rounded-full bg-black-900 px-5 text-base font-semibold whitespace-nowrap text-white transition-colors hover:bg-white hover:text-black-900"
+                className="flex h-10.5 shrink-0 items-center justify-center rounded-full bg-black-900 px-5 text-base font-semibold whitespace-nowrap text-white transition-colors hover:bg-white hover:text-black-900"
               >
                 Get started
               </Link>
@@ -256,12 +168,18 @@ export function AcademySeries() {
       </section>
 
       {/* ──────────────────────────────────────────────────────────────── */}
-      {/* COURSE SERIES (mirror: 3 module cards, 10 lessons)              */}
+      {/* COURSE SERIES (3 module cards, 10 syllabus lessons)             */}
       {/* ──────────────────────────────────────────────────────────────── */}
       <section id="series-1">
         <div className="mx-auto flex w-full max-w-[1492px] flex-col px-4 py-8 md:px-6 md:py-10 xl:px-24">
-          <p className="mb-8 text-center text-14 font-medium text-white/50 md:text-15">
-            10 lessons across 3 modules to take you from setup to scale.
+          <p className="mb-4 text-center text-14 font-medium text-white/50 md:text-15">
+            Ten lessons in three modules, taking you from first setup to
+            steady, well-run campaigns.
+          </p>
+          <p className="mx-auto mb-8 max-w-2xl text-center text-14 font-medium text-white/50 md:text-15">
+            NxtSend Academy video lessons are currently in production.
+            The curriculum below is the syllabus for the series — it sets
+            out, in order, the topics each lesson will cover.
           </p>
           <div className="flex flex-col gap-y-8 md:gap-y-10">
             {modules.map((mod, moduleIndex) => (
@@ -285,25 +203,22 @@ export function AcademySeries() {
                   </p>
                   <div className="flex flex-col divide-y divide-white/10">
                     {mod.lessons.map((lesson) => (
-                      <button
+                      <div
                         key={lesson.number}
-                        type="button"
-                        onClick={() =>
-                          setActive({
-                            title: lesson.title,
-                            videoId: lesson.videoId,
-                          })
-                        }
-                        className="-mx-2 flex cursor-pointer items-center gap-x-4 rounded-xl px-2 py-3 text-left transition-colors hover:bg-white/5"
+                        className="-mx-2 flex items-start gap-x-4 rounded-xl px-2 py-3"
                       >
-                        <PlayCircleIcon className="size-6 shrink-0 text-white/70" />
-                        <span className="flex-1 text-14 font-medium text-white/90 md:text-15">
-                          {lesson.title}
+                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-white/20 text-12 font-semibold text-white/70">
+                          {lesson.number}
                         </span>
-                        <span className="shrink-0 text-13 whitespace-nowrap text-white/40">
-                          {lesson.duration}
+                        <span className="flex-1">
+                          <span className="block text-14 font-medium text-white/90 md:text-15">
+                            {lesson.title}
+                          </span>
+                          <span className="mt-0.5 block text-13 font-medium text-white/50">
+                            {lesson.description}
+                          </span>
                         </span>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -325,90 +240,6 @@ export function AcademySeries() {
           </div>
         </div>
       </section>
-
-      {/* ──────────────────────────────────────────────────────────────── */}
-      {/* LATEST VIDEOS (live-only section, added by Aimfox after the     */}
-      {/* mirror download — data extracted from the live page)           */}
-      {/* ──────────────────────────────────────────────────────────────── */}
-      <section className="mx-auto flex w-full max-w-[1492px] flex-col px-4 py-8 md:px-6 md:py-10 xl:px-24">
-        <div className="mx-auto mt-16 mb-12 flex w-full max-w-[40.5rem] flex-col items-center md:mt-20 xl:mt-28 xl:mb-20">
-          <h2 className="mb-6 text-center text-30 font-semibold text-white last:mb-0 md:text-36 xl:text-54">
-            Latest videos
-          </h2>
-        </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-4">
-          {LATEST_VIDEOS.map((video) => (
-            <button
-              key={video.youtubeId}
-              type="button"
-              onClick={() =>
-                setActive({ videoId: video.youtubeId, title: video.title })
-              }
-              aria-label={`Play video: ${video.title}`}
-              className="group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-3xl border border-white/10 text-left text-white transition-colors hover:bg-white/5"
-            >
-              {/* The live page hotlinks YouTube's thumbnail CDN; the same
-                  hqdefault thumbnails are self-hosted here, matching this
-                  rebuild's all-local imagery (public/images/academy/). */}
-              <Image
-                src={`/images/academy/latest-${video.youtubeId}.jpg`}
-                alt=""
-                width={480}
-                height={360}
-                className="aspect-video w-full object-cover"
-              />
-              <span className="relative flex flex-1 flex-col p-4">
-                <span className="mb-6 line-clamp-2 flex-1 text-16 font-bold">
-                  {video.title}
-                </span>
-                <span className="relative flex size-9 rounded-xl border border-black-700">
-                  <ArrowUpRight className="m-auto size-4 text-white/20 transition-colors group-hover:text-white" />
-                </span>
-              </span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* ──────────────────────────────────────────────────────────────── */}
-      {/* VIDEO PLAYER (mirror: clicking a lesson or the hero play        */}
-      {/* button opens the lesson video in an overlay player)             */}
-      {/* ──────────────────────────────────────────────────────────────── */}
-      {active ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
-          onClick={() => setActive(null)}
-          role="dialog"
-          aria-modal="true"
-          aria-label={active.title}
-        >
-          <div
-            className="w-full max-w-4xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between gap-4">
-              <p className="text-16 font-semibold text-white">{active.title}</p>
-              <button
-                type="button"
-                aria-label="Close video"
-                onClick={() => setActive(null)}
-                className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-white/20 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-            <div className="aspect-video w-full overflow-hidden rounded-2xl bg-black">
-              <iframe
-                src={`https://www.youtube-nocookie.com/embed/${active.videoId}?autoplay=1&rel=0`}
-                title={active.title}
-                className="size-full"
-                allow="accelerometer; autoplay; encrypted-media; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
-          </div>
-        </div>
-      ) : null}
     </>
   );
 }

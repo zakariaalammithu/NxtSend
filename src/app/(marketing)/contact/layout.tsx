@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Contact Us — Get in Touch with NxtSend",
+  title: "Contact Us — Get in Touch",
   description:
     "Have questions about NxtSend? Reach out to our team at hello@nxtsend.com or submit a message. We're here to help.",
 };

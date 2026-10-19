@@ -6,74 +6,74 @@ import {
   Check,
   ShieldCheck,
   Headphones,
-  Star,
 } from "lucide-react";
 import { AvatarsShowcase } from "@/components/marketing/AvatarsShowcase";
 import { AvatarsPricing } from "@/components/marketing/AvatarsPricing";
-import { AvatarsWall } from "@/components/marketing/AvatarsWall";
-import { AvatarsTrustedLogos } from "@/components/marketing/AvatarsTrustedLogos";
 
 export const metadata: Metadata = {
-  title: "NxtSend Avatars – Rent LinkedIn accounts for outreach",
+  title: { absolute: "NxtSend Avatars – Rent LinkedIn accounts for outreach" },
   description:
-    "NxtSend Avatars are pre-warmed up LinkedIn accounts you can rent to scale your LinkedIn outreach.",
+    "NxtSend Avatars are prepared LinkedIn profiles you can rent, personalize and manage alongside your own accounts — so you can run more outreach from one workspace.",
 };
 
 /* ──────────────────────────────────────────────────────────────────────── */
-/* Avatars page (mirror: aimfox.com/avatars — ZIP 4,                        */
-/* "6. aimfox.com.avatars/www.aimfox.com/avatars.html").                    */
-/*                                                                          */
-/* Every heading, paragraph, step, feature, plan figure and testimonial   */
-/* below is copied verbatim from the mirror, including its original       */
-/* typos ("LinekdIn", "dosen't"). Data that only exists in the mirror's   */
-/* serialized page state (the 16 wall reviews with photos, video          */
-/* thumbnails and Vimeo IDs, the strategy video ID) was decoded from      */
-/* that state — see AVATARS_MAP.md. The mirror's sales CTAs point at an   */
-/* Aimfox Calendly link; they map to the app's /demo page, as on          */
-/* /pricing. No Aimfox tracking scripts/IDs and no aimfox.com or          */
-/* app.aimfox.com links are carried over.                                 */
+/* Avatars page (layout provenance: aimfox.com/avatars mirror, ZIP 4).    */
+/* Phase-2 branding: all body copy rewritten originally for NxtSend.      */
+/* Removed per owner-approved defaults: the two hero testimonials, the    */
+/* trusted-by ratings/claims row, the company wordmark row and the        */
+/* 16-review wall (D1–D4). The wall section is replaced by an original    */
+/* "What's included" product section below. No third-party tracking       */
+/* scripts/IDs and no external brand links are carried over.              */
 /* ──────────────────────────────────────────────────────────────────────── */
 
-/* ── Hero company testimonials (mirror: two testimonial popups in the ──── */
-/* trusted-by logo strip — Xavier C. / oneaway, Marc Gaudett / instantly)  */
-const companyTestimonials = [
-  {
-    quote:
-      "The thing that probably sets Aimfox apart the most from other LinkedIn outreach tools is the the option to rent LinkedIn profiles natively. For us this means that we can scale LinekdIn outbound at the same pace we scale email outbound.",
-    name: "Xavier C.",
-    title: "Founder",
-    company: "oneaway",
-    photo: "/images/testimonials/xavier-c..jpeg",
-  },
-  {
-    quote:
-      "I always thought that LinekdIn outreach dosen't scale - until Aimfox proved me wrong. Such an amazing team behind the product. Super excited for what the future holds!",
-    name: "Marc Gaudett",
-    title: "Head of Partnerships",
-    company: "instantly",
-    photo: "/images/testimonials/marc-gaudett.jpeg",
-  },
-];
-
-/* ── How it works (mirror: three steps) ────────────────────────────────── */
+/* ── How it works (three steps) ────────────────────────────────────────── */
 const steps = [
   {
     number: "1",
-    title: "Rent an account",
-    text: "Talk to our sales team to purchase the avatars",
+    title: "Choose your avatars",
+    text: "Pick how many profiles you need and tell our team which market you want to cover",
     image: "/images/avatars/step-1.webp",
   },
   {
     number: "2",
-    title: "Fill out the customization form",
-    text: "Fill out the form we send - we’ll take care of the setup",
+    title: "Shape each profile",
+    text: "Share the headline, photo, experience and location you want — we prepare and warm each profile for you",
     image: "/images/avatars/step-2.svg",
   },
   {
     number: "3",
-    title: "Scale your LinkedIn outreach",
-    text: "Go past the LinkedIn limits and start more conversations faster",
+    title: "Launch from one workspace",
+    text: "Run campaigns and handle every reply from the same NxtSend inbox you use for your own accounts",
     image: "/images/avatars/step-3.webp",
+  },
+];
+
+/* ── What's included with every avatar (original product section that ─── */
+/* replaces the removed review wall; product copy only, no testimonials)  */
+const included = [
+  {
+    title: "Personalized profile setup",
+    text: "Photo, banner, headline, experience and summary are shaped around the persona and offer you want each profile to carry.",
+  },
+  {
+    title: "Location matched to your market",
+    text: "Profiles are prepared for the region you sell into, so your outreach comes from a presence that fits your audience.",
+  },
+  {
+    title: "Warmed before you start",
+    text: "Every profile goes through preparation and early activity before handover, so it arrives ready to join your campaigns.",
+  },
+  {
+    title: "One inbox for everything",
+    text: "Replies from avatar profiles land in the same NxtSend inbox as your own accounts — no separate tools or logins to juggle.",
+  },
+  {
+    title: "Campaigns alongside your seats",
+    text: "Run avatar profiles in the same campaigns and sequences as your connected seats, and manage sending limits in one place.",
+  },
+  {
+    title: "Ongoing care from our team",
+    text: "If a profile needs attention, our team helps you review it and keep your outreach running from your workspace.",
   },
 ];
 
@@ -81,8 +81,8 @@ export default function AvatarsPage() {
   return (
     <div className="relative overflow-hidden bg-black-900">
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* HERO (mirror: rounded banner — hero-bg artwork with the avatar     */}
-      {/* profile collage from hero.webp along the bottom, gradient headline) */}
+      {/* HERO (rounded banner — hero-bg artwork with the avatar profile     */}
+      {/* collage from hero.webp along the bottom, gradient headline)        */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="px-2.5 pt-24 sm:pt-28">
         <div className="relative flex min-h-[720px] flex-col items-center overflow-hidden rounded-5xl px-4 pt-16 md:px-6 xl:rounded-8xl">
@@ -103,87 +103,25 @@ export default function AvatarsPage() {
             className="pointer-events-none absolute bottom-0 left-1/2 w-[140%] max-w-none -translate-x-1/2 sm:w-full"
           />
           <h1 className="relative z-10 mb-5 max-w-4xl bg-gradient-purple-horizontal bg-clip-text text-center text-48 font-semibold text-transparent md:text-54 2xl:text-64">
-            Customizable LinkedIn accounts for faster outreach
+            Additional LinkedIn profiles, tailored and ready to send
           </h1>
           <p className="relative z-10 mb-6 text-center text-15 font-medium text-white">
-            Rent LinkedIn accounts and get more done, faster.
+            Rent fully prepared profiles and expand your outreach without
+            tying up your own account.
           </p>
           <div className="relative z-10 flex justify-center gap-x-3">
             <Link
               href="/demo"
               className="flex h-10.5 items-center justify-center rounded-full bg-black-900 px-5 text-16 font-semibold whitespace-nowrap text-white transition-colors hover:bg-black-600"
             >
-              Talk to sales
+              Talk to our team
             </Link>
           </div>
         </div>
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* TRUSTED BY (mirror: ratings + company testimonial popups; the      */}
-      {/* mirror's G2 / Capterra links point at Aimfox's own review          */}
-      {/* profiles, so the ratings render without outbound links)             */}
-      {/* ──────────────────────────────────────────────────────────────────── */}
-      <section className="px-5.5 py-16 lg:pb-20">
-        <p className="mx-auto mb-1.5 text-center text-sm font-bold text-white/60">
-          Trusted by more than 10,000 outreach experts
-        </p>
-        <div className="mx-auto mb-12 flex items-center justify-center gap-x-7 text-14 font-bold text-white/40 md:mb-8">
-          <span className="flex items-center gap-2">
-            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-            4.8 rating
-          </span>
-          <span className="flex items-center gap-2">
-            <Star className="h-4 w-4 fill-orange-400 text-orange-400" />
-            4.9 rating
-          </span>
-        </div>
-
-        {/* Mirror: customer wordmark row under the ratings (the two
-            testimonial popups hang off oneaway / instantly on the mirror;
-            here the wordmarks are static and the two testimonials render
-            as cards below, as before) */}
-        <div className="mb-14">
-          <AvatarsTrustedLogos />
-        </div>
-
-        <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-6 text-left md:grid-cols-2">
-          {companyTestimonials.map((t) => (
-            <div
-              key={t.name}
-              className="glass-card flex flex-col justify-between p-6"
-            >
-              <div>
-                <span className="text-11 font-bold tracking-wider text-purple-400 uppercase">
-                  Testimonial
-                </span>
-                <p className="mt-3 text-14 leading-relaxed text-black-200">
-                  {t.quote}
-                </p>
-              </div>
-              <div className="mt-6 flex items-center gap-3 border-t border-black-700/70 pt-4">
-                <Image
-                  src={t.photo}
-                  alt={t.name}
-                  width={44}
-                  height={44}
-                  className="h-11 w-11 rounded-full object-cover"
-                />
-                <div>
-                  <div className="text-14 font-bold text-white">{t.name}</div>
-                  <div className="text-12 text-black-400">
-                    {t.title} ·{" "}
-                    <span className="text-purple-300">{t.company}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* HOW IT WORKS (mirror: 3 step cards over the bg-graphic artwork)    */}
+      {/* HOW IT WORKS (3 step cards over the bg-graphic artwork)             */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative border-t border-black-700/80 py-24 lg:py-32">
         <div className="section-container relative">
@@ -192,14 +130,13 @@ export default function AvatarsPage() {
               How it works
             </span>
             <h2 className="mt-4 text-36 font-bold tracking-tight text-white sm:text-48">
-              Three simple steps to scale your outreach
+              From setup to sending in three steps
             </h2>
           </div>
 
-          {/* Mirror layout: the 3 step cards stand side by side on xl
-              (each w-90, visual on top, text below); below xl they stack
-              as wide horizontal cards, exactly as the mirror's own
-              responsive classes do. */}
+          {/* Layout: the 3 step cards stand side by side on xl (each w-90,
+              visual on top, text below); below xl they stack as wide
+              horizontal cards. */}
           <div className="relative mx-auto mt-20 flex w-full max-w-[74.5rem] flex-col gap-y-16 px-6 md:px-2.5 xl:flex-row xl:justify-between xl:px-0">
             <Image
               src="/images/avatars/steps-bg.webp"
@@ -218,9 +155,7 @@ export default function AvatarsPage() {
                 </div>
                 <div className="flex-1">
                   {step.image?.endsWith(".svg") ? (
-                    /* Step 2's visual is the mirror's own inline-SVG form
-                       illustration, extracted verbatim to a static file
-                       (it is not a downloadable image asset in the mirror). */
+                    /* Step 2's visual is a static form illustration file. */
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={step.image}
@@ -254,11 +189,11 @@ export default function AvatarsPage() {
               href="/demo"
               className="inline-flex h-12 items-center justify-center rounded-full bg-purple-600 px-6 text-16 font-semibold text-white transition-colors hover:bg-purple-800"
             >
-              Talk to the sales team
+              Speak with our team
             </Link>
           </div>
 
-          {/* Mirror: responsive app screenshot under the steps */}
+          {/* Responsive app screenshot under the steps */}
           <div className="mx-auto mt-16 max-w-6xl">
             <Image
               src="/images/avatars/showcase-desktop.webp"
@@ -279,18 +214,18 @@ export default function AvatarsPage() {
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* STRATEGY VIDEO + WHAT YOU GET (mirror: one white panel)            */}
+      {/* STRATEGY OVERVIEW + WHAT YOU GET (one white panel)                  */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <AvatarsShowcase />
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* PRICING THAT SCALES WITH YOUR GROWTH (mirror: single avatar card)  */}
+      {/* PRICING (single avatar card)                                        */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative border-t border-black-700/80 py-24 lg:py-32">
         <div className="section-container flex flex-col items-center">
           <div className="mx-auto mb-12 flex max-w-2xl flex-col items-center text-center">
             <h2 className="text-48 font-semibold text-white xl:text-54">
-              Pricing that scales with your growth
+              Simple pricing that grows with you
             </h2>
           </div>
           <AvatarsPricing />
@@ -298,34 +233,49 @@ export default function AvatarsPage() {
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* LOVED BY AGENCIES, SALES TEAMS & GTM EXPERTS (mirror wall)         */}
+      {/* WHAT'S INCLUDED WITH EVERY AVATAR (original section replacing      */}
+      {/* the removed review wall — same footprint, product copy only)       */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative border-t border-black-700/80 bg-black-900 py-24 lg:py-32">
         <div className="pointer-events-none absolute top-1/2 right-10 h-[350px] w-[350px] -translate-y-1/2 rounded-full bg-purple-600/15 blur-[140px]" />
         <div className="section-container relative z-10">
           <div className="text-center">
             <h2 className="text-36 font-bold tracking-tight text-white sm:text-48">
-              Loved by agencies, sales teams &amp; GTM experts
+              What&apos;s included with every avatar
             </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-16 text-white/60">
+              Each rented profile arrives as a complete, managed package —
+              set up around your brief and looked after inside your NxtSend
+              workspace.
+            </p>
           </div>
-          <AvatarsWall />
+          <div className="mx-auto mt-14 grid w-full max-w-5xl grid-cols-1 gap-6 text-left md:grid-cols-2 lg:grid-cols-3">
+            {included.map((item) => (
+              <div key={item.title} className="glass-card flex flex-col p-6">
+                <h3 className="text-16 font-bold text-white">{item.title}</h3>
+                <p className="mt-3 text-14 leading-relaxed text-black-200">
+                  {item.text}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* START SCALING YOUR OUTREACH TODAY (mirror final CTA)               */}
+      {/* FINAL CTA                                                           */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-t border-black-700/80 bg-gradient-hero py-24">
         <div className="pointer-events-none absolute inset-0 bg-radial-glow opacity-30" />
         <div className="section-container relative z-10 text-center">
           <div className="mx-auto max-w-3xl rounded-3xl border border-purple-500/30 bg-black-800/80 p-8 shadow-glow-purple/20 backdrop-blur-2xl sm:p-14">
             <h2 className="text-36 font-extrabold tracking-tight text-white sm:text-48">
-              Start scaling your outreach today
+              Ready to add more outreach capacity?
             </h2>
             <p className="mt-4 text-17 text-black-300 sm:text-20">
-              Master your LinkedIn outreach. Register now for simple and
-              intuitive campaign management and lead generation that delivers.
-              Your upgrade starts here
+              Bring prepared avatar profiles into the workspace where you
+              already plan campaigns, send sequences and answer replies —
+              and give every campaign more room to run.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link
@@ -338,15 +288,16 @@ export default function AvatarsPage() {
             </div>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-12 text-black-400">
               <span className="flex items-center gap-1.5">
-                <Check className="h-3.5 w-3.5 text-green-400" /> No credit card
+                <Check className="h-3.5 w-3.5 text-green-400" /> No card
+                needed to start
               </span>
               <span className="flex items-center gap-1.5">
-                <ShieldCheck className="h-3.5 w-3.5 text-green-400" /> Safe
-                &amp; secure
+                <ShieldCheck className="h-3.5 w-3.5 text-green-400" />{" "}
+                Profiles managed in NxtSend
               </span>
               <span className="flex items-center gap-1.5">
-                <Headphones className="h-3.5 w-3.5 text-green-400" /> 24/7
-                Support
+                <Headphones className="h-3.5 w-3.5 text-green-400" /> Help
+                from a real team
               </span>
             </div>
           </div>

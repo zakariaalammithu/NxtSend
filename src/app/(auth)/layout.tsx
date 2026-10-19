@@ -65,7 +65,7 @@ export default function AuthLayout({
               </div>
               <p className="text-14 text-black-200">
                 <strong>Smart Human Delays:</strong> Randomized sending patterns
-                keep your LinkedIn profile and sender domain 100% safe.
+                help protect your LinkedIn profile and sender domain.
               </p>
             </div>
 
@@ -81,15 +81,15 @@ export default function AuthLayout({
           </div>
         </div>
 
-        {/* Footer quote */}
+        {/* Footer brand statement */}
         <div className="relative z-10 border-t border-black-700/60 pt-6">
           <p className="text-13 text-black-400 italic">
-            &ldquo;NxtSend replaced three separate tools and 4x’d our demo booking rate in 3 weeks.&rdquo;
+            &ldquo;Plan campaigns, personalize every message, and work every reply from one inbox.&rdquo;
           </p>
           <div className="mt-2 flex items-center gap-2 text-12 font-medium text-black-300">
-            <span>Alex Vance</span>
+            <span>NxtSend</span>
             <span className="text-black-600">•</span>
-            <span>Head of Growth at ScaleWave</span>
+            <span>LinkedIn &amp; email outreach, in one workspace</span>
           </div>
         </div>
       </div>

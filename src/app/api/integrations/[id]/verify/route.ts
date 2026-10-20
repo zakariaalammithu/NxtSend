@@ -14,6 +14,7 @@ import {
   getWorkspaceWebhookConfig,
   createSupabaseWebhookStore,
 } from "@/lib/webhooks/store";
+import { verifyOAuthConnection } from "@/lib/oauth/service";
 
 /**
  * POST /api/integrations/[id]/verify
@@ -103,10 +104,23 @@ export async function POST(
     }
   }
 
+  // ── Mailbox (Gmail / Outlook) real verification ────────────────────
+  // Composed here because it needs the caller's workspace + the
+  // service role: it validates the stored OAuth grant against the
+  // provider (token refresh + profile re-fetch). Live mode only.
+  let mailboxVerify: VerifyDeps["mailboxVerify"];
+  if (ctx.mode !== "demo" && ctx.admin) {
+    const admin = ctx.admin;
+    const workspaceId = ctx.workspaceId;
+    mailboxVerify = (provider) =>
+      verifyOAuthConnection(provider, { workspaceId }, { admin });
+  }
+
   const outcome = await verifyIntegration(params.id, {
     mode: ctx.mode,
     webhookConfigured,
     dispatchTestEvent,
+    mailboxVerify,
   });
   if (!outcome) {
     return NextResponse.json(

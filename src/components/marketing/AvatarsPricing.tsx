@@ -4,6 +4,14 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Check, Gem } from "lucide-react";
+import {
+  AVATAR_PRICES,
+  formatAnnualTotal,
+  formatPrice,
+  priceFor,
+  type BillingCycle,
+} from "@/lib/marketing-prices";
+import { BillingToggle } from "./BillingToggle";
 
 /**
  * Avatars pricing card (layout provenance: aimfox.com/avatars mirror,
@@ -14,10 +22,12 @@ import { Check, Gem } from "lucide-react";
  * up, the same artwork family as the homepage pricing cards), price
  * block on the left, features and the small Monthly/Yearly toggle on
  * the right. Phase-2 branding: card copy rewritten originally for
- * NxtSend; the price is unchanged ($387/mo, 3 profiles included).
+ * NxtSend.
  *
- * The Monthly/Yearly toggle is state-only: no yearly price is shown,
- * so nothing is invented.
+ * Prices come from the shared model in src/lib/marketing-prices.ts:
+ * monthly renders the long-standing figure; yearly shows the exact
+ * monthly-equivalent at the advertised -25% plus a "billed annually"
+ * caption with the annual total.
  */
 
 const FEATURES = [
@@ -27,7 +37,8 @@ const FEATURES = [
 ] as const;
 
 export function AvatarsPricing() {
-  const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
+  const [billing, setBilling] = useState<BillingCycle>("monthly");
+  const yearly = billing === "yearly";
 
   return (
     <div className="mx-auto flex w-full max-w-[61.25rem] flex-col gap-y-8">
@@ -61,7 +72,7 @@ export function AvatarsPricing() {
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-x-2.5 gap-y-2">
               <span className="text-48 font-medium leading-none text-white xl:text-54">
-                $387
+                {formatPrice(priceFor(AVATAR_PRICES, billing))}
               </span>
               <span className="self-end pb-1 text-15 font-semibold text-white/70">
                 /month
@@ -70,6 +81,11 @@ export function AvatarsPricing() {
                 3 profiles included
               </span>
             </div>
+            {yearly && (
+              <p className="mt-3 text-13 text-white/60">
+                {formatAnnualTotal(AVATAR_PRICES.yearlyTotal)} billed annually
+              </p>
+            )}
             <Link
               href="/signup"
               className="mt-auto flex h-12.5 w-full items-center justify-center rounded-full bg-black-900 text-15 font-semibold text-white transition-colors hover:bg-black-800 md:mt-10"
@@ -81,35 +97,11 @@ export function AvatarsPricing() {
           {/* Right: toggle + features */}
           <div className="mt-10 flex flex-col md:mt-0 md:flex-1">
             <div className="flex md:justify-end">
-              <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-black-900/40 p-1 backdrop-blur-md">
-                <button
-                  type="button"
-                  onClick={() => setBilling("monthly")}
-                  aria-pressed={billing === "monthly"}
-                  className={`cursor-pointer rounded-full px-3 py-1 text-11 ${
-                    billing === "monthly"
-                      ? "bg-black-900 font-bold text-white ring-1 ring-white/20"
-                      : "font-semibold text-white/70"
-                  }`}
-                >
-                  Monthly
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBilling("yearly")}
-                  aria-pressed={billing === "yearly"}
-                  className={`inline-flex cursor-pointer items-center gap-1 rounded-full px-3 py-1 text-11 ${
-                    billing === "yearly"
-                      ? "bg-black-900 font-bold text-white ring-1 ring-white/20"
-                      : "font-semibold text-white/70"
-                  }`}
-                >
-                  Yearly
-                  <span className="rounded-full bg-purple-600 px-1.5 py-px text-9 font-bold text-white">
-                    up to -25%
-                  </span>
-                </button>
-              </span>
+              <BillingToggle
+                size="sm"
+                billing={billing}
+                onChange={setBilling}
+              />
             </div>
 
             <div className="mt-6 text-15 font-bold text-white">

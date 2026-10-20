@@ -1,10 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { executeDueSteps } from "../core";
 import type {
   ExecutorCampaign,
   ExecutorEnrollment,
   ExecutorStore,
   LeadSignals,
+  SenderIdentity,
   StepExecutionRecord,
 } from "../types";
 import type { CampaignStep, Lead, PlanType } from "@/types";
@@ -94,6 +95,7 @@ class FakeStore implements ExecutorStore {
   signalsByLead = new Map<string, LeadSignals>();
   claims = new Map<string, StepExecutionRecord>();
   messages: RecordedInput[] = [];
+  senderIdentity: SenderIdentity | null = null;
   activities: Array<{
     campaign_id: string | null;
     action: string;
@@ -116,6 +118,9 @@ class FakeStore implements ExecutorStore {
   async getCampaign(workspaceId: string, campaignId: string) {
     const c = this.campaigns.get(campaignId);
     return c && c.workspace_id === workspaceId ? c : null;
+  }
+  async getSenderIdentity() {
+    return this.senderIdentity;
   }
   async getSteps(campaignId: string) {
     return this.stepsByCampaign.get(campaignId) ?? [];
@@ -275,6 +280,58 @@ describe("executeDueSteps — sending", () => {
     expect(
       store.activities.some((a) => a.action === "step_sent")
     ).toBe(true);
+  });
+
+  describe("reply routing (P5 Stage C)", () => {
+    afterEach(() => {
+      delete process.env.EMAIL_REPLY_TO;
+    });
+
+    it("passes EMAIL_REPLY_TO as replyTo on the send when set", async () => {
+      process.env.EMAIL_REPLY_TO = "replies@reply.example.com";
+      const { store, adapter } = setup();
+      store.enrollments = [makeEnrollment()];
+      store.stepsByCampaign.set("camp_1", [makeStep()]);
+      await run(store, adapter);
+      expect(adapter.calls).toHaveLength(1);
+      expect(adapter.calls[0].replyTo).toBe("replies@reply.example.com");
+    });
+
+    it("leaves replyTo unset when EMAIL_REPLY_TO is not configured (previous behaviour)", async () => {
+      delete process.env.EMAIL_REPLY_TO;
+      const { store, adapter } = setup();
+      store.enrollments = [makeEnrollment()];
+      store.stepsByCampaign.set("camp_1", [makeStep()]);
+      await run(store, adapter);
+      expect(adapter.calls[0].replyTo).toBeUndefined();
+    });
+  });
+
+  it("renders {my_*} variables from the campaign's sender identity (accounts model)", async () => {
+    const { store, adapter } = setup();
+    const enrollment = makeEnrollment();
+    store.enrollments = [enrollment];
+    store.stepsByCampaign.set("camp_1", [
+      makeStep({
+        subject: "Note from {{my_first_name}}",
+        content:
+          "Hi {{first_name}}, this is {{my_first_name}} {{my_last_name}}, {{my_job_title}} at {{my_company_name}}.",
+      }),
+    ]);
+    store.senderIdentity = {
+      firstName: "Alex",
+      lastName: "Vance",
+      jobTitle: "Account Executive",
+      companyName: "NxtSend",
+    };
+
+    const summary = await run(store, adapter);
+
+    expect(summary.sent).toBe(1);
+    expect(adapter.calls[0].subject).toBe("Note from Alex");
+    expect(adapter.calls[0].text).toBe(
+      "Hi Sarah, this is Alex Vance, Account Executive at NxtSend."
+    );
   });
 
   it("does not touch a step whose delay has not elapsed", async () => {
@@ -461,6 +518,73 @@ describe("executeDueSteps — limits, channels, idempotency", () => {
     expect(claim.channel).toBe("linkedin");
     expect(claim.detail).toContain("no authorized LinkedIn provider");
     expect(enrollment.current_step).toBe(1);
+    expect(enrollment.status).toBe("completed");
+  });
+
+  it.each(["like_post", "view_profile", "endorse_skills"] as const)(
+    "records the Closely touch step %s as skipped (LinkedIn channel) and advances",
+    async (stepType) => {
+      const { store, adapter } = setup();
+      const enrollment = makeEnrollment();
+      store.enrollments = [enrollment];
+      store.stepsByCampaign.set("camp_1", [
+        makeStep({ step_type: stepType, subject: undefined, content: "" }),
+      ]);
+
+      const summary = await run(store, adapter);
+
+      expect(summary.skippedLinkedIn).toBe(1);
+      expect(summary.sent).toBe(0);
+      expect(summary.simulated).toBe(0);
+      expect(adapter.calls).toHaveLength(0);
+      expect(store.messages).toHaveLength(0);
+      const claim = store.onlyClaim();
+      expect(claim.status).toBe("skipped");
+      expect(claim.channel).toBe("linkedin");
+      expect(claim.step_type).toBe(stepType);
+      expect(claim.detail).toContain("no authorized LinkedIn provider");
+      expect(enrollment.current_step).toBe(1);
+      expect(enrollment.status).toBe("completed");
+    }
+  );
+
+  it("does not evaluate condition branches — the condition step elapses and branch content is never executed", async () => {
+    const { store, adapter } = setup();
+    const enrollment = makeEnrollment();
+    store.enrollments = [enrollment];
+    store.stepsByCampaign.set("camp_1", [
+      makeStep({
+        step_type: "condition",
+        subject: "If connected",
+        content: "",
+        config: {
+          branches: {
+            yes: [
+              {
+                id: "branch-msg",
+                step_type: "linkedin_message",
+                delay_hours: 0,
+                subject: "Branch message",
+                content: "This branch text must never be sent by the executor.",
+                config: {},
+              },
+            ],
+            no: [],
+          },
+        },
+      }),
+    ]);
+
+    const summary = await run(store, adapter);
+
+    expect(summary.waitsExecuted).toBe(1);
+    expect(summary.skippedLinkedIn).toBe(0);
+    expect(adapter.calls).toHaveLength(0);
+    expect(store.messages).toHaveLength(0);
+    const claim = store.onlyClaim();
+    expect(claim.status).toBe("executed");
+    expect(claim.channel).toBe("none");
+    expect(claim.detail).toContain("not evaluated");
     expect(enrollment.status).toBe("completed");
   });
 

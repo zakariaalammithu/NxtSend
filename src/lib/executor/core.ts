@@ -28,6 +28,7 @@ import type { CampaignStep, Lead } from "@/types";
 import { checkLimit } from "@/lib/billing/limits";
 import { renderTemplate } from "@/lib/ai/prompt";
 import type { EmailProviderAdapter } from "@/lib/email/types";
+import { getEmailReplyTo } from "@/lib/email/state";
 import {
   stepExecutionKey,
   emptyRunSummary,
@@ -35,6 +36,7 @@ import {
   type ExecutorStore,
   type ExecutorRunSummary,
   type LeadSignals,
+  type SenderIdentity,
   type StepChannel,
 } from "./types";
 
@@ -46,6 +48,11 @@ export function stepChannel(step: Pick<CampaignStep, "step_type">): StepChannel 
       return "email";
     case "connection_request":
     case "linkedin_message":
+    // Closely-style LinkedIn touch steps (migration 011): same
+    // treatment as every LinkedIn step — recorded skipped, never sent.
+    case "like_post":
+    case "view_profile":
+    case "endorse_skills":
       return "linkedin";
     default:
       return "none"; // wait / condition — time-based, no message
@@ -141,6 +148,8 @@ export async function executeDueSteps(
   // by a single scan.
   const usageByWorkspace = new Map<string, { plan: string; used: number; limit: number }>();
   const overLimitCampaigns = new Map<string, { workspaceId: string; name: string; deferred: number }>();
+  // Sender identities ({my_*} variables) resolved once per campaign.
+  const senderByCampaign = new Map<string, SenderIdentity | null>();
 
   for (const enrollment of enrollments) {
     summary.scanned++;
@@ -270,6 +279,17 @@ export async function executeDueSteps(
     }
 
     // ── LinkedIn steps: never sent, never simulated-as-sent ────────
+    // PROVIDER SEAM (P5 Stage F): this branch is where an approved
+    // LinkedIn provider plugs in. When createLinkedInAdapter()
+    // (src/lib/linkedin) returns a real vendor adapter whose state
+    // is "connected", LinkedIn steps dispatch through it here —
+    // sendConnectionRequest / sendMessage — and the execution is
+    // recorded with the provider's outcome + provider message id
+    // (the duplicate-prevention key, alongside the claim below).
+    // While the adapter is the NotConfigured implementation (the
+    // only one today), behavior is exactly what follows: the step is
+    // claimed once (at-most-once) and recorded `skipped` with the
+    // reason — never sent, never simulated as sent.
     if (channel === "linkedin") {
       const claim = await store.claimStepExecution({
         workspace_id: workspaceId,
@@ -370,10 +390,30 @@ export async function executeDueSteps(
       continue;
     }
 
+    // Sender ("my_*") variables resolve from the campaign's connected
+    // email account when the store can provide it (accounts model,
+    // migration 011); otherwise they render their {my_*:fallback}.
+    let sender = senderByCampaign.get(campaign.id);
+    if (sender === undefined) {
+      sender = store.getSenderIdentity
+        ? await store
+            .getSenderIdentity(workspaceId, campaign.id, "email")
+            .catch(() => null)
+        : null;
+      senderByCampaign.set(campaign.id, sender);
+    }
     const vars = {
       firstName: lead.first_name,
+      lastName: lead.last_name,
       company: lead.company,
       jobTitle: lead.job_title,
+      myFirstName: sender?.firstName,
+      myLastName: sender?.lastName,
+      myJobTitle: sender?.jobTitle,
+      myCompanyName: sender?.companyName,
+      // Custom fields (e.g. extra CSV columns) resolve {{custom_name}}
+      // variables.
+      customFields: lead.custom_fields ?? {},
     };
     const subject = renderTemplate(step.subject ?? "", vars);
     const content = renderTemplate(step.content ?? "", vars);
@@ -383,6 +423,10 @@ export async function executeDueSteps(
       to: recipient,
       subject,
       text: content,
+      // Reply routing (P5 Stage C): when EMAIL_REPLY_TO is set,
+      // replies land on the receiving domain and reach the Inbox;
+      // unset keeps the previous behaviour (replies to EMAIL_FROM).
+      replyTo: getEmailReplyTo(),
       leadId: lead.id,
       campaignId: campaign.id,
     });

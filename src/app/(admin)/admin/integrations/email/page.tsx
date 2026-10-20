@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { AdminIntegrationView } from "@/components/admin/AdminIntegrationView";
+import EmailAuthPanel from "@/components/integrations/EmailAuthPanel";
 
 /**
  * Admin → Integrations → Email / Resend. The sending provider's
@@ -16,6 +17,10 @@ export default function AdminEmailIntegrationPage() {
       title="Email / Resend"
       description="Transactional and outreach email delivery via Resend. Delivery, bounce, and complaint events return through the signed Resend webhook and update message records; bounces and complaints also feed the suppression list."
       integrationIds={["resend"]}
-    />
+    >
+      {/* Same panel as the Integration Center's Resend page — one
+          implementation, two placements (extend, don't duplicate). */}
+      <EmailAuthPanel />
+    </AdminIntegrationView>
   );
 }

@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import {
@@ -9,6 +10,8 @@ import {
 } from "lucide-react";
 import { HomeFaq } from "@/components/marketing/HomeFaq";
 import { PricingCards } from "@/components/marketing/PricingCards";
+import { BillingProvider } from "@/components/marketing/BillingContext";
+import { CompareTableHead } from "@/components/marketing/CompareTableHead";
 
 export const metadata: Metadata = {
   title: { absolute: "NxtSend Pricing – Transparent Plans for LinkedIn Automation" },
@@ -239,6 +242,9 @@ function CompareCellValue({ value }: { value: CompareCell }) {
 export default function PricingPage() {
   return (
     <div className="relative overflow-hidden bg-black-900">
+      {/* BillingProvider spans the plan cards and the comparison table so
+          every Monthly/Yearly toggle on this page shares one state. */}
+      <BillingProvider>
       {/* ──────────────────────────────────────────────────────────────────── */}
       {/* HERO + PLAN CARDS (mirror: aimfox.com/pricing) */}
       {/* ──────────────────────────────────────────────────────────────────── */}
@@ -283,62 +289,10 @@ export default function PricingPage() {
         <div className="section-container">
           <div className="overflow-x-auto rounded-2xl border border-black-700 bg-black-800/40 backdrop-blur-md">
             <table className="w-full min-w-[720px] border-collapse text-left text-13">
-              <thead>
-                <tr className="border-b border-black-700 bg-black-900/80 align-top text-white">
-                  <th className="w-2/5 p-5 sm:p-6">
-                    <p className="text-14 font-medium text-black-400">
-                      Choose how you pay
-                    </p>
-                    <div className="mt-4 inline-flex items-center gap-1 rounded-full border border-black-600 bg-black-800 p-1">
-                      <span className="rounded-full bg-gradient-brand px-4 py-1.5 text-13 font-semibold text-white">
-                        Monthly
-                      </span>
-                      <span className="rounded-full px-4 py-1.5 text-13 font-medium text-black-300">
-                        Yearly <span className="text-green-400">up to -25%</span>
-                      </span>
-                    </div>
-                  </th>
-                  <th className="w-[20%] p-5 sm:p-6">
-                    <div className="text-18 font-semibold">Outreach seat</div>
-                    <p className="mt-1 text-13 font-medium text-black-400">
-                      $49 per seat / month
-                    </p>
-                    <Link
-                      href="/signup"
-                      className="mt-4 inline-flex h-9 items-center justify-center rounded-full border border-black-600 bg-black-700 px-4 text-13 font-semibold text-white transition-colors hover:bg-black-600"
-                    >
-                      Try it free
-                    </Link>
-                  </th>
-                  <th className="w-[20%] p-5 sm:p-6">
-                    <div className="text-18 font-semibold">Outreach avatar</div>
-                    <p className="mt-1 text-13 font-medium text-black-400">
-                      $387 per profile / month
-                    </p>
-                    <Link
-                      href="/signup"
-                      className="mt-4 inline-flex h-9 items-center justify-center rounded-full border border-black-600 bg-black-700 px-4 text-13 font-semibold text-white transition-colors hover:bg-black-600"
-                    >
-                      Rent an avatar
-                    </Link>
-                  </th>
-                  <th className="w-[20%] p-5 sm:p-6">
-                    <div className="text-18 font-semibold">Agency</div>
-                    <p className="mt-1 text-13 font-medium text-black-400">
-                      from $499 for 20 seats / month
-                    </p>
-                    <Link
-                      href="/demo"
-                      className="mt-4 inline-flex h-9 items-center justify-center rounded-full border border-black-600 bg-black-700 px-4 text-13 font-semibold text-white transition-colors hover:bg-black-600"
-                    >
-                      Book a call
-                    </Link>
-                  </th>
-                </tr>
-              </thead>
+              <CompareTableHead />
               <tbody className="divide-y divide-black-800">
                 {comparisonGroups.map((group) => (
-                  <tr key={group.title} className="contents">
+                  <Fragment key={group.title}>
                     <tr className="bg-black-900/90">
                       <td
                         colSpan={4}
@@ -364,13 +318,14 @@ export default function PricingPage() {
                         ))}
                       </tr>
                     ))}
-                  </tr>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
           </div>
         </div>
       </section>
+      </BillingProvider>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
       {/* FREQUENTLY ASKED QUESTIONS */}

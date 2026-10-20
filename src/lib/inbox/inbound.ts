@@ -194,6 +194,22 @@ export interface InboundStore {
     sentAt: string;
   }): Promise<{ id: string }>;
   touchConversation(workspaceId: string, conversationId: string, at: string): Promise<void>;
+  /**
+   * Optional (P5 Stage D): record a reply-arrival notification for
+   * the workspace a reply was filed into. Called ONLY on a successful
+   * ingest — never for unrouted mail (there is no workspace to notify)
+   * and never for duplicates (the reply was already announced).
+   * Implementations persist through their own backend (the
+   * `notifications` table live; the demo notification store in demo).
+   */
+  notifyReplyReceived?(input: {
+    workspaceId: string;
+    conversationId: string;
+    senderName: string;
+    senderEmail: string;
+    subject: string | null;
+    preview: string;
+  }): Promise<void>;
 }
 
 export type IngestOutcome =
@@ -274,5 +290,29 @@ export async function ingestReceivedEmail(
     sentAt: email.receivedAt,
   });
   await store.touchConversation(workspaceId, conversationId, email.receivedAt);
+
+  // Reply-arrival notification (Stage D). Best-effort by design: the
+  // reply is already durably filed, so a notification failure must
+  // never turn a successful ingest into a webhook failure (which
+  // would make the provider redeliver and duplicate work). Failures
+  // are logged loudly instead.
+  if (store.notifyReplyReceived) {
+    try {
+      await store.notifyReplyReceived({
+        workspaceId,
+        conversationId,
+        senderName: sender.name,
+        senderEmail: sender.email,
+        subject: email.subject,
+        preview: content,
+      });
+    } catch (err) {
+      console.error(
+        "[Inbox] Reply notification failed (reply itself was filed):",
+        err
+      );
+    }
+  }
+
   return { status: "ingested", conversationId };
 }

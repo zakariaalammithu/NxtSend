@@ -93,9 +93,33 @@ export interface LeadSignals {
   suppressionReason: string | null;
 }
 
+/**
+ * The sender identity behind the {my_*} template variables, resolved
+ * from the campaign's connected account for a channel (migration 011).
+ */
+export interface SenderIdentity {
+  firstName?: string;
+  lastName?: string;
+  jobTitle?: string;
+  companyName?: string;
+}
+
 export interface ExecutorStore {
   /** True for the Demo Mode store — every record is labelled simulated. */
   readonly simulated: boolean;
+  /**
+   * Optional: resolves the sender identity for a campaign's connected
+   * account on the given channel (campaigns.sender_account_id for
+   * LinkedIn, email_account_id for email). Stores that cannot resolve
+   * it (or campaigns without an account) return null — the {my_*}
+   * variables then render their template fallback/empty, exactly as
+   * before the accounts model existed.
+   */
+  getSenderIdentity?(
+    workspaceId: string,
+    campaignId: string,
+    channel: "linkedin" | "email"
+  ): Promise<SenderIdentity | null>;
   /**
    * Enrollments that may have a due step: status pending/active and
    * their campaign is active. Time-based due filtering happens in the

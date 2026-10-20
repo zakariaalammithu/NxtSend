@@ -9,7 +9,8 @@
  */
 
 import { isValidEmail } from "@/lib/utils";
-import type { Lead } from "@/types";
+import type { Campaign, Lead } from "@/types";
+import type { CampaignStats } from "./campaign-stats";
 
 // ============================================================================
 // Lead field model for import mapping
@@ -49,7 +50,10 @@ export const LEAD_FIELDS: LeadFieldDef[] = [
     key: "email",
     label: "Email",
     aliases: ["email", "email address", "emailaddress", "work email", "e mail"],
-    required: true,
+    // Not required on its own: a row is identified by an email OR a
+    // LinkedIn URL (LinkedIn's My Network export has no email column).
+    // The "one identity is required" rule lives in validateLeadRow.
+    required: false,
   },
   {
     key: "company",
@@ -81,7 +85,8 @@ export const LEAD_FIELDS: LeadFieldDef[] = [
 export interface NewLeadInput {
   first_name: string;
   last_name?: string;
-  email: string;
+  /** Optional: a lead is identified by an email OR a LinkedIn URL. */
+  email?: string;
   company?: string;
   job_title?: string;
   linkedin_url?: string;
@@ -214,9 +219,13 @@ export function validateLeadRow(values: Record<LeadFieldKey, string>): {
   if (!firstName) {
     errors.push("Missing first name");
   }
-  if (!email) {
-    errors.push("Missing email");
-  } else if (!isValidEmail(email)) {
+  // Identity rule (P4 Stage 2, matching Closely's model): every row
+  // needs an email OR a LinkedIn URL. My Network exports have no emails
+  // at all, so email alone can no longer be mandatory.
+  if (!email && !linkedinUrl) {
+    errors.push("Missing email and LinkedIn URL (one of them is required)");
+  }
+  if (email && !isValidEmail(email)) {
     errors.push(`Invalid email format: "${email}"`);
   }
   if (
@@ -236,7 +245,7 @@ export function validateLeadRow(values: Record<LeadFieldKey, string>): {
     lead: {
       first_name: firstName,
       last_name: lastName || undefined,
-      email,
+      email: email || undefined,
       company: company || undefined,
       job_title: jobTitle || undefined,
       linkedin_url: linkedinUrl || undefined,
@@ -260,8 +269,31 @@ export interface ImportRowError {
 export interface ImportDuplicate {
   /** 1-based row number in the original file (header is row 1). */
   row: number;
-  email: string;
+  /** The identity the row was deduplicated on: its email, or its LinkedIn URL when it has no email. */
+  identity: string;
   reason: "existing" | "in-file";
+}
+
+/** Normalizes a LinkedIn profile URL for identity comparison. */
+export function normalizeLinkedinUrl(url: string): string {
+  return url.trim().toLowerCase().replace(/\/+$/, "");
+}
+
+/**
+ * The dedupe identity of a validated lead: its email when it has one,
+ * otherwise its LinkedIn URL. Mirrors Closely's model (dedupe on
+ * LinkedIn URL) while keeping the existing email behaviour for
+ * email-carrying rows.
+ */
+export function leadIdentityKey(lead: {
+  email?: string;
+  linkedin_url?: string;
+}): string | null {
+  const email = (lead.email ?? "").trim().toLowerCase();
+  if (email) return `email:${email}`;
+  const url = normalizeLinkedinUrl(lead.linkedin_url ?? "");
+  if (url) return `linkedin:${url}`;
+  return null;
 }
 
 export interface CsvImportResult {
@@ -275,7 +307,8 @@ export interface CsvImportResult {
 export function processCsvImport(
   rows: string[][],
   mapping: ColumnMapping,
-  existingEmails: Iterable<string>
+  existingEmails: Iterable<string>,
+  existingLinkedinUrls: Iterable<string> = []
 ): CsvImportResult {
   const result: CsvImportResult = {
     leads: [],
@@ -300,7 +333,12 @@ export function processCsvImport(
 
   const existing = new Set<string>();
   for (const e of Array.from(existingEmails)) {
-    if (e) existing.add(e.trim().toLowerCase());
+    const key = leadIdentityKey({ email: e });
+    if (key) existing.add(key);
+  }
+  for (const u of Array.from(existingLinkedinUrls)) {
+    const key = leadIdentityKey({ linkedin_url: u });
+    if (key) existing.add(key);
   }
   const seenInFile = new Set<string>();
 
@@ -324,16 +362,19 @@ export function processCsvImport(
       continue;
     }
 
-    const emailKey = lead.email.toLowerCase();
-    if (existing.has(emailKey)) {
-      result.duplicates.push({ row: fileRow, email: lead.email, reason: "existing" });
+    const identity = leadIdentityKey(lead);
+    // A validated lead always has an identity (validateLeadRow requires
+    // an email or a LinkedIn URL), so `identity` is never null here.
+    const identityLabel = lead.email ?? lead.linkedin_url ?? "";
+    if (identity && existing.has(identity)) {
+      result.duplicates.push({ row: fileRow, identity: identityLabel, reason: "existing" });
       continue;
     }
-    if (seenInFile.has(emailKey)) {
-      result.duplicates.push({ row: fileRow, email: lead.email, reason: "in-file" });
+    if (identity && seenInFile.has(identity)) {
+      result.duplicates.push({ row: fileRow, identity: identityLabel, reason: "in-file" });
       continue;
     }
-    seenInFile.add(emailKey);
+    if (identity) seenInFile.add(identity);
     result.leads.push(lead);
   }
 
@@ -362,6 +403,55 @@ export const LEAD_EXPORT_HEADERS = [
   "Tags",
   "Added",
 ] as const;
+
+export const CAMPAIGN_EXPORT_HEADERS = [
+  "Campaign",
+  "Type",
+  "Status",
+  "Created",
+  "Prospects",
+  "LinkedIn Connections Sent",
+  "LinkedIn Accepted",
+  "LinkedIn Messages Sent",
+  "LinkedIn Replied",
+  "Email Sent",
+  "Email Opened",
+  "Email Clicked",
+  "Email Replied",
+] as const;
+
+/**
+ * Campaigns export — one row per campaign with the honest stats from
+ * campaign-stats.ts. Metrics with no data source (LinkedIn Accepted,
+ * email Opened/Clicked when the provider event log is unavailable) are
+ * exported as "n/a" — never as an invented number.
+ */
+export function campaignsToCsv(
+  rows: Array<{ campaign: Campaign; stats: CampaignStats | undefined }>
+): string {
+  const num = (v: number | null | undefined): string =>
+    v === null || v === undefined ? "n/a" : String(v);
+  const lines: string[] = [CAMPAIGN_EXPORT_HEADERS.join(",")];
+  for (const { campaign, stats } of rows) {
+    const cells = [
+      campaign.name,
+      campaign.type,
+      campaign.status,
+      campaign.created_at,
+      num(stats?.prospects),
+      num(stats?.linkedin.connectionRequestsSent),
+      num(stats?.linkedin.accepted ?? null),
+      num(stats?.linkedin.messagesSent),
+      num(stats?.linkedin.replied),
+      num(stats?.email.sent),
+      num(stats?.email.opened ?? null),
+      num(stats?.email.clicked ?? null),
+      num(stats?.email.replied),
+    ];
+    lines.push(cells.map((c) => escapeCsvField(String(c))).join(","));
+  }
+  return lines.join("\r\n") + "\r\n";
+}
 
 export function leadsToCsv(leads: Lead[]): string {
   const lines: string[] = [LEAD_EXPORT_HEADERS.join(",")];

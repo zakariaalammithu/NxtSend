@@ -19,6 +19,10 @@ import {
   type IntegrationsRepository,
 } from "./integrations";
 import { createAdminRepository, type AdminRepository } from "./admin";
+import {
+  createAccountsRepository,
+  type AccountsRepository,
+} from "./accounts";
 import { createInboxRepository, type InboxRepository } from "./inbox";
 import { createUsageRepository, type UsageRepository } from "./usage";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -35,6 +39,20 @@ export type {
   EnrollmentRecord,
 } from "./campaigns";
 export type { IntegrationsRepository } from "./integrations";
+export type {
+  AccountsRepository,
+  CreateAccountInput,
+  UpdateAccountPatch,
+} from "./accounts";
+export {
+  DEMO_LINKEDIN_ACCOUNT_ID,
+  DEMO_EMAIL_ACCOUNT_ID,
+  accountLimits,
+  accountSenderVars,
+  profileSenderVars,
+  resolveSenderVars,
+  withDefaultLimits,
+} from "./accounts";
 export type {
   AdminRepository,
   AdminUserRecord,
@@ -56,9 +74,21 @@ export {
   type HistoryMessage,
   type MessageVerification,
 } from "./message-history";
+export {
+  loadCampaignStats,
+  loadCampaignExecutions,
+  computeCampaignStats,
+  aggregateCampaignStats,
+  countEmailEvents,
+  type CampaignStats,
+  type CampaignStatsDeps,
+  type CampaignStatsSource,
+  type EmailEventCounts,
+} from "./campaign-stats";
 
 let leadsRepo: LeadsRepository | null = null;
 let campaignsRepo: CampaignsRepository | null = null;
+let accountsRepo: AccountsRepository | null = null;
 let integrationsRepo: IntegrationsRepository | null = null;
 let adminRepo: AdminRepository | null = null;
 let demoInboxRepo: InboxRepository | null = null;
@@ -77,6 +107,11 @@ export function getLeadsRepository(): LeadsRepository {
 export function getCampaignsRepository(): CampaignsRepository {
   if (!campaignsRepo) campaignsRepo = createCampaignsRepository(getDataMode());
   return campaignsRepo;
+}
+
+export function getAccountsRepository(): AccountsRepository {
+  if (!accountsRepo) accountsRepo = createAccountsRepository(getDataMode());
+  return accountsRepo;
 }
 
 export function getIntegrationsRepository(): IntegrationsRepository {

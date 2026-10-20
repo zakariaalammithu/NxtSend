@@ -143,7 +143,8 @@ export function AcademySeries() {
               priority
               className="absolute inset-0 size-full object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black-900/95 via-black-900/20 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black-900/85 via-black-900/40 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black-900/95 via-black-900/45 to-transparent" />
             <div className="relative flex max-w-160 flex-col items-start p-8 md:p-14 xl:p-16">
               <span className="mb-2 text-13 font-semibold uppercase tracking-wide text-white/60">
                 NxtSend Academy

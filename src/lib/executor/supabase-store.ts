@@ -24,6 +24,7 @@ import type {
   ExecutorEnrollment,
   ExecutorStore,
   LeadSignals,
+  SenderIdentity,
   StepExecutionRecord,
 } from "./types";
 
@@ -121,6 +122,51 @@ export class SupabaseExecutorStore implements ExecutorStore {
       type: (r.type as ExecutorCampaign["type"]) ?? "linkedin",
       status: String(r.status ?? "draft"),
     };
+  }
+
+  /**
+   * Sender identity for the {my_*} variables: the campaign's
+   * connected account (migration 011) for the requested channel.
+   * Any failure (011 not applied yet, account deleted) resolves to
+   * null — rendering falls back to the templates' {my_*:fallback}.
+   */
+  async getSenderIdentity(
+    workspaceId: string,
+    campaignId: string,
+    channel: "linkedin" | "email"
+  ): Promise<SenderIdentity | null> {
+    try {
+      const { data: camp, error } = await this.admin
+        .from("campaigns")
+        .select("sender_account_id, email_account_id")
+        .eq("workspace_id", workspaceId)
+        .eq("id", campaignId)
+        .maybeSingle();
+      if (error || !camp) return null;
+      const row = camp as Row;
+      const accountId = (channel === "linkedin"
+        ? row.sender_account_id
+        : row.email_account_id) as string | null;
+      if (!accountId) return null;
+      const { data: acc, error: accError } = await this.admin
+        .from("connected_accounts")
+        .select(
+          "sender_first_name, sender_last_name, sender_job_title, sender_company"
+        )
+        .eq("workspace_id", workspaceId)
+        .eq("id", accountId)
+        .maybeSingle();
+      if (accError || !acc) return null;
+      const a = acc as Row;
+      return {
+        firstName: (a.sender_first_name as string) || undefined,
+        lastName: (a.sender_last_name as string) || undefined,
+        jobTitle: (a.sender_job_title as string) || undefined,
+        companyName: (a.sender_company as string) || undefined,
+      };
+    } catch {
+      return null;
+    }
   }
 
   async getSteps(campaignId: string): Promise<CampaignStep[]> {

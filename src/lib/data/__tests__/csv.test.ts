@@ -127,13 +127,38 @@ describe("validateLeadRow", () => {
     expect(lead?.tags).toEqual([]);
   });
 
-  it("rejects a missing email", () => {
+  it("rejects a row with neither an email nor a LinkedIn URL", () => {
     const { lead, errors } = validateLeadRow({
       ...EMPTY_VALUES,
       first_name: "Jane",
     });
     expect(lead).toBeUndefined();
-    expect(errors.some((e) => e.includes("Missing email"))).toBe(true);
+    expect(
+      errors.some((e) => e.includes("Missing email and LinkedIn URL"))
+    ).toBe(true);
+  });
+
+  it("accepts a LinkedIn-URL-only row (My Network exports have no emails)", () => {
+    const { lead, errors } = validateLeadRow({
+      ...EMPTY_VALUES,
+      first_name: "Jane",
+      last_name: "Doe",
+      linkedin_url: "https://www.linkedin.com/in/jane-doe",
+    });
+    expect(errors).toEqual([]);
+    expect(lead?.email).toBeUndefined();
+    expect(lead?.linkedin_url).toBe("https://www.linkedin.com/in/jane-doe");
+  });
+
+  it("still validates the email format when an email is present", () => {
+    const { lead, errors } = validateLeadRow({
+      ...EMPTY_VALUES,
+      first_name: "Jane",
+      email: "not-an-email",
+      linkedin_url: "https://www.linkedin.com/in/jane-doe",
+    });
+    expect(lead).toBeUndefined();
+    expect(errors.some((e) => e.includes("Invalid email"))).toBe(true);
   });
 
   it("rejects an invalid email", () => {
@@ -206,7 +231,7 @@ describe("processCsvImport", () => {
     const result = processCsvImport(rows, MAPPING, ["jane@acme.com"]);
     expect(result.leads).toHaveLength(0);
     expect(result.duplicates).toEqual([
-      { row: 2, email: "JANE@acme.com", reason: "existing" },
+      { row: 2, identity: "JANE@acme.com", reason: "existing" },
     ]);
   });
 
@@ -220,8 +245,58 @@ describe("processCsvImport", () => {
     expect(result.leads).toHaveLength(1);
     expect(result.leads[0].first_name).toBe("Jane");
     expect(result.duplicates).toEqual([
-      { row: 3, email: "jane@acme.com", reason: "in-file" },
+      { row: 3, identity: "jane@acme.com", reason: "in-file" },
     ]);
+  });
+
+  it("imports LinkedIn-URL-only rows and dedupes on the URL", () => {
+    const NET_HEADERS = ["First Name", "Last Name", "Profile URL"];
+    const NET_MAPPING = {
+      first_name: "First Name",
+      last_name: "Last Name",
+      linkedin_url: "Profile URL",
+    };
+    const rows = [
+      NET_HEADERS,
+      ["Jane", "Doe", "https://www.linkedin.com/in/jane-doe"],
+      // Same person, trailing slash + case variant — still a duplicate.
+      ["Jane", "Doe", "https://www.linkedin.com/in/Jane-Doe/"],
+      ["John", "Smith", "https://www.linkedin.com/in/john-smith"],
+    ];
+    const result = processCsvImport(rows, NET_MAPPING, [], [
+      "https://www.linkedin.com/in/john-smith",
+    ]);
+    expect(result.totalDataRows).toBe(3);
+    expect(result.leads).toHaveLength(1);
+    expect(result.leads[0].first_name).toBe("Jane");
+    expect(result.leads[0].email).toBeUndefined();
+    expect(result.duplicates).toEqual([
+      {
+        row: 3,
+        identity: "https://www.linkedin.com/in/Jane-Doe/",
+        reason: "in-file",
+      },
+      {
+        row: 4,
+        identity: "https://www.linkedin.com/in/john-smith",
+        reason: "existing",
+      },
+    ]);
+  });
+
+  it("does not dedupe an email row against a LinkedIn-only row", () => {
+    const rows = [
+      ["First Name", "Email", "LinkedIn URL"],
+      ["Jane", "jane@acme.com", ""],
+      ["Janet", "", "https://www.linkedin.com/in/janet"],
+    ];
+    const result = processCsvImport(
+      rows,
+      { first_name: "First Name", email: "Email", linkedin_url: "LinkedIn URL" },
+      []
+    );
+    expect(result.leads).toHaveLength(2);
+    expect(result.duplicates).toEqual([]);
   });
 
   it("reports per-row errors with file row numbers", () => {

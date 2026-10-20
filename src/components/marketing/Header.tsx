@@ -33,7 +33,7 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       {
         label: "LinkedIn Automation",
-        href: "/",
+        href: "/#how-it-works",
         description: "Automated connection requests and message sequences",
         icon: LinkedInIcon,
       },
@@ -51,7 +51,7 @@ export const NAV_ITEMS: NavItem[] = [
       },
       {
         label: "Analytics",
-        href: "/",
+        href: "/#analytics",
         description: "Track performance and optimize campaigns",
         icon: AnalyticsIcon,
       },

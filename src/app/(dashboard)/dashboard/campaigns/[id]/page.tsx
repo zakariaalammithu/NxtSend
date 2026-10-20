@@ -3,18 +3,30 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Play, Pause, Archive, Target, Users, MessageSquare, Clock, Mail, Linkedin, CheckCircle2, Pencil, Plus, Trash2, ArrowUp, ArrowDown, Save, X } from "lucide-react";
+import { ArrowLeft, Play, Pause, Archive, Target, Users, MessageSquare, Mail, Linkedin, CheckCircle2, Pencil, Save, X } from "lucide-react";
 import { DemoBanner, Badge } from "@/components/ui";
 import { StatsCard } from "@/components/dashboard/StatsCard";
-import { MOCK_PERFORMANCE_DATA } from "@/lib/db/mock/data";
 import {
+  getAccountsRepository,
   getCampaignsRepository,
+  getInboxRepository,
   getLeadsRepository,
+  loadCampaignStats,
+  resolveSenderVars,
   resolveWorkspaceId,
   type ActivityEntry,
-  type CampaignStepDraft,
+  type CampaignStats,
   type EnrollmentRecord,
 } from "@/lib/data";
+import { getUserSettingsRepository } from "@/lib/data/user-settings";
+import { SequenceBuilder } from "@/components/dashboard/sequence/SequenceBuilder";
+import {
+  campaignStepToDraft,
+  collectCustomFieldNames,
+  draftToPayload,
+  leadToPreviewContact,
+  type SequenceStepDraft,
+} from "@/lib/sequence";
 import { formatDate } from "@/lib/utils";
 import { runDemoSequenceScan } from "@/lib/executor/demo-runner";
 import type { ExecutorRunSummary } from "@/lib/executor/types";
@@ -26,22 +38,27 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import type { Campaign, CampaignStatus, CampaignStep, CampaignType, Lead, StepType } from "@/types";
+import type { Campaign, CampaignStatus, CampaignStep, CampaignType, ConnectedAccount, Lead } from "@/types";
 
-interface StepEditDraft {
-  step_type: StepType;
-  delay_hours: number;
-  subject: string;
-  content: string;
+function AnalyticsTile({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div className="rounded-xl bg-black-800/80 p-3.5 border border-black-700">
+      <span className="text-black-400 text-11 block">{label}</span>
+      <span className="font-semibold text-white text-18 mt-0.5 block">
+        {value}
+      </span>
+      {hint && <span className="text-11 text-black-500 block mt-0.5">{hint}</span>}
+    </div>
+  );
 }
-
-const STEP_TYPE_OPTIONS: StepType[] = [
-  "connection_request",
-  "linkedin_message",
-  "email",
-  "wait",
-  "condition",
-];
 
 export default function CampaignDetailPage() {
   const params = useParams();
@@ -49,13 +66,21 @@ export default function CampaignDetailPage() {
 
   const campaignsRepo = React.useMemo(() => getCampaignsRepository(), []);
   const leadsRepo = React.useMemo(() => getLeadsRepository(), []);
+  const inboxRepo = React.useMemo(() => getInboxRepository(), []);
+  const accountsRepo = React.useMemo(() => getAccountsRepository(), []);
   const isDemo = campaignsRepo.mode === "demo";
 
   const [workspaceId, setWorkspaceId] = React.useState<string | null>(null);
   const [campaign, setCampaign] = React.useState<Campaign | null>(null);
+  // The campaign's sender account (for the sequence drawer's {my_*}
+  // preview) + the signed-in profile name as its fallback.
+  const [senderAccount, setSenderAccount] =
+    React.useState<ConnectedAccount | null>(null);
+  const [profileName, setProfileName] = React.useState<string | null>(null);
   const [steps, setSteps] = React.useState<CampaignStep[]>([]);
   const [activity, setActivity] = React.useState<ActivityEntry[]>([]);
   const [enrollments, setEnrollments] = React.useState<EnrollmentRecord[]>([]);
+  const [stats, setStats] = React.useState<CampaignStats | null>(null);
   const [leadsById, setLeadsById] = React.useState<Map<string, Lead>>(new Map());
   const [isLoading, setIsLoading] = React.useState(true);
   const [notFound, setNotFound] = React.useState(false);
@@ -87,12 +112,85 @@ export default function CampaignDetailPage() {
     "overview" | "sequence" | "leads" | "analytics"
   >("overview");
 
-  // Edit state
+  // Edit state (name/type — the sequence itself is edited on the
+  // Sequence tab's canvas, P4 Stage 3)
   const [isEditing, setIsEditing] = React.useState(false);
   const [editName, setEditName] = React.useState("");
   const [editType, setEditType] = React.useState<CampaignType>("linkedin");
-  const [editSteps, setEditSteps] = React.useState<StepEditDraft[]>([]);
   const [isSaving, setIsSaving] = React.useState(false);
+
+  // Sequence canvas state: drafts mirror the stored steps once loaded;
+  // "Save sequence" writes them back through replaceCampaignSteps.
+  const [seqDrafts, setSeqDrafts] = React.useState<SequenceStepDraft[] | null>(null);
+  const [savedSeqJson, setSavedSeqJson] = React.useState<string>("");
+  const [seqSaving, setSeqSaving] = React.useState(false);
+  const [seqError, setSeqError] = React.useState<string | null>(null);
+  const [seqNotice, setSeqNotice] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (seqDrafts === null && campaign) {
+      const drafts = steps.map(campaignStepToDraft);
+      setSeqDrafts(drafts);
+      setSavedSeqJson(JSON.stringify(drafts));
+    }
+  }, [steps, campaign, seqDrafts]);
+
+  const seqDirty =
+    seqDrafts !== null && JSON.stringify(seqDrafts) !== savedSeqJson;
+
+  const seqPreviewContacts = React.useMemo(() => {
+    const enrolled = enrollments
+      .map((e) => leadsById.get(e.lead_id))
+      .filter((l): l is Lead => Boolean(l));
+    return enrolled.map(leadToPreviewContact);
+  }, [enrollments, leadsById]);
+
+  const seqCustomFieldNames = React.useMemo(
+    () =>
+      collectCustomFieldNames(
+        Array.from(leadsById.values()).map(leadToPreviewContact)
+      ),
+    [leadsById]
+  );
+
+  // {my_*} preview variables: the campaign's sender account identity
+  // first, then the signed-in profile, then template fallbacks.
+  const seqSenderVars = React.useMemo(
+    () => resolveSenderVars(senderAccount, profileName),
+    [senderAccount, profileName]
+  );
+
+  const handleSaveSequence = async () => {
+    if (!workspaceId || !campaign || !seqDrafts) return;
+    setSeqSaving(true);
+    setSeqError(null);
+    setSeqNotice(null);
+    try {
+      const savedSteps = await campaignsRepo.replaceCampaignSteps(
+        campaign.id,
+        seqDrafts.map(draftToPayload)
+      );
+      await campaignsRepo
+        .appendActivity(workspaceId, {
+          campaign_id: campaign.id,
+          action: "campaign_updated",
+          details: `Campaign "${campaign.name}" sequence edited on the canvas (${savedSteps.length} top-level steps).`,
+        })
+        .catch(() => undefined);
+      const drafts = savedSteps.map(campaignStepToDraft);
+      setSteps(savedSteps);
+      setSeqDrafts(drafts);
+      setSavedSeqJson(JSON.stringify(drafts));
+      setActivity(await campaignsRepo.listActivity(workspaceId, campaign.id));
+      setSeqNotice("Sequence saved.");
+    } catch (err) {
+      setSeqError(
+        err instanceof Error ? err.message : "Failed to save the sequence."
+      );
+    } finally {
+      setSeqSaving(false);
+    }
+  };
 
   const loadAll = React.useCallback(
     async (ws: string, campaignId: string) => {
@@ -109,13 +207,48 @@ export default function CampaignDetailPage() {
         return;
       }
       setCampaign(camp);
+      // Resolve the campaign's sender account for the {my_*}
+      // variables in the sequence drawer preview. A deleted account
+      // resolves to null and the preview falls back to the profile.
+      const [liAccount, emAccount] = await Promise.all([
+        camp.sender_account_id
+          ? accountsRepo.getAccount(ws, camp.sender_account_id)
+          : Promise.resolve(null),
+        camp.email_account_id
+          ? accountsRepo.getAccount(ws, camp.email_account_id)
+          : Promise.resolve(null),
+      ]);
+      setSenderAccount(liAccount ?? emAccount);
+      try {
+        const settings = await getUserSettingsRepository().getSettings();
+        setProfileName(settings.identity.full_name);
+      } catch {
+        // Preview fallback only — never block the page.
+      }
       setSteps(stepRows);
       setActivity(activityRows);
       setEnrollments(enrollmentRows);
       setLeadsById(new Map(leadRows.map((l) => [l.id, l])));
+      // Honest stats for the Overview cards + Analytics tab, derived
+      // from this campaign's enrollments, messages and step executions.
+      const statsResult = await loadCampaignStats(
+        { campaignsRepo, inboxRepo, leadsRepo, mode: campaignsRepo.mode },
+        ws,
+        [camp]
+      );
+      setStats(statsResult.byCampaign.get(campaignId) ?? null);
     },
-    [campaignsRepo, leadsRepo]
+    [campaignsRepo, leadsRepo, inboxRepo, accountsRepo]
   );
+
+  // Deep link support: /dashboard/campaigns/[id]?tab=analytics (used by
+  // the list page's per-row analytics action).
+  React.useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "overview" || t === "sequence" || t === "leads" || t === "analytics") {
+      setActiveTab(t);
+    }
+  }, []);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -179,14 +312,6 @@ export default function CampaignDetailPage() {
     if (!campaign) return;
     setEditName(campaign.name);
     setEditType(campaign.type);
-    setEditSteps(
-      steps.map((s) => ({
-        step_type: s.step_type,
-        delay_hours: s.delay_hours,
-        subject: s.subject ?? "",
-        content: s.content ?? "",
-      }))
-    );
     setIsEditing(true);
   };
 
@@ -199,27 +324,15 @@ export default function CampaignDetailPage() {
         name: editName.trim() || campaign.name,
         type: editType,
       });
-      const drafts: CampaignStepDraft[] = editSteps.map((s) => ({
-        step_type: s.step_type,
-        delay_hours: s.delay_hours,
-        subject: s.subject,
-        content: s.content,
-        config: {},
-      }));
-      const savedSteps = await campaignsRepo.replaceCampaignSteps(
-        campaign.id,
-        drafts
-      );
       // Activity write is best-effort here: the edit itself has committed.
       await campaignsRepo
         .appendActivity(workspaceId, {
           campaign_id: campaign.id,
           action: "campaign_updated",
-          details: `Campaign "${updated.name}" edited (${savedSteps.length} steps).`,
+          details: `Campaign "${updated.name}" details edited (name/type). Sequence steps are edited on the Sequence tab.`,
         })
         .catch(() => undefined);
       setCampaign(updated);
-      setSteps(savedSteps);
       setActivity(await campaignsRepo.listActivity(workspaceId, campaign.id));
       setIsEditing(false);
     } catch (err) {
@@ -229,18 +342,6 @@ export default function CampaignDetailPage() {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const moveEditStep = (index: number, direction: "up" | "down") => {
-    setEditSteps((prev) => {
-      const next = [...prev];
-      const target = direction === "up" ? index - 1 : index + 1;
-      if (target < 0 || target >= next.length) return prev;
-      const tmp = next[index];
-      next[index] = next[target];
-      next[target] = tmp;
-      return next;
-    });
   };
 
   if (isLoading) {
@@ -399,140 +500,12 @@ export default function CampaignDetailPage() {
             </div>
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-13 font-semibold text-white">Sequence Steps</h4>
-              <button
-                type="button"
-                onClick={() =>
-                  setEditSteps((prev) => [
-                    ...prev,
-                    { step_type: "email", delay_hours: 24, subject: "", content: "" },
-                  ])
-                }
-                className="inline-flex items-center gap-1 rounded-lg bg-black-800 hover:bg-black-700 border border-black-600 px-2.5 py-1.5 text-12 text-black-200"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Add Step</span>
-              </button>
-            </div>
-
-            {editSteps.map((step, idx) => (
-              <div
-                key={idx}
-                className="rounded-2xl border border-black-700/80 bg-black-800/70 p-4 space-y-3"
-              >
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-black-700 text-12 font-bold text-white">
-                      {idx + 1}
-                    </span>
-                    <select
-                      value={step.step_type}
-                      onChange={(e) =>
-                        setEditSteps((prev) =>
-                          prev.map((s, i) =>
-                            i === idx
-                              ? { ...s, step_type: e.target.value as StepType }
-                              : s
-                          )
-                        )
-                      }
-                      className="rounded-lg border border-black-600 bg-black-800 px-2 py-1.5 text-12 text-white focus:outline-none focus:border-purple-500"
-                    >
-                      {STEP_TYPE_OPTIONS.map((t) => (
-                        <option key={t} value={t}>
-                          {t.replace("_", " ")}
-                        </option>
-                      ))}
-                    </select>
-                    <label className="text-11 text-black-400 flex items-center gap-1.5">
-                      Delay (h)
-                      <input
-                        type="number"
-                        min="0"
-                        value={step.delay_hours}
-                        onChange={(e) =>
-                          setEditSteps((prev) =>
-                            prev.map((s, i) =>
-                              i === idx
-                                ? { ...s, delay_hours: Number(e.target.value) || 0 }
-                                : s
-                            )
-                          )
-                        }
-                        className="w-20 rounded-lg border border-black-600 bg-black-800 px-2 py-1.5 text-12 text-white focus:outline-none focus:border-purple-500"
-                      />
-                    </label>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      disabled={idx === 0}
-                      onClick={() => moveEditStep(idx, "up")}
-                      className="h-7 w-7 flex items-center justify-center rounded-lg text-black-400 hover:text-white hover:bg-black-700 disabled:opacity-20"
-                      title="Move Up"
-                    >
-                      <ArrowUp className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={idx === editSteps.length - 1}
-                      onClick={() => moveEditStep(idx, "down")}
-                      className="h-7 w-7 flex items-center justify-center rounded-lg text-black-400 hover:text-white hover:bg-black-700 disabled:opacity-20"
-                      title="Move Down"
-                    >
-                      <ArrowDown className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setEditSteps((prev) => prev.filter((_, i) => i !== idx))
-                      }
-                      className="h-7 w-7 flex items-center justify-center rounded-lg text-black-400 hover:text-rose-400 hover:bg-rose-950/20"
-                      title="Delete Step"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                <input
-                  type="text"
-                  value={step.subject}
-                  onChange={(e) =>
-                    setEditSteps((prev) =>
-                      prev.map((s, i) =>
-                        i === idx ? { ...s, subject: e.target.value } : s
-                      )
-                    )
-                  }
-                  placeholder="Step label / subject"
-                  className="input-field py-2 text-13"
-                />
-                {step.step_type !== "wait" && (
-                  <textarea
-                    rows={3}
-                    value={step.content}
-                    onChange={(e) =>
-                      setEditSteps((prev) =>
-                        prev.map((s, i) =>
-                          i === idx ? { ...s, content: e.target.value } : s
-                        )
-                      )
-                    }
-                    placeholder="Message body (supports {{first_name}}, {{company}})"
-                    className="input-field py-2 text-13 resize-none font-mono text-12 text-black-200"
-                  />
-                )}
-              </div>
-            ))}
-            {editSteps.length === 0 && (
-              <p className="text-12 text-black-400">
-                No steps. Add a step before saving, or save with zero steps to clear the sequence.
-              </p>
-            )}
-          </div>
+          <p className="text-12 text-black-400 leading-relaxed">
+            The sequence itself is edited on the{" "}
+            <strong className="text-white">Sequence tab</strong> — the canvas
+            builder with templates, branches and the message editor lives
+            there, and saves through the same repository.
+          </p>
 
           <div className="flex justify-end gap-3 pt-3 border-t border-black-700">
             <button
@@ -584,6 +557,12 @@ export default function CampaignDetailPage() {
       {/* TAB CONTENT: Overview */}
       {activeTab === "overview" && (
         <div className="space-y-6">
+          {/* Overview stats — all four are real counts from the stats
+              module (enrollments, message history, step executions).
+              The previous hardcoded 42/36/14 literals and the invented
+              "Configuration Summary" (50/day cap, sending window,
+              "Smart Random Delays") were removed: none of those values
+              are stored or enforced anywhere in the product. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4.5">
             <StatsCard
               label="Enrolled Leads"
@@ -593,52 +572,26 @@ export default function CampaignDetailPage() {
               isDemo={isDemo}
             />
             <StatsCard
-              label="Active Sequence"
-              value={42}
-              change={5}
-              changeType="up"
+              label="In Progress"
+              value={stats ? stats.enrollments.inProgress : "—"}
               icon={Target}
-              sublabel="in progress"
-              isDemo={true}
+              sublabel="enrollments not finished"
+              isDemo={isDemo}
             />
             <StatsCard
               label="Completed"
-              value={36}
-              change={20}
-              changeType="up"
+              value={stats ? stats.enrollments.completed : "—"}
               icon={CheckCircle2}
-              sublabel="all steps executed"
-              isDemo={true}
+              sublabel="finished every step"
+              isDemo={isDemo}
             />
             <StatsCard
               label="Replies"
-              value={14}
-              change={16.7}
-              changeType="up"
+              value={stats ? stats.repliesTotal : "—"}
               icon={MessageSquare}
-              sublabel="positive interest"
-              isDemo={true}
+              sublabel="inbound replies recorded"
+              isDemo={isDemo}
             />
-          </div>
-
-          <div className="glass-card p-6">
-            <h3 className="text-16 font-semibold text-white mb-2">
-              Campaign Configuration Summary
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-13 pt-2">
-              <div className="rounded-xl bg-black-800/80 p-3.5 border border-black-700">
-                <span className="text-black-400 text-11 block">Daily Sending Cap</span>
-                <span className="font-semibold text-white text-15 mt-0.5 block">50 touches / day</span>
-              </div>
-              <div className="rounded-xl bg-black-800/80 p-3.5 border border-black-700">
-                <span className="text-black-400 text-11 block">Sending Window</span>
-                <span className="font-semibold text-white text-15 mt-0.5 block">Mon - Fri, 09:00 - 18:00</span>
-              </div>
-              <div className="rounded-xl bg-black-800/80 p-3.5 border border-black-700">
-                <span className="text-black-400 text-11 block">Account Safety</span>
-                <span className="font-semibold text-emerald-400 text-15 mt-0.5 block">Smart Random Delays (Active)</span>
-              </div>
-            </div>
           </div>
 
           {/* Sequence execution — the executor (src/lib/executor)
@@ -750,60 +703,58 @@ export default function CampaignDetailPage() {
       {/* TAB CONTENT: Sequence */}
       {activeTab === "sequence" && (
         <div className="glass-card p-6 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-black-700">
+          <div className="flex items-center justify-between pb-3 border-b border-black-700 flex-wrap gap-3">
             <div>
               <h3 className="text-16 font-semibold text-white">Sequence Flow</h3>
-              <p className="text-12 text-black-400">
-                Steps stored for this campaign. Use Edit above to change them.
-                Execution is simulated — no messages are sent.
+              <p className="text-12 text-black-400 max-w-xl">
+                Build on the canvas — templates, &quot;if connected&quot; branches and
+                the message editor. Changes save when you click Save sequence.{" "}
+                {isDemo
+                  ? "In Demo Mode execution is simulated: email sends are labelled Simulated and LinkedIn steps are recorded as skipped."
+                  : "Email steps are sent by the background worker; LinkedIn steps are recorded as skipped (no authorized provider)."}
               </p>
             </div>
-            <span className="demo-badge">{steps.length} Steps</span>
-          </div>
-
-          <div className="space-y-4 pt-2">
-            {steps.length === 0 && (
-              <p className="text-13 text-black-400">
-                This campaign has no steps yet. Click Edit to build its sequence.
-              </p>
-            )}
-            {steps.map((step, idx) => (
-              <div
-                key={step.id}
-                className="rounded-2xl border border-black-700/80 bg-black-800/70 p-5 space-y-2.5 relative"
+            <div className="flex items-center gap-2">
+              {seqDirty && (
+                <span className="text-11 font-medium text-amber-300">
+                  Unsaved changes
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleSaveSequence}
+                disabled={!seqDirty || seqSaving}
+                data-testid="save-sequence"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 px-4 py-2 text-13 font-semibold text-white shadow-glow-purple disabled:opacity-40"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-black-700 text-12 font-bold text-white">
-                      {idx + 1}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      {step.step_type === "connection_request" ? (
-                        <Linkedin className="h-4 w-4 text-blue-400" />
-                      ) : step.step_type === "wait" ? (
-                        <Clock className="h-4 w-4 text-orange-400" />
-                      ) : (
-                        <Mail className="h-4 w-4 text-purple-400" />
-                      )}
-                      <span className="text-14 font-semibold text-white">
-                        {step.subject || step.step_type.replace("_", " ")}
-                      </span>
-                    </div>
-                  </div>
-
-                  <span className="text-11 text-black-400">
-                    Delay: {step.delay_hours}h
-                  </span>
-                </div>
-
-                {step.content && (
-                  <p className="text-13 text-black-200 font-mono bg-black-900/60 p-3 rounded-xl border border-black-700/60">
-                    {step.content}
-                  </p>
-                )}
-              </div>
-            ))}
+                <Save className="h-4 w-4" />
+                <span>{seqSaving ? "Saving…" : "Save sequence"}</span>
+              </button>
+            </div>
           </div>
+
+          {seqError && (
+            <p className="text-12 text-rose-300">{seqError}</p>
+          )}
+          {seqNotice && !seqDirty && (
+            <p className="text-12 text-emerald-300">{seqNotice}</p>
+          )}
+
+          {seqDrafts !== null && (
+            <SequenceBuilder
+              steps={seqDrafts}
+              onStepsChange={(next) => {
+                setSeqDrafts(next);
+                setSeqNotice(null);
+              }}
+              campaignName={campaign?.name ?? ""}
+              campaignDescription={campaign?.description ?? ""}
+              previewContacts={seqPreviewContacts}
+              customFieldNames={seqCustomFieldNames}
+              sender={seqSenderVars}
+              showEntryModal={false}
+            />
+          )}
         </div>
       )}
 
@@ -865,28 +816,125 @@ export default function CampaignDetailPage() {
         </div>
       )}
 
-      {/* TAB CONTENT: Analytics */}
+      {/* TAB CONTENT: Analytics — real aggregates from the stats
+          module (enrollments, message history, step executions). The
+          previous MOCK_PERFORMANCE_DATA chart was removed. */}
       {activeTab === "analytics" && (
-        <div className="glass-card p-6 space-y-4">
+        <div className="glass-card p-6 space-y-5">
           <div className="flex items-center justify-between pb-3 border-b border-black-700">
             <div>
-              <h3 className="text-16 font-semibold text-white">Conversion Funnel</h3>
-              <p className="text-12 text-black-400">Weekly touches and response rates for this sequence</p>
+              <h3 className="text-16 font-semibold text-white">Campaign Analytics</h3>
+              <p className="text-12 text-black-400">
+                Computed from this campaign&apos;s recorded enrollments,
+                messages and step executions — nothing here is estimated.
+              </p>
             </div>
-            <span className="demo-badge">Demo Data</span>
+            {isDemo && <span className="demo-badge">Demo Mode</span>}
           </div>
 
-          <div className="h-[260px] pt-4">
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={MOCK_PERFORMANCE_DATA}>
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="messages" name="Touches" fill="#642cff" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="replies" name="Replies" fill="#10b981" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {!stats ? (
+            <p className="text-13 text-black-400">Loading analytics…</p>
+          ) : (
+            <>
+              <div>
+                <h4 className="text-13 font-semibold text-white mb-2.5 flex items-center gap-2">
+                  <Linkedin className="h-4 w-4 text-blue-400" /> LinkedIn
+                  {!stats.linkedin.providerConnected && (
+                    <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-10 font-semibold text-amber-300">
+                      Provider not connected — steps recorded, not sent
+                    </span>
+                  )}
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <AnalyticsTile label="Connections sent" value={String(stats.linkedin.connectionRequestsSent)} />
+                  <AnalyticsTile label="Accepted" value="—" hint="No data source until a provider reports it" />
+                  <AnalyticsTile label="Messages sent" value={String(stats.linkedin.messagesSent)} />
+                  <AnalyticsTile label="Replied" value={String(stats.linkedin.replied)} />
+                  <AnalyticsTile label="Steps skipped" value={String(stats.linkedin.stepsSkipped)} hint="No authorized LinkedIn provider" />
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-13 font-semibold text-white mb-2.5 flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-purple-400" /> Email
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+                  <AnalyticsTile
+                    label="Sent"
+                    value={String(stats.email.sent)}
+                    hint={`${stats.email.sentProviderConfirmed} provider-confirmed · ${stats.email.sentSimulated} simulated`}
+                  />
+                  <AnalyticsTile
+                    label="Opened"
+                    value={stats.email.opened === null ? "—" : String(stats.email.opened)}
+                    hint={stats.email.opened === null ? "No provider event source available" : "Provider webhook events (simulated in Demo Mode)"}
+                  />
+                  <AnalyticsTile
+                    label="Clicked"
+                    value={stats.email.clicked === null ? "—" : String(stats.email.clicked)}
+                    hint={stats.email.clicked === null ? "No provider event source available" : "Provider webhook events (simulated in Demo Mode)"}
+                  />
+                  <AnalyticsTile
+                    label="Bounced"
+                    value={stats.email.bounced === null ? "—" : String(stats.email.bounced)}
+                    hint={stats.email.bounced === null ? "No provider event source available" : "Provider-reported bounces; auto-suppressed"}
+                  />
+                  <AnalyticsTile
+                    label="Complained"
+                    value={stats.email.complained === null ? "—" : String(stats.email.complained)}
+                    hint={stats.email.complained === null ? "No provider event source available" : "Provider-reported complaints; auto-suppressed"}
+                  />
+                  <AnalyticsTile label="Replied" value={String(stats.email.replied)} />
+                  <AnalyticsTile label="Failed / blocked" value={String(stats.email.failed)} />
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-13 font-semibold text-white mb-2.5">
+                  Step execution outcomes
+                </h4>
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+                  <AnalyticsTile label="Sent" value={String(stats.executions.sent)} />
+                  <AnalyticsTile label="Simulated" value={String(stats.executions.simulated)} />
+                  <AnalyticsTile label="Skipped" value={String(stats.executions.skipped)} />
+                  <AnalyticsTile label="Stopped" value={String(stats.executions.stopped)} hint="Stop rules: reply / suppression" />
+                  <AnalyticsTile label="Executed" value={String(stats.executions.executed)} hint="Wait / condition steps" />
+                  <AnalyticsTile label="Failed" value={String(stats.executions.failed)} />
+                </div>
+              </div>
+
+              {stats.executions.total === 0 &&
+              stats.email.sent === 0 &&
+              stats.repliesTotal === 0 ? (
+                <p className="text-13 text-black-400">
+                  No execution or message activity has been recorded for
+                  this campaign yet. Enroll leads from the Leads page
+                  {isDemo
+                    ? ", then use “Run due steps now” in the Overview tab to execute due steps against the demo store."
+                    : " — due steps are executed by the background worker."}
+                </p>
+              ) : (
+                <div className="h-[240px] pt-2">
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart
+                      data={[
+                        { name: "Email sent", value: stats.email.sent },
+                        { name: "Email replies", value: stats.email.replied },
+                        { name: "LinkedIn replies", value: stats.linkedin.replied },
+                        { name: "Steps skipped", value: stats.executions.skipped },
+                        { name: "Completed", value: stats.enrollments.completed },
+                      ]}
+                    >
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="value" name="Count" fill="#642cff" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>

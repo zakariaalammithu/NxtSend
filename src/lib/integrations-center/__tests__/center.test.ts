@@ -171,6 +171,8 @@ describe("getIntegrationStatuses", () => {
       { name: "RESEND_API_KEY", present: true },
       { name: "EMAIL_FROM", present: true },
       { name: "RESEND_WEBHOOK_SECRET", present: true },
+      { name: "EMAIL_REPLY_TO", present: false },
+      { name: "UNSUBSCRIBE_SECRET", present: false },
     ]);
     // No secret value leaks anywhere in the payload.
     expect(JSON.stringify(entries)).not.toContain("fake-resend-key-123");
@@ -345,6 +347,56 @@ describe("verifyIntegration — live provider checks (fakes)", () => {
     });
     expect(bad?.status).toBe("Error");
     expect(bad?.attempted).toBe(true);
+  });
+
+  it("resend: EMAIL_FROM domain verified at the provider → verified, naming the domain", async () => {
+    const out = await verifyIntegration("resend", {
+      env: FAKE_ENV,
+      mode: "supabase",
+      resendListDomains: async () => ({
+        error: null,
+        domains: [
+          { id: "d1", name: "example.com", status: "verified", records: [] },
+        ],
+      }),
+    });
+    expect(out?.status).toBe("Connected and Verified");
+    expect(out?.ok).toBe(true);
+    expect(out?.message).toContain("example.com");
+  });
+
+  it("resend: EMAIL_FROM domain listed but unverified → Configuration Required warning", async () => {
+    const out = await verifyIntegration("resend", {
+      env: FAKE_ENV,
+      mode: "supabase",
+      resendListDomains: async () => ({
+        error: null,
+        domains: [
+          { id: "d1", name: "example.com", status: "pending", records: [] },
+        ],
+      }),
+    });
+    expect(out?.status).toBe("Configuration Required");
+    expect(out?.ok).toBe(false);
+    expect(out?.attempted).toBe(true);
+    expect(out?.message).toContain("not verified at Resend");
+  });
+
+  it("resend: EMAIL_FROM domain absent from the provider list → Configuration Required warning", async () => {
+    const out = await verifyIntegration("resend", {
+      env: FAKE_ENV,
+      mode: "supabase",
+      resendListDomains: async () => ({
+        error: null,
+        domains: [
+          { id: "d9", name: "someone-else.com", status: "verified", records: [] },
+        ],
+      }),
+    });
+    expect(out?.status).toBe("Configuration Required");
+    expect(out?.ok).toBe(false);
+    expect(out?.message).toContain("example.com");
+    expect(out?.message).toContain("someone-else.com");
   });
 
   it("stripe: account retrieve verifies; a throw surfaces as Error", async () => {

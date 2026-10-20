@@ -10,6 +10,8 @@
 import {
   Linkedin,
   Mail,
+  Inbox,
+  Send,
   CreditCard,
   Puzzle,
   FileSpreadsheet,
@@ -30,6 +32,8 @@ import type { CenterStatus } from "@/lib/integrations-center/types";
 export const INTEGRATION_ICONS: Record<string, LucideIcon> = {
   supabase: Database,
   resend: Mail,
+  gmail: Inbox,
+  microsoft: Send,
   stripe: CreditCard,
   openai: Sparkles,
   anthropic: Bot,

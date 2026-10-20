@@ -69,6 +69,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { label: "Browser Automation", href: "/admin/system/browser-automation", icon: "MonitorSmartphone" },
       { label: "Campaign Settings", href: "/admin/system/campaign-settings", icon: "Settings2" },
       { label: "System Health", href: "/admin/system/health", icon: "HeartPulse" },
+      { label: "Deliverability", href: "/admin/system/deliverability", icon: "MailCheck" },
       { label: "Inbox Testing", href: "/admin/system/inbox-testing", icon: "FlaskConical" },
       { label: "Development Diagnostics", href: "/admin/system/diagnostics", icon: "Stethoscope" },
     ],

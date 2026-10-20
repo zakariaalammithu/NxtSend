@@ -12,8 +12,11 @@ import {
   Users,
   ListOrdered,
   ArrowUpRight,
+  Ban,
+  Flame,
 } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/StatsCard";
+import DeliverabilityCard from "@/components/dashboard/DeliverabilityCard";
 import {
   getCampaignsRepository,
   getInboxRepository,
@@ -34,9 +37,10 @@ import {
  *   - send KPIs + the recent-sends list from the message-history
  *     repository (the same store the Inbox and Usage & History read),
  *     each send carrying its verification classification — provider-
- *     confirmed, simulated, failed, or suppressed. No open/bounce
- *     rates are shown: the app only learns those from provider
- *     webhooks, and inventing them here would be fiction;
+ *     confirmed, simulated, failed, or suppressed. Open/bounce rates
+ *     appear only in the Deliverability card (Stage D), which reads
+ *     the provider webhook event log through /api/email/deliverability
+ *     and shows an empty state when no real events exist;
  *   - sending state from the Integration Center status API (Resend).
  *
  * Scheduling/execution is the background worker's job
@@ -160,7 +164,8 @@ export default function EmailPage() {
       .then((json) => {
         if (cancelled || !json) return;
         const entry = (json.integrations ?? []).find(
-          (i: { id: string }) => i.id === "resend"
+          (i: { id?: string; descriptor?: { id?: string } }) =>
+            (i.descriptor?.id ?? i.id) === "resend"
         );
         if (entry) {
           setResend({
@@ -259,6 +264,18 @@ export default function EmailPage() {
             className="btn-secondary !py-2 !px-3 text-13"
           >
             <Mail className="w-4 h-4" /> Email integration
+          </Link>
+          <Link
+            href="/dashboard/email/suppression"
+            className="btn-secondary !py-2 !px-3 text-13"
+          >
+            <Ban className="w-4 h-4" /> Suppression list
+          </Link>
+          <Link
+            href="/dashboard/email/warmup"
+            className="btn-secondary !py-2 !px-3 text-13"
+          >
+            <Flame className="w-4 h-4" /> Warm-up
           </Link>
         </div>
       </div>
@@ -414,12 +431,14 @@ export default function EmailPage() {
                 </div>
               )}
               <p className="text-12 text-black-500 mt-4">
-                Open and bounce rates are not shown: they only exist once
-                provider webhooks report them, and this page does not
-                invent numbers.
+                Open and bounce numbers live in the Deliverability card
+                below: they come from the provider&apos;s webhook event
+                log and are shown only when real events exist.
               </p>
             </div>
           </div>
+
+          <DeliverabilityCard />
         </>
       )}
     </div>

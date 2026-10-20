@@ -242,7 +242,7 @@ function inputToRow(workspaceId: string, input: NewLeadInput): LeadRow {
     workspace_id: workspaceId,
     first_name: input.first_name,
     last_name: input.last_name ?? null,
-    email: input.email,
+    email: input.email ?? null,
     company: input.company ?? null,
     job_title: input.job_title ?? null,
     linkedin_url: input.linkedin_url ?? null,

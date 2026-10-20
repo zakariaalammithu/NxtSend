@@ -4,14 +4,11 @@ import type { Metadata } from "next";
 import {
   ArrowRight,
   Check,
-  Linkedin,
   ShieldCheck,
   Headphones,
-  Zap,
-  Briefcase,
-  Gem,
 } from "lucide-react";
 import { HomeFaq } from "@/components/marketing/HomeFaq";
+import { HomePricing } from "@/components/marketing/HomePricing";
 
 export const metadata: Metadata = {
   title: { absolute: "NxtSend — Reach more of the right people on LinkedIn" },
@@ -29,6 +26,19 @@ const rentedAgents = [
   { name: "Emily Johnson", role: "Sales Agent", photo: "/images/agents/emily-johnson.webp" },
   { name: "Olivia W.", role: "Sales Agent", photo: "/images/agents/olivia-w.webp" },
   { name: "Chris H.", role: "Sales Agent", photo: "/images/agents/chris-h.webp" },
+];
+
+/* Map pins — the same illustrative personas placed over the regions panel
+   (positions are % of the 1200×350 panel slot, matched to the dot map). */
+const mapPins = [
+  { name: "Daniel C.", photo: "/images/agents/daniel-c.webp", left: "16.5%", top: "34%" },
+  { name: "Michael B.", photo: "/images/agents/michael-b.webp", left: "23.5%", top: "36.5%" },
+  { name: "Thomas E.", photo: "/images/agents/thomas-e.webp", left: "29.8%", top: "31.3%" },
+  { name: "James Miller", photo: "/images/agents/james-miller.webp", left: "37%", top: "74.5%" },
+  { name: "Emery E.", photo: "/images/agents/emery-e.webp", left: "49.4%", top: "31.5%" },
+  { name: "Emily Johnson", photo: "/images/agents/emily-johnson.webp", left: "54%", top: "23%" },
+  { name: "Olivia W.", photo: "/images/agents/olivia-w.webp", left: "57%", top: "33%" },
+  { name: "Chris H.", photo: "/images/agents/chris-h.webp", left: "79.3%", top: "58.7%" },
 ];
 
 /* ── Made to convert (mirror section 2) — artwork cards from the mirror ──── */
@@ -279,7 +289,7 @@ export default function MarketingHomePage() {
             ))}
           </div>
 
-          {/* Segment panel — abstract artwork strip (features-grid) + segment chips */}
+          {/* Segment panel — dotted world map with profile pins + segment chips */}
           <div className="relative mx-auto mt-12 max-w-6xl rounded-[2rem] bg-white p-3 shadow-2xl sm:p-4">
             <div className="relative z-10 flex flex-col items-center gap-3 px-1 pt-1 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex flex-wrap items-center justify-center gap-2">
@@ -309,13 +319,30 @@ export default function MarketingHomePage() {
               </div>
             </div>
 
-            <Image
-              src="/images/features-grid.png"
-              alt="Abstract gradient artwork in soft violet and blue tones"
-              width={1200}
-              height={350}
-              className="mt-2 h-auto w-full rounded-3xl"
-            />
+            <div
+              role="img"
+              aria-label="Rented LinkedIn profiles available across regions"
+              className="relative mt-2 aspect-[1200/350] w-full overflow-hidden rounded-3xl bg-gradient-to-b from-[#f7f6ff] via-[#eef1fe] to-[#e4ebfd]"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/world-dots.svg"
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 h-full w-full"
+              />
+              {mapPins.map((pin) => (
+                <span
+                  key={pin.name}
+                  aria-hidden="true"
+                  className="absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full shadow-lg ring-2 ring-white transition-transform duration-300 hover:scale-110 sm:h-8 sm:w-8 lg:h-10 lg:w-10"
+                  style={{ left: pin.left, top: pin.top }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={pin.photo} alt="" className="h-full w-full object-cover" />
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -406,7 +433,7 @@ export default function MarketingHomePage() {
       {/* ──────────────────────────────────────────────────────────────────── */}
       {/* 3. ONE LIVE VIEW OF EVERY CAMPAIGN */}
       {/* ──────────────────────────────────────────────────────────────────── */}
-      <section className="relative border-t border-black-700/80 py-24 lg:py-32">
+      <section id="analytics" className="relative border-t border-black-700/80 py-24 lg:py-32">
         <div className="section-container">
           <div className="text-center">
             <h2 className="text-36 sm:text-48 font-bold text-white tracking-tight">
@@ -550,237 +577,11 @@ export default function MarketingHomePage() {
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* 6. PRICING THAT SCALES WITH YOUR GROWTH — artwork cards (mirror) */}
+      {/* 6. PRICING THAT SCALES WITH YOUR GROWTH — artwork cards (mirror). */}
+      {/* Rendered by the HomePricing client component so the billing      */}
+      {/* toggle holds real state (model: src/lib/marketing-prices.ts).     */}
       {/* ──────────────────────────────────────────────────────────────────── */}
-      <section className="relative border-t border-black-700/80 bg-black-800/40 py-24 lg:py-32">
-        <div className="section-container">
-          <div className="text-center">
-            <h2 className="text-36 sm:text-48 font-bold text-white tracking-tight">
-              Straightforward pricing that grows with your team
-            </h2>
-            <div className="mt-8 inline-flex items-center gap-1 rounded-full border border-white/15 bg-black-800 p-1">
-              <span className="rounded-full bg-black-900 px-4 py-1.5 text-13 font-bold text-white ring-1 ring-white/20">
-                Monthly
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-13 font-semibold text-white/70">
-                Yearly
-                <span className="rounded-full bg-purple-600 px-2 py-0.5 text-10 font-bold text-white">
-                  up to -25%
-                </span>
-              </span>
-            </div>
-          </div>
-
-          <div className="mx-auto mt-14 grid max-w-5xl grid-cols-1 gap-6 lg:grid-cols-2">
-            {/* Outreach seat */}
-            <div className="relative overflow-hidden rounded-[2rem] shadow-2xl ring-1 ring-white/10">
-              <Image
-                src="/images/pricing/card-bg-1.webp"
-                alt=""
-                fill
-                sizes="(max-width: 1024px) 100vw, 500px"
-                className="object-cover"
-              />
-              <div className="relative flex h-full flex-col p-8">
-                <div className="flex items-center gap-2 text-white">
-                  <Zap className="h-5 w-5 fill-white" />
-                  <h3 className="text-17 font-semibold">Outreach seat</h3>
-                </div>
-                <p className="mt-3 max-w-[260px] text-14 leading-relaxed text-white/70">
-                  For running campaigns from LinkedIn profiles you connect to
-                  your workspace
-                </p>
-                <div className="mt-7 flex flex-wrap items-end gap-x-2.5 gap-y-2">
-                  <span className="text-54 font-semibold leading-none text-white">$49</span>
-                  <span className="pb-1 text-15 text-white/60">/mo</span>
-                  <span className="mb-1 rounded-full border border-purple-400/40 bg-purple-600/30 px-2.5 py-0.5 text-11 font-semibold text-purple-100">
-                    per seat
-                  </span>
-                </div>
-
-                <Link
-                  href="/signup"
-                  className="mt-8 flex h-12 w-full items-center justify-center rounded-full border border-white/15 bg-white/10 text-15 font-semibold text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20"
-                >
-                  Try it free for 14 days
-                </Link>
-
-                <div className="mt-9">
-                  <div className="text-15 font-bold text-white">
-                    What each seat includes
-                  </div>
-                  <ul className="mt-4 space-y-3">
-                    <li className="flex items-start gap-2.5 text-14 text-white/85">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
-                      <span>
-                        Connect and manage{" "}
-                        <Linkedin className="inline h-3.5 w-3.5 text-white" />{" "}
-                        accounts
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-2.5 text-14 text-white/85">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
-                      <span>
-                        Run inbound and outbound campaigns
-                        <span className="mt-1 block text-12 leading-relaxed text-white/50">
-                          Inbound campaigns speak to people already in your
-                          network, while outbound campaigns open conversations
-                          with new prospects
-                        </span>
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-2.5 text-14 text-white/85">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
-                      <span>Access to the unified inbox</span>
-                    </li>
-                    <li className="flex items-start gap-2.5 text-14 text-white/85">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
-                      <span>Integrations with third-party tools</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            {/* Agency */}
-            <div className="relative overflow-hidden rounded-[2rem] shadow-2xl ring-1 ring-white/10">
-              <Image
-                src="/images/pricing/card-bg-2.webp"
-                alt=""
-                fill
-                sizes="(max-width: 1024px) 100vw, 500px"
-                className="object-cover"
-              />
-              <div className="relative flex h-full flex-col p-8">
-                <div className="flex items-center gap-2 text-white">
-                  <Briefcase className="h-5 w-5" />
-                  <h3 className="text-17 font-semibold">Agency</h3>
-                </div>
-                <p className="mt-3 max-w-[260px] text-14 leading-relaxed text-white/70">
-                  For agencies running outreach across client accounts and
-                  teams.
-                </p>
-                <div className="mt-7">
-                  <div className="text-13 text-white/60">From:</div>
-                  <div className="mt-1 flex flex-wrap items-end gap-x-2.5 gap-y-2">
-                    <span className="text-54 font-semibold leading-none text-white">$499</span>
-                    <span className="pb-1 text-15 text-white/60">/20 seats</span>
-                    <span className="mb-1 rounded-full border border-purple-400/40 bg-purple-600/30 px-2.5 py-0.5 text-11 font-semibold text-purple-100">
-                      +$20 per new seat
-                    </span>
-                  </div>
-                </div>
-
-                <Link
-                  href="/demo"
-                  className="mt-8 flex h-12 w-full items-center justify-center rounded-full border border-white/15 bg-white/10 text-15 font-semibold text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20"
-                >
-                  Book an agency call
-                </Link>
-
-                <div className="mt-9">
-                  <div className="text-15 font-bold text-white">
-                    Agency essentials included
-                  </div>
-                  <ul className="mt-4 space-y-3">
-                    {[
-                      "Onboarding via Slack",
-                      "White-label client reporting",
-                      "Collaboration for your whole team",
-                      "Help migrating existing profiles",
-                    ].map((feat) => (
-                      <li key={feat} className="flex items-start gap-2.5 text-14 text-white/85">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
-                        <span>{feat}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            {/* Outreach avatar — wide card */}
-            <div className="relative overflow-hidden rounded-[2rem] shadow-2xl ring-1 ring-white/10 lg:col-span-2">
-              <Image
-                src="/images/pricing/card-bg-3.webp"
-                alt=""
-                fill
-                sizes="(max-width: 1024px) 100vw, 1024px"
-                className="object-cover"
-              />
-              <div className="relative grid gap-8 p-8 md:grid-cols-2">
-                <div>
-                  <div className="flex items-center gap-2 text-white">
-                    <Gem className="h-5 w-5" />
-                    <h3 className="text-17 font-semibold">Outreach avatar</h3>
-                  </div>
-                  <p className="mt-3 max-w-[280px] text-14 leading-relaxed text-white/70">
-                    Add ready-to-use LinkedIn profiles to your workspace and
-                    shape them around your offer
-                  </p>
-                  <div className="mt-7 flex flex-wrap items-end gap-x-2.5 gap-y-2">
-                    <span className="text-54 font-semibold leading-none text-white">$387</span>
-                    <span className="pb-1 text-15 text-white/60">/month</span>
-                    <span className="mb-1 rounded-full border border-purple-400/40 bg-purple-600/30 px-2.5 py-0.5 text-11 font-semibold text-purple-100">
-                      3 profiles included
-                    </span>
-                  </div>
-                  <Link
-                    href="/avatars"
-                    className="mt-8 flex h-12 w-full items-center justify-center rounded-full border border-white/15 bg-white/10 text-15 font-semibold text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20"
-                  >
-                    See rented profiles
-                  </Link>
-                </div>
-
-                <div className="md:pt-1">
-                  <div className="flex md:justify-end">
-                    <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-black-900/40 p-1 backdrop-blur-md">
-                      <span className="rounded-full bg-black-900 px-3 py-1 text-11 font-bold text-white ring-1 ring-white/20">
-                        Monthly
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-11 font-semibold text-white/70">
-                        Yearly
-                        <span className="rounded-full bg-purple-600 px-1.5 py-px text-9 font-bold text-white">
-                          up to -25%
-                        </span>
-                      </span>
-                    </span>
-                  </div>
-                  <div className="mt-6 text-15 font-bold text-white">Ready when you are</div>
-                  <ul className="mt-4 space-y-3">
-                    <li className="flex items-start gap-2.5 text-14 text-white/85">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
-                      <span className="rounded-full border border-white/25 bg-white/10 px-2.5 py-0.5 text-13 font-medium text-white">
-                        3x Outreach seat included
-                      </span>
-                    </li>
-                    {[
-                      "Profiles tailored to your market",
-                      "Delivered straight into your workspace",
-                      "Covered by a replacement guarantee",
-                    ].map((feat) => (
-                      <li key={feat} className="flex items-start gap-2.5 text-14 text-white/85">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-white" />
-                        <span>{feat}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-12 text-center">
-            <Link
-              href="/pricing"
-              className="inline-flex items-center gap-2 rounded-full border border-black-600 bg-black-800 px-7 py-3 text-15 font-semibold text-white transition-all hover:border-purple-500/50 hover:text-purple-300"
-            >
-              <span>Compare all plans</span>
-            </Link>
-          </div>
-        </div>
-      </section>
+      <HomePricing />
 
       {/* ──────────────────────────────────────────────────────────────────── */}
       {/* 7. FREQUENTLY ASKED QUESTIONS */}

@@ -18,6 +18,7 @@ export interface EmailEnv {
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
   RESEND_WEBHOOK_SECRET?: string;
+  EMAIL_REPLY_TO?: string;
 }
 
 function envFromProcess(): EmailEnv {
@@ -25,7 +26,22 @@ function envFromProcess(): EmailEnv {
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     EMAIL_FROM: process.env.EMAIL_FROM,
     RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET,
+    EMAIL_REPLY_TO: process.env.EMAIL_REPLY_TO,
   };
+}
+
+/**
+ * The configured Reply-To for outbound mail (EMAIL_REPLY_TO), or
+ * undefined when unset/placeholder. Callers (sequence executor, inbox
+ * reply service) pass it as the adapter's `replyTo` so replies land
+ * on the receiving domain and reach the Inbox — without it, replies
+ * go to the EMAIL_FROM address and the reply loop silently never
+ * fires unless that domain also receives (P5 audit §5).
+ */
+export function getEmailReplyTo(env: EmailEnv = envFromProcess()): string | undefined {
+  return isConfiguredValue(env.EMAIL_REPLY_TO)
+    ? (env.EMAIL_REPLY_TO as string).trim()
+    : undefined;
 }
 
 export function isEmailFromConfigured(from: string | undefined): boolean {

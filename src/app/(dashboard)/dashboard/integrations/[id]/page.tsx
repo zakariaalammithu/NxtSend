@@ -27,6 +27,9 @@ import {
   MUSE_READINESS_CHECKLIST,
   MUSE_CONNECTOR_MANIFEST_STATUS,
 } from "@/lib/muse-connector";
+import EmailAuthPanel from "@/components/integrations/EmailAuthPanel";
+import EmailRoutingPanel from "@/components/integrations/EmailRoutingPanel";
+import OAuthMailboxPanel from "@/components/integrations/OAuthMailboxPanel";
 
 /**
  * Integration Center detail page — one dynamic route driven entirely
@@ -253,6 +256,19 @@ export default function IntegrationDetailPage() {
         )}
       </Section>
 
+      {/* Email authentication — Resend only: real DNS verdicts for the
+          sending domain + the provider-domain match. */}
+      {d.id === "resend" && <EmailAuthPanel />}
+
+      {/* Reply routing & unsubscribe — Resend only: where replies land
+          (EMAIL_REPLY_TO) and whether unsubscribe signing is ready. */}
+      {d.id === "resend" && <EmailRoutingPanel />}
+
+      {/* Mailbox OAuth — Gmail / Outlook only: the connected mailbox
+          (metadata only), Connect (live OAuth) and Disconnect. */}
+      {d.id === "gmail" && <OAuthMailboxPanel provider="google" />}
+      {d.id === "microsoft" && <OAuthMailboxPanel provider="microsoft" />}
+
       {/* Overview */}
       <Section title="Overview">
         <p className="text-13 text-black-300 leading-relaxed">{d.description}</p>
@@ -375,7 +391,9 @@ export default function IntegrationDetailPage() {
         <p className="text-13 text-black-300 leading-relaxed">
           {d.id === "webhooks"
             ? "Disable the subscription toggle in the Outbound Webhooks section (deliveries stop immediately), or delete the subscription to remove it entirely. Past delivery logs are kept."
-            : d.id === "muse-ai" || d.kind === "info"
+            : d.id === "gmail" || d.id === "microsoft"
+              ? "Use the Disconnect button in the Connected mailbox panel above: it deletes the stored (encrypted) OAuth tokens and marks the account disconnected — for Gmail it also revokes the grant at Google (best effort, reported in the result); Microsoft offers no revocation endpoint, so remove the app's consent in the Microsoft account too if you want it gone there. Removing the env variables additionally prevents NEW connections. Past message records are kept."
+              : d.id === "muse-ai" || d.kind === "info"
               ? "Nothing is connected, so there is nothing to disconnect. This entry documents the limitation and what implementing it would require."
               : "Remove (or replace) the environment variables listed above in Vercel and redeploy. The status returns to Not Connected, and any stored verification stops applying because the configuration it verified is gone. No data is deleted by disconnecting."}
         </p>

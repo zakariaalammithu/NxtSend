@@ -25,6 +25,7 @@
  */
 
 import type { EmailProviderAdapter, SendEmailResult } from "@/lib/email/types";
+import { getEmailReplyTo } from "@/lib/email/state";
 import {
   deriveReplySubject,
   isValidEmailAddress,
@@ -107,6 +108,12 @@ export async function sendInboxReply(
   const { conversation } = thread;
 
   if (conversation.channel === "linkedin") {
+    // PROVIDER SEAM (P5 Stage F): LinkedIn replies dispatch through
+    // LinkedInProviderAdapter.sendMessage (src/lib/linkedin) once an
+    // approved provider adapter is configured and reports state
+    // "connected". Until then — the NotConfigured implementation is
+    // the only one — the refusal below stands and the API route maps
+    // it to HTTP 422. Behavior is unchanged by the seam.
     return {
       ok: false,
       code: "linkedin_unavailable",
@@ -169,6 +176,9 @@ export async function sendInboxReply(
     to: recipient,
     subject,
     text: content,
+    // Reply routing (P5 Stage C): EMAIL_REPLY_TO when set, so a reply
+    // to this reply also lands on the receiving domain / Inbox.
+    replyTo: getEmailReplyTo(),
     leadId: conversation.lead_id,
   });
 

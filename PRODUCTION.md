@@ -46,6 +46,7 @@ values): **Admin → System → Diagnostics** (`GET
 | Variable | When | Visibility | Where it comes from | Verify |
 |---|---|---|---|---|
 | `NEXT_PUBLIC_APP_URL` | build + runtime | public | Your production origin, e.g. `https://nxtsend-seven.vercel.app` or your custom domain. **No localhost in production** — billing routes refuse (503) rather than redirect a customer to localhost. | Diagnostics → core group; billing checkout reaches Stripe (test mode) |
+| `NEXT_PUBLIC_DEMO_MODE` | build | public | Optional. Set to `true` to force the Demo Mode banner even when Supabase is configured (banner override only — it does not change the data mode). Leave unset in production. | Banner appears despite live Supabase config |
 | `NEXT_PUBLIC_SUPABASE_URL` | build | public | Supabase → Project Settings → API → Project URL | App leaves Demo Mode (no demo banner) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | build | public | Supabase → Project Settings → API → anon key | Signup/login work |
 | `SUPABASE_SERVICE_ROLE_KEY` | runtime | **server secret** | Supabase → Project Settings → API → service_role key | Admin APIs answer (not 503); jobs worker runs |
@@ -53,6 +54,8 @@ values): **Admin → System → Diagnostics** (`GET
 | `RESEND_API_KEY` | runtime | **server secret** | Resend → API Keys | Integration Center → Email → Test Connection |
 | `EMAIL_FROM` | runtime | server | A sender on a Resend-verified domain, e.g. `NxtSend <hello@yourdomain>` | Test send arrives |
 | `RESEND_WEBHOOK_SECRET` | runtime | **server secret** | Resend webhook endpoint you register in §4 (`whsec_…`) | Resend dashboard shows successful deliveries to `/api/webhooks/resend` |
+| `EMAIL_REPLY_TO` | runtime | server | An address on your Resend receiving domain, e.g. `replies@reply.yourdomain` | Integration Center → Email / Resend → "Reply routing & unsubscribe" shows it; a reply to a test send lands in the Inbox |
+| `UNSUBSCRIBE_SECRET` | runtime | **server secret** | You generate it (`openssl rand -base64 64`). Optional — while unset the signing key is derived from `SUPABASE_SERVICE_ROLE_KEY` | Same panel shows signing "Configured"; the footer link in a test email opens the confirmation page |
 | `STRIPE_SECRET_KEY` | runtime | **server secret** | Stripe → Developers → API keys (use **test** keys first) | Integration Center → Stripe → Test Connection |
 | `STRIPE_WEBHOOK_SECRET` | runtime | **server secret** | Stripe webhook endpoint you register in §4 (`whsec_…`) | Stripe dashboard → webhook attempts succeed |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | build | public | Stripe → Developers → API keys (`pk_…`) | Billing page loads without console errors |
@@ -66,6 +69,11 @@ values): **Admin → System → Diagnostics** (`GET
 | `NEXT_PUBLIC_META_PIXEL_ID` | build | public | Meta Events Manager → your Pixel ID (numeric) | Events Manager → Test Events shows PageView (consent required first — SETUP.md §8) |
 | `CRON_SECRET` | runtime | **server secret** | You generate it (`openssl rand -hex 32`). Vercel Cron automatically sends it as `Authorization: Bearer …` when it exists in the project env — the value here and the one Vercel uses are the same project variable | `curl -X POST https://<domain>/api/jobs/run -H "x-cron-secret: <value>"` → 200 summary; without it → 401 |
 | `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, `LINKEDIN_REDIRECT_URI` | runtime | server | **Not used by any live flow.** No LinkedIn OAuth exists (no authorized provider). Leave unset; the variables are documented-demo placeholders for a future provider integration | — |
+| `GOOGLE_CLIENT_ID` | runtime | server | Google Cloud Console → OAuth client (Web) — SETUP.md §15.2 | Integration Center → Gmail shows the client configured |
+| `GOOGLE_CLIENT_SECRET` | runtime | **server secret** | Same OAuth client | Gmail → Connect completes the consent + profile fetch |
+| `MICROSOFT_CLIENT_ID` | runtime | server | Azure → App registrations → Application (client) ID — SETUP.md §15.3 | Integration Center → Outlook (Microsoft 365) shows the client configured |
+| `MICROSOFT_CLIENT_SECRET` | runtime | **server secret** | Azure → Certificates & secrets → the secret **Value** (shown once) | Outlook → Connect completes the consent + Graph /me fetch |
+| `TOKEN_ENCRYPTION_KEY` | runtime | **server secret** | You generate it: `openssl rand -base64 32` (exactly 32 bytes decoded). Encrypts stored mailbox OAuth tokens (migration 014); also derives the OAuth state + fallback unsubscribe signing keys. **Rotating it invalidates every stored mailbox grant — mailboxes must reconnect** | Diagnostics → "Mailbox OAuth (Gmail / Outlook)" group; connect a mailbox and confirm `/api/oauth/connections` returns metadata with no token fields |
 
 ## 3. Supabase: migrations + post-migration checklist
 
@@ -74,11 +82,23 @@ In the Supabase SQL Editor, run the migrations **in numeric order**:
 `001_initial_schema` → `002_security_hardening` → `003_campaign_activity`
 → `004_providers_billing_jobs` → `005_inbox` → `006_integration_verification`
 → `007_admin_settings` → `008_referrals` → `009_user_preferences`
-→ `010_sequence_executor`
+→ `010_sequence_executor` → `011_campaign_config_step_types`
+→ `012_notifications` → `013_connected_account_provider_health`
+→ `014_oauth_connections`
+
+Migration 011 in full: `campaigns.config` JSONB (wizard metadata),
+`step_type` enum values `like_post` / `view_profile` / `endorse_skills`,
+the `connected_accounts` table (per-channel sending accounts — warm-up
+state, daily limits, sender identity for the `{my_*}` variables), and
+`campaigns.sender_account_id` / `email_account_id`. Until 011 is
+applied, live mode cannot persist wizard metadata, the new step types
+or connected accounts (Demo Mode has no such dependency).
 
 Post-migration checklist:
 
-- [ ] All 10 ran without errors (SQL Editor history).
+- [ ] All 14 ran without errors (SQL Editor history). (014 creates
+      `oauth_connections` — RLS enabled with **no** client policies by
+      design; it must show "RLS enabled" with zero policies.)
 - [ ] RLS is enabled on every public table (Database → Tables — no
       table shows "RLS disabled").
 - [ ] Run the negative tests in SETUP.md §13 (self-promotion to
@@ -106,6 +126,39 @@ Post-migration checklist:
 
 - Verify your sending domain (SPF/DKIM) — sending from an unverified
   domain fails at the provider, by design.
+- **Domain authentication records** (copy the exact values from the
+  Resend dashboard for your domain; full guidance in SETUP.md §6):
+  DKIM TXT at `resend._domainkey` with the full public key; SPF TXT
+  `v=spf1 include:amazonses.com ~all` on the `send` subdomain plus its
+  MX (`feedback-smtp.<region>.amazonses.com`, priority 10); DMARC TXT
+  at `_dmarc` starting `v=DMARC1; p=none; rua=mailto:...`, tightened
+  to `quarantine` → `reject` once aggregate reports are clean.
+- **Verify in-app after DNS propagates**: Integration Center →
+  Email / Resend (or Admin → Integrations → Email) → **Email
+  authentication** panel → Run check — it shows real SPF/DKIM/DMARC
+  verdicts for the EMAIL_FROM domain and the provider-domain match.
+  Test Connection reports the same match and warns ("Configuration
+  Required") when the EMAIL_FROM domain is unverified at Resend.
+- **Replies**: sending alone does not deliver replies to the Inbox.
+  Set **`EMAIL_REPLY_TO`** to an address on a Resend receiving domain
+  (MX configured — SETUP.md §6): every outbound email (sequence steps
+  and Inbox replies) carries it as Reply-To, so replies land on the
+  receiving domain and reach the Inbox. While it is unset, replies go
+  to EMAIL_FROM and only reach the Inbox if that domain also receives.
+- **Unsubscribe**: built in (P5 Stage C) — every outbound email gets a
+  signed one-click `List-Unsubscribe` header (RFC 8058) + a footer
+  link at send time, pointing at the public
+  `https://<NEXT_PUBLIC_APP_URL>/api/unsubscribe/<token>` endpoint
+  (no auth — the HMAC token is the credential; GET shows a
+  confirmation page, POST performs it). Set **`UNSUBSCRIBE_SECRET`**
+  for a stable signing key; while unset, the key is derived from
+  `SUPABASE_SERVICE_ROLE_KEY` (rotating that key invalidates older
+  links). In production with neither set — or with
+  NEXT_PUBLIC_APP_URL unset/localhost — sends omit the URL and warn
+  in the send result rather than emitting an invalid link. Confirming
+  an unsubscribe adds the address to the workspace suppression list
+  (manage it at Dashboard → Email → Suppression list) and stops the
+  lead's active enrollments.
 - **Webhooks → Add endpoint**: `https://<your-domain>/api/webhooks/resend`
   — events: delivery/bounce/complaint set from SETUP.md §6, plus the
   inbound/receiving setup if you enabled reply receiving (sending
@@ -125,6 +178,24 @@ Post-migration checklist:
 - Create the Customer Portal configuration (Settings → Billing →
   Customer portal) or portal sessions will fail at Stripe.
 - Do the full test-mode pass (§6) before swapping in live keys.
+
+### Mailbox OAuth callbacks (Gmail / Outlook — SETUP.md §15)
+
+Not webhooks — OAuth **redirect URIs**, registered at the provider
+and derived from `NEXT_PUBLIC_APP_URL`. They must match the deployed
+origin exactly:
+
+- **Google Cloud Console** → OAuth client (Web) → Authorized
+  redirect URIs: `https://<your-domain>/api/oauth/google/callback`
+- **Azure** → App registration → Web platform redirect URI:
+  `https://<your-domain>/api/oauth/microsoft/callback`
+
+If you change the production origin (custom domain), update BOTH
+registrations and `NEXT_PUBLIC_APP_URL` together — a mismatch fails
+the connect with `redirect_uri_mismatch` (Google) / `AADSTS50011`
+(Microsoft) and stores nothing. Disconnect semantics: Gmail also
+revokes at Google (best effort); Microsoft has no revocation
+endpoint — token deletion + account state is the disconnect there.
 
 ## 5. Cron + worker notes
 
@@ -164,6 +235,15 @@ Post-migration checklist:
 8. [ ] Integration Center: **Test Connection** per integration
        (Supabase, Resend, Stripe, OpenAI/Anthropic/Meta) — each
        reports Connected **and Verified** only on a real check.
+8b. [ ] **Mailbox OAuth** (if used, SETUP.md §15): connect a test
+       Gmail/Outlook mailbox → it appears in Connected Accounts;
+       point the test campaign's email account at it → the worker
+       run sends From the mailbox address (check the received
+       message's From + the `messages` row provider `gmail` /
+       `microsoft` with a provider message ID); reply from the
+       Inbox → also sent via the mailbox. Disconnect → tokens are
+       gone (`/api/oauth/connections` returns an empty list) and
+       the account shows `not_connected`.
 9. [ ] **Stripe test mode**: Billing → upgrade with card
        `4242 4242 4242 4242` → plan changes ONLY after the webhook
        fires; Stripe dashboard shows the webhook delivery succeeded;

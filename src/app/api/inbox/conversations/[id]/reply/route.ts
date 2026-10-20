@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { resolveInboxContext } from "@/lib/server/inbox";
-import { ResendEmailAdapter } from "@/lib/email";
+import { createAdminClient } from "@/lib/supabase/server";
+import {
+  ResendEmailAdapter,
+  createConversationRoutingAdapter,
+  type EmailProviderAdapter,
+} from "@/lib/email";
 import { sendInboxReply, type ReplyFailureCode } from "@/lib/inbox/reply";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +52,21 @@ export async function POST(
 
   // The inbox owns its message rows (idempotency), so the adapter must
   // not write a second bookkeeping row for the same send.
-  const adapter = new ResendEmailAdapter({ skipMessageRecord: true });
+  // Live mode (P5 Stage G): replies route through the conversation's
+  // sending account — when that account (or the workspace's single
+  // active OAuth mailbox) is a Gmail / Outlook mailbox, the reply is
+  // sent from that mailbox; otherwise Resend, exactly as before.
+  // Demo Mode keeps the plain Resend adapter (its demo branch yields
+  // the labelled simulated outcome).
+  let adapter: EmailProviderAdapter = new ResendEmailAdapter({
+    skipMessageRecord: true,
+  });
+  if (ctx.mode !== "demo") {
+    const admin = createAdminClient();
+    if (admin) {
+      adapter = createConversationRoutingAdapter(admin, params.id);
+    }
+  }
 
   const outcome = await sendInboxReply(
     { repo: ctx.repo, adapter },

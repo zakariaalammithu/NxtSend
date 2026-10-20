@@ -3,9 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Target, Linkedin, Mail, MessageSquare, BarChart3, Puzzle, CreditCard, Settings, Bell, Search, LogOut, ChevronDown, ChevronLeft, ChevronRight, Zap, X, User, Shield, Check, Sparkles, History, Gift, Coins, ShoppingCart, ContactRound } from "lucide-react";
+import { LayoutDashboard, Target, Linkedin, Mail, MessageSquare, BarChart3, Puzzle, CreditCard, Settings, Bell, Search, LogOut, ChevronDown, ChevronLeft, ChevronRight, Zap, X, User, Users, Shield, Check, Sparkles, History, Gift, Coins, ShoppingCart, ContactRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import {
+  formatRelativeTime,
+  type AppNotification,
+} from "@/lib/notifications/core";
 
 interface NavSection {
   title: string;
@@ -87,6 +91,11 @@ const NAV_SECTIONS: NavSection[] = [
     title: "SETTINGS",
     items: [
       { label: "Integrations", href: "/dashboard/integrations", icon: Puzzle },
+      {
+        label: "Connected Accounts",
+        href: "/dashboard/accounts",
+        icon: Users,
+      },
       { label: "Settings", href: "/dashboard/settings", icon: Settings },
     ],
   },
@@ -177,29 +186,77 @@ export default function DashboardLayout({
   // Mock workspace
   const currentWorkspace = "Alex Vance's Workspace";
 
-  const notifications = [
-    {
-      id: "1",
-      title: "New positive reply",
-      desc: "Sarah Jenkins from Stripe replied to your sequence.",
-      time: "10m ago",
-      unread: true,
-    },
-    {
-      id: "2",
-      title: "Connection accepted",
-      desc: "David Zhao accepted your LinkedIn request.",
-      time: "35m ago",
-      unread: true,
-    },
-    {
-      id: "3",
-      title: "Sequence completed",
-      desc: "Batch 4 finished 50 touches.",
-      time: "2h ago",
-      unread: false,
-    },
-  ];
+  // Real notifications (Stage D): stored records from
+  // GET /api/notifications — created by product events (today:
+  // reply arrivals filed by ingestion). There is deliberately no
+  // sample data: an empty list means nothing has happened yet.
+  const [userNotifications, setUserNotifications] = React.useState<
+    AppNotification[]
+  >([]);
+  const [notifUnreadCount, setNotifUnreadCount] = React.useState(0);
+  const loadNotifications = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/notifications", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        notifications?: AppNotification[];
+        unreadCount?: number;
+      };
+      setUserNotifications(data.notifications ?? []);
+      setNotifUnreadCount(data.unreadCount ?? 0);
+    } catch {
+      // Chrome is best-effort; the inbox itself surfaces real errors.
+    }
+  }, []);
+  React.useEffect(() => {
+    loadNotifications();
+    window.addEventListener("nxtsend:inbox-unread-changed", loadNotifications);
+    return () => {
+      window.removeEventListener(
+        "nxtsend:inbox-unread-changed",
+        loadNotifications
+      );
+    };
+  }, [loadNotifications, pathname]);
+
+  const openNotification = async (n: AppNotification) => {
+    if (!n.read_at) {
+      try {
+        await fetch("/api/notifications/read", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: n.id }),
+        });
+      } catch {
+        /* marking read is best-effort; navigation still happens */
+      }
+      setUserNotifications((prev) =>
+        prev.map((x) =>
+          x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x
+        )
+      );
+      setNotifUnreadCount((c) => Math.max(0, c - 1));
+    }
+    setNotificationsOpen(false);
+    if (n.link) router.push(n.link);
+  };
+
+  const markAllNotificationsRead = async () => {
+    try {
+      await fetch("/api/notifications/read", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ all: true }),
+      });
+    } catch {
+      /* best-effort */
+    }
+    const now = new Date().toISOString();
+    setUserNotifications((prev) =>
+      prev.map((x) => (x.read_at ? x : { ...x, read_at: now }))
+    );
+    setNotifUnreadCount(0);
+  };
 
   const handleLogout = async () => {
     // Real logout: terminate the Supabase session (clears the auth cookies)
@@ -474,25 +531,58 @@ export default function DashboardLayout({
                 aria-label="Notifications"
               >
                 <Bell className="h-4 w-4" />
-                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-purple-500 shadow-glow-purple" />
+                {notifUnreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-purple-500 px-1 text-9 font-bold text-white shadow-glow-purple">
+                    {notifUnreadCount}
+                  </span>
+                )}
               </button>
 
               {notificationsOpen && (
                 <div className="absolute right-0 top-full mt-2 w-80 sm:w-88 rounded-2xl bg-black-800 border border-black-600 p-3 shadow-2xl z-40 text-13 animate-fade-in">
                   <div className="flex items-center justify-between pb-2 border-b border-black-700">
                     <span className="font-semibold text-white">Notifications</span>
-                    <span className="text-11 text-purple-400 font-medium">2 unread</span>
+                    {notifUnreadCount > 0 ? (
+                      <button
+                        type="button"
+                        onClick={markAllNotificationsRead}
+                        className="text-11 text-purple-400 font-medium hover:text-purple-300"
+                      >
+                        {notifUnreadCount} unread — mark all read
+                      </button>
+                    ) : (
+                      <span className="text-11 text-black-400 font-medium">All caught up</span>
+                    )}
                   </div>
-                  <div className="divide-y divide-black-700/50 py-1">
-                    {notifications.map((n) => (
-                      <div key={n.id} className="py-2.5 hover:bg-black-700/30 px-2 rounded-lg transition-colors">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-white text-12">{n.title}</span>
-                          <span className="text-10 text-black-400">{n.time}</span>
-                        </div>
-                        <p className="text-11 text-black-300 mt-0.5 line-clamp-1">{n.desc}</p>
-                      </div>
-                    ))}
+                  <div className="divide-y divide-black-700/50 py-1 max-h-80 overflow-y-auto">
+                    {userNotifications.length === 0 ? (
+                      <p className="py-4 px-2 text-12 text-black-400">
+                        No notifications yet. New replies to your campaigns
+                        will appear here when they arrive.
+                      </p>
+                    ) : (
+                      userNotifications.map((n) => (
+                        <button
+                          key={n.id}
+                          type="button"
+                          onClick={() => openNotification(n)}
+                          className="w-full text-left py-2.5 hover:bg-black-700/30 px-2 rounded-lg transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium text-white text-12 flex items-center gap-1.5">
+                              {!n.read_at && (
+                                <span className="h-1.5 w-1.5 rounded-full bg-purple-400 shrink-0" />
+                              )}
+                              {n.title}
+                            </span>
+                            <span className="text-10 text-black-400 shrink-0">
+                              {formatRelativeTime(n.created_at)}
+                            </span>
+                          </div>
+                          <p className="text-11 text-black-300 mt-0.5 line-clamp-2">{n.body}</p>
+                        </button>
+                      ))
+                    )}
                   </div>
                   <button
                     type="button"

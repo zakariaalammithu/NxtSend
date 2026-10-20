@@ -174,6 +174,127 @@ describe("DemoCampaignsRepository", () => {
     expect(enrollments).toHaveLength(3);
     expect(enrollments.every((e) => e.status === "pending")).toBe(true);
   });
+
+  it("persists wizard metadata (description, audience source, warm-up limits) in demo mode", async () => {
+    const repo = createCampaignsRepository("demo");
+    const campaign = await repo.createCampaign(DEMO_WORKSPACE_ID, {
+      name: "Wizard Draft",
+      type: "mixed",
+      status: "draft",
+      steps: [],
+      description: "Targeting seed-stage founders.",
+      audience_source: {
+        type: "linkedin_search",
+        url: "https://www.linkedin.com/search/results/people/",
+        requested_count: 500,
+      },
+      warmup_limits: {
+        connection_requests: 5,
+        messages: 10,
+        profile_views: 20,
+        like_post: 20,
+        endorse_skills: 20,
+        find_email: 20,
+      },
+    });
+    expect(campaign.description).toBe("Targeting seed-stage founders.");
+    expect(campaign.audience_source?.type).toBe("linkedin_search");
+
+    const reloaded = await repo.getCampaign(DEMO_WORKSPACE_ID, campaign.id);
+    expect(reloaded?.description).toBe("Targeting seed-stage founders.");
+    expect(reloaded?.audience_source?.requested_count).toBe(500);
+    expect(reloaded?.warmup_limits?.connection_requests).toBe(5);
+
+    const updated = await repo.updateCampaign(campaign.id, {
+      description: "Updated objective.",
+      audience_source: { type: "csv", file_name: "leads.csv", imported_count: 3 },
+    });
+    expect(updated.description).toBe("Updated objective.");
+    expect(updated.audience_source?.type).toBe("csv");
+  });
+
+  it("round-trips a condition step's branch step-lists inside step config", async () => {
+    const repo = createCampaignsRepository("demo");
+    const branchStep = {
+      id: "branch-1",
+      step_type: "linkedin_message" as const,
+      delay_hours: 0,
+      subject: "If connected — say hello",
+      content: "Thanks for connecting, {{first_name}}!",
+      config: {},
+    };
+    const campaign = await repo.createCampaign(DEMO_WORKSPACE_ID, {
+      name: "Branching Draft",
+      type: "linkedin",
+      status: "draft",
+      steps: [
+        {
+          step_type: "connection_request",
+          delay_hours: 0,
+          subject: "Connection request",
+          content: "Hi {{first_name}}, let's connect.",
+          config: {},
+        },
+        {
+          step_type: "condition",
+          delay_hours: 24,
+          subject: "If connected",
+          content: "",
+          config: {
+            branches: { yes: [branchStep], no: [] },
+          },
+        },
+        {
+          step_type: "like_post",
+          delay_hours: 48,
+          subject: "Like post",
+          content: "",
+          config: {},
+        },
+      ],
+    });
+
+    const steps = await repo.getCampaignSteps(campaign.id);
+    expect(steps.map((s) => s.step_type)).toEqual([
+      "connection_request",
+      "condition",
+      "like_post",
+    ]);
+    const branches = (
+      steps[1].config.branches as { yes: Array<{ content: string }> }
+    ).yes;
+    expect(branches).toHaveLength(1);
+    expect(branches[0].content).toBe("Thanks for connecting, {{first_name}}!");
+
+    // replaceCampaignSteps (the canvas save path) round-trips too.
+    const replaced = await repo.replaceCampaignSteps(campaign.id, [
+      {
+        step_type: "condition",
+        delay_hours: 0,
+        subject: "If connected",
+        content: "",
+        config: { branches: { yes: [], no: [branchStep] } },
+      },
+    ]);
+    const noBranch = (
+      replaced[0].config.branches as { no: Array<{ id: string }> }
+    ).no;
+    expect(noBranch[0].id).toBe("branch-1");
+  });
+
+  it("removes a single enrollment without touching the others", async () => {
+    const repo = createCampaignsRepository("demo");
+    await repo.enrollLeads(DEMO_WORKSPACE_ID, "cmp_demo_002", [
+      "lead_demo_001",
+      "lead_demo_002",
+    ]);
+    await repo.removeEnrollment("cmp_demo_002", "lead_demo_001");
+    const enrollments = await repo.listEnrollments("cmp_demo_002");
+    expect(enrollments.map((e) => e.lead_id)).toEqual(["lead_demo_002"]);
+    // Removing again is a no-op, not an error.
+    await repo.removeEnrollment("cmp_demo_002", "lead_demo_001");
+    expect(await repo.listEnrollments("cmp_demo_002")).toHaveLength(1);
+  });
 });
 
 describe("DemoAdminRepository", () => {

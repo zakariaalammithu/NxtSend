@@ -37,15 +37,106 @@ export function buildDraftUserPrompt(input: DraftRequest): string {
 }
 
 /**
- * Renders {{first_name}} / {{company}} / {{job_title}} placeholders with
- * sample lead values (used by the demo drafter and previews).
+ * Variables available to message templates.
+ *
+ * Contact variables resolve from the recipient lead; sender ("my_*")
+ * variables resolve from the sending account's profile (connected
+ * accounts, migration 011 — callers pass them in; absent values
+ * render their fallback or empty); any other name resolves from the
+ * lead's custom fields (e.g. extra CSV columns captured on import).
+ */
+export interface TemplateVariables {
+  firstName?: string;
+  lastName?: string;
+  company?: string;
+  jobTitle?: string;
+  myFirstName?: string;
+  myLastName?: string;
+  myJobTitle?: string;
+  myCompanyName?: string;
+  customFields?: Record<string, unknown>;
+}
+
+/** Built-in fallbacks used when neither a value nor an inline
+ *  `{var:Fallback}` is present. Unknown variables without a custom
+ *  field or fallback are left untouched so typos stay visible. */
+const VARIABLE_DEFAULTS: Record<string, string> = {
+  first_name: "there",
+  company: "your company",
+  company_name: "your company",
+  job_title: "your role",
+  last_name: "",
+  my_first_name: "",
+  my_last_name: "",
+  my_job_title: "",
+  my_company_name: "",
+};
+
+function variableValue(
+  name: string,
+  vars: TemplateVariables
+): string | undefined {
+  switch (name) {
+    case "first_name":
+      return vars.firstName;
+    case "last_name":
+      return vars.lastName;
+    case "company":
+    case "company_name":
+      return vars.company;
+    case "job_title":
+      return vars.jobTitle;
+    case "my_first_name":
+      return vars.myFirstName;
+    case "my_last_name":
+      return vars.myLastName;
+    case "my_job_title":
+      return vars.myJobTitle;
+    case "my_company_name":
+      return vars.myCompanyName;
+    default: {
+      const custom = vars.customFields?.[name];
+      return custom === undefined || custom === null
+        ? undefined
+        : String(custom);
+    }
+  }
+}
+
+// Matches {{name}}, {{name:Fallback text}}, {name} and
+// {name:Fallback text}. Double-brace is NxtSend's established syntax;
+// single-brace is accepted so Closely-style chips/text also render.
+const VARIABLE_PATTERN =
+  /\{\{\s*([A-Za-z0-9_]+)\s*(?::([^{}]*))?\}\}|\{\s*([A-Za-z0-9_]+)\s*(?::([^{}]*))?\}/g;
+
+/**
+ * Renders template placeholders with lead/sender values (used by the
+ * executor, the demo drafter and the sequence builder's live preview).
+ *
+ * Supported: {{first_name}} {{last_name}} {{company}} {{company_name}}
+ * {{job_title}}, sender variables {{my_first_name}} {{my_last_name}}
+ * {{my_job_title}} {{my_company_name}}, custom fields by name, and the
+ * fallback syntax {{first_name:Fallback text}} — the fallback is used
+ * whenever the variable has no value.
  */
 export function renderTemplate(
   template: string,
-  lead: { firstName?: string; company?: string; jobTitle?: string }
+  vars: TemplateVariables
 ): string {
-  return template
-    .replaceAll("{{first_name}}", lead.firstName ?? "there")
-    .replaceAll("{{company}}", lead.company ?? "your company")
-    .replaceAll("{{job_title}}", lead.jobTitle ?? "your role");
+  return template.replace(
+    VARIABLE_PATTERN,
+    (match, dName, dFallback, sName, sFallback) => {
+      const name = (dName ?? sName) as string;
+      const rawFallback = (dName !== undefined ? dFallback : sFallback) as
+        | string
+        | undefined;
+      const fallback =
+        rawFallback === undefined ? undefined : rawFallback.trim();
+      const value = variableValue(name, vars);
+      if (value !== undefined && value !== "") return value;
+      if (fallback !== undefined) return fallback;
+      if (value !== undefined) return value; // defined-but-empty stays empty
+      return VARIABLE_DEFAULTS[name] ?? match;
+    }
+  );
 }

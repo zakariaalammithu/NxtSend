@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Upload, Download, Trash2, Search, Linkedin, Target, Check, FileSpreadsheet, AlertTriangle, Tags, Copy, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Plus, Upload, Download, Trash2, Search, Linkedin, Target, Check, AlertTriangle, Tags, Copy, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { DemoBanner, Badge, Modal } from "@/components/ui";
+import { CsvImport } from "@/components/dashboard/CsvImport";
 import { formatDate } from "@/lib/utils";
 import {
   getCampaignsRepository,
@@ -14,18 +15,8 @@ import {
   countDuplicatedLeads,
   type DuplicateGroup,
 } from "@/lib/data/duplicates";
-import {
-  LEAD_FIELDS,
-  leadsToCsv,
-  parseCsv,
-  processCsvImport,
-  suggestColumnMapping,
-  type ColumnMapping,
-  type CsvImportResult,
-} from "@/lib/data/csv";
+import { leadsToCsv } from "@/lib/data/csv";
 import type { Campaign, Lead } from "@/types";
-
-type CsvStage = "pick" | "map" | "done";
 
 export default function LeadsPage() {
   const leadsRepo = React.useMemo(() => getLeadsRepository(), []);
@@ -70,16 +61,9 @@ export default function LeadsPage() {
   const [newLinkedin, setNewLinkedin] = React.useState("");
   const [newTags, setNewTags] = React.useState("Outreach, Q4");
 
-  // CSV import state
-  const [csvStage, setCsvStage] = React.useState<CsvStage>("pick");
-  const [csvFileName, setCsvFileName] = React.useState("");
-  const [csvHeaders, setCsvHeaders] = React.useState<string[]>([]);
-  const [csvRows, setCsvRows] = React.useState<string[][]>([]);
-  const [csvMapping, setCsvMapping] = React.useState<ColumnMapping>({});
-  const [importResult, setImportResult] = React.useState<CsvImportResult | null>(null);
-  const [importError, setImportError] = React.useState<string | null>(null);
-  const [isImporting, setIsImporting] = React.useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  // CSV import lives in the shared CsvImport component (P4 Stage 2);
+  // this counter remounts it fresh every time the modal opens.
+  const [csvSession, setCsvSession] = React.useState(0);
 
   // ---------------------------------------------------------------------------
   // Data loading through the repository layer (Supabase when configured,
@@ -317,68 +301,6 @@ export default function LeadsPage() {
   };
 
   // ---------------------------------------------------------------------------
-  // CSV import — real parsing, column mapping, validation, dedupe.
-  // ---------------------------------------------------------------------------
-  const resetCsvState = () => {
-    setCsvStage("pick");
-    setCsvFileName("");
-    setCsvHeaders([]);
-    setCsvRows([]);
-    setCsvMapping({});
-    setImportResult(null);
-    setImportError(null);
-    setIsImporting(false);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const handleCsvFileChosen = async (file: File) => {
-    setImportError(null);
-    try {
-      const text = await file.text();
-      const rows = parseCsv(text);
-      if (rows.length < 2) {
-        setImportError(
-          "That file has no data rows — it needs a header row plus at least one lead row."
-        );
-        return;
-      }
-      const headers = rows[0].map((h) => h.trim());
-      setCsvFileName(file.name);
-      setCsvHeaders(headers);
-      setCsvRows(rows);
-      setCsvMapping(suggestColumnMapping(headers));
-      setCsvStage("map");
-    } catch {
-      setImportError("Could not read that file. Please choose a valid CSV file.");
-    }
-  };
-
-  const handleRunImport = async () => {
-    if (!workspaceId) return;
-    setIsImporting(true);
-    setImportError(null);
-    try {
-      const result = processCsvImport(
-        csvRows,
-        csvMapping,
-        leads.map((l) => l.email ?? "")
-      );
-      if (result.leads.length > 0) {
-        const created = await leadsRepo.importLeads(workspaceId, result.leads);
-        setLeads((prev) => [...created, ...prev]);
-      }
-      setImportResult(result);
-      setCsvStage("done");
-    } catch (err) {
-      setImportError(
-        err instanceof Error ? err.message : "The import failed. No leads were added."
-      );
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
-  // ---------------------------------------------------------------------------
   // Enrollment — records a real assignment in the campaigns repository.
   // Sequence execution stays simulated; only the assignment is recorded.
   // ---------------------------------------------------------------------------
@@ -435,7 +357,7 @@ export default function LeadsPage() {
           <button
             type="button"
             onClick={() => {
-              resetCsvState();
+              setCsvSession((s) => s + 1);
               setIsCsvModalOpen(true);
             }}
             className="inline-flex items-center gap-2 rounded-xl bg-black-800 hover:bg-black-700 border border-black-600 px-4 py-2.5 text-13 font-medium text-white transition-colors"
@@ -1019,209 +941,26 @@ export default function LeadsPage() {
         )}
       </div>
 
-      {/* CSV IMPORT MODAL — real file parsing, mapping, validation, dedupe */}
+      {/* CSV IMPORT MODAL — the shared CsvImport component (P4 Stage 2):
+          same pipeline the campaign wizard's Audience step uses. */}
       <Modal
         isOpen={isCsvModalOpen}
         onClose={() => setIsCsvModalOpen(false)}
         title="Import Leads via CSV"
         size="lg"
       >
-        <div className="space-y-5">
-          {csvStage === "pick" && (
-            <>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full rounded-2xl border-2 border-dashed border-black-600 bg-black-900/50 p-8 text-center space-y-3 hover:border-purple-500/50 transition-colors"
-              >
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-600/10 text-purple-400 border border-purple-500/20">
-                  <FileSpreadsheet className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="text-14 font-medium text-white">
-                    Click to choose a CSV file from your computer
-                  </p>
-                  <p className="text-12 text-black-400 mt-1">
-                    The file is parsed in your browser. You will map its columns
-                    to lead fields before anything is imported.
-                  </p>
-                </div>
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void handleCsvFileChosen(file);
-                }}
-              />
-              {isDemo && (
-                <p className="text-12 text-orange-300/90">
-                  Demo mode: imported leads are stored in this browser
-                  (localStorage) only — they are not uploaded anywhere.
-                </p>
-              )}
-            </>
-          )}
-
-          {csvStage === "map" && (
-            <>
-              <div>
-                <h4 className="text-13 font-semibold text-white">
-                  Map columns — {csvFileName}
-                </h4>
-                <p className="text-12 text-black-400 mt-1">
-                  {Math.max(csvRows.length - 1, 0)} data row(s) found. Match each
-                  lead field to a column in your file. Email and First Name are
-                  required; rows that fail validation or duplicate an existing
-                  email are reported, not imported.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {LEAD_FIELDS.map((field) => (
-                  <div key={field.key}>
-                    <label className="block text-12 text-black-300 mb-1">
-                      {field.label}
-                      {field.required ? " *" : ""}
-                    </label>
-                    <select
-                      value={csvMapping[field.key] ?? ""}
-                      onChange={(e) =>
-                        setCsvMapping((prev) => ({
-                          ...prev,
-                          [field.key]: e.target.value || undefined,
-                        }))
-                      }
-                      className="w-full rounded-xl border border-black-600 bg-black-800 px-3 py-2 text-13 text-white focus:outline-none focus:border-purple-500"
-                    >
-                      <option value="">— Not mapped —</option>
-                      {csvHeaders.map((h) => (
-                        <option key={h} value={h}>
-                          {h}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
-              </div>
-
-              <div>
-                <h4 className="text-13 font-semibold text-white mb-2">
-                  Preview (first rows of your file):
-                </h4>
-                <div className="rounded-xl border border-black-700 bg-black-900/60 p-3 text-12 font-mono text-black-300 space-y-1 overflow-x-auto">
-                  {csvRows.slice(0, 4).map((row, i) => (
-                    <div key={i} className="whitespace-nowrap">
-                      {row.join(", ")}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-
-          {csvStage === "done" && importResult && (
-            <div className="space-y-4">
-              <h4 className="text-14 font-semibold text-white">Import summary</h4>
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="rounded-xl bg-emerald-950/30 border border-emerald-500/30 p-3">
-                  <div className="text-20 font-bold text-emerald-300">
-                    {importResult.leads.length}
-                  </div>
-                  <div className="text-11 text-black-300">Added</div>
-                </div>
-                <div className="rounded-xl bg-amber-950/30 border border-amber-500/30 p-3">
-                  <div className="text-20 font-bold text-amber-300">
-                    {importResult.duplicates.length}
-                  </div>
-                  <div className="text-11 text-black-300">Duplicates skipped</div>
-                </div>
-                <div className="rounded-xl bg-rose-950/30 border border-rose-500/30 p-3">
-                  <div className="text-20 font-bold text-rose-300">
-                    {importResult.errors.length}
-                  </div>
-                  <div className="text-11 text-black-300">Rows with errors</div>
-                </div>
-              </div>
-
-              {importResult.duplicates.length > 0 && (
-                <div>
-                  <h5 className="text-12 font-semibold text-amber-300 mb-1">
-                    Duplicates (by email):
-                  </h5>
-                  <ul className="text-12 text-black-300 space-y-0.5 max-h-28 overflow-y-auto">
-                    {importResult.duplicates.slice(0, 10).map((d, i) => (
-                      <li key={i}>
-                        Row {d.row}: {d.email} —{" "}
-                        {d.reason === "existing"
-                          ? "already in your leads"
-                          : "duplicate inside the file"}
-                      </li>
-                    ))}
-                    {importResult.duplicates.length > 10 && (
-                      <li>…and {importResult.duplicates.length - 10} more</li>
-                    )}
-                  </ul>
-                </div>
-              )}
-
-              {importResult.errors.length > 0 && (
-                <div>
-                  <h5 className="text-12 font-semibold text-rose-300 mb-1">
-                    Row errors:
-                  </h5>
-                  <ul className="text-12 text-black-300 space-y-0.5 max-h-28 overflow-y-auto">
-                    {importResult.errors.slice(0, 10).map((e, i) => (
-                      <li key={i}>
-                        Row {e.row}: {e.messages.join("; ")}
-                      </li>
-                    ))}
-                    {importResult.errors.length > 10 && (
-                      <li>…and {importResult.errors.length - 10} more</li>
-                    )}
-                  </ul>
-                </div>
-              )}
-
-              {isDemo && (
-                <p className="text-12 text-orange-300/90">
-                  Demo mode: the added leads were saved to this browser&apos;s
-                  demo store (localStorage).
-                </p>
-              )}
-            </div>
-          )}
-
-          {importError && (
-            <div className="rounded-xl border border-rose-500/40 bg-rose-950/20 px-4 py-3 text-12 text-rose-200 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              <span>{importError}</span>
-            </div>
-          )}
-
-          <div className="flex justify-end gap-3 pt-3 border-t border-black-700">
-            <button
-              type="button"
-              onClick={() => setIsCsvModalOpen(false)}
-              className="rounded-xl bg-black-800 hover:bg-black-700 px-4 py-2 text-13 font-medium text-white"
-            >
-              {csvStage === "done" ? "Close" : "Cancel"}
-            </button>
-            {csvStage === "map" && (
-              <button
-                type="button"
-                disabled={isImporting || !csvMapping.email || !csvMapping.first_name}
-                onClick={handleRunImport}
-                className="rounded-xl bg-purple-600 hover:bg-purple-500 px-4 py-2 text-13 font-semibold text-white shadow-glow-purple disabled:opacity-40"
-              >
-                {isImporting ? "Importing…" : "Validate & Import"}
-              </button>
-            )}
-          </div>
-        </div>
+        <CsvImport
+          key={csvSession}
+          workspaceId={workspaceId}
+          isDemo={isDemo}
+          existingLeads={leads}
+          onImported={(created) => {
+            if (created.length > 0) {
+              setLeads((prev) => [...created, ...prev]);
+            }
+          }}
+          onCancel={() => setIsCsvModalOpen(false)}
+        />
       </Modal>
 
       {/* ADD LEAD MODAL */}

@@ -20,6 +20,11 @@ import type { ProviderState } from "@/lib/env";
 import type { EmailProviderAdapter, SendEmailInput, SendEmailResult } from "./types";
 import { getEmailState } from "./state";
 import { checkSuppression } from "./suppression";
+import {
+  appendUnsubscribeFooter,
+  buildUnsubscribeHeaders,
+  type UnsubscribeEnv,
+} from "./unsubscribe";
 
 /** The subset of the Resend SDK the adapter depends on (injectable). */
 export interface ResendSender {
@@ -30,6 +35,7 @@ export interface ResendSender {
     html?: string;
     text?: string;
     replyTo?: string;
+    headers?: Record<string, string>;
   }): Promise<{ id: string | null; error: string | null }>;
 }
 
@@ -47,6 +53,9 @@ function sdkSender(apiKey: string): ResendSender {
       if (payload.html) options.html = payload.html;
       if (payload.text) options.text = payload.text;
       if (payload.replyTo) options.replyTo = payload.replyTo;
+      if (payload.headers && Object.keys(payload.headers).length > 0) {
+        options.headers = payload.headers;
+      }
       const { data, error } = await client.emails.send(
         options as unknown as Parameters<typeof client.emails.send>[0]
       );
@@ -74,6 +83,8 @@ export interface ResendAdapterDeps {
    * All send behaviour (suppression, state, results) is unchanged.
    */
   skipMessageRecord?: boolean;
+  /** Test seam: env for the unsubscribe preparation (defaults to process.env). */
+  unsubscribeEnv?: UnsubscribeEnv;
 }
 
 export class ResendEmailAdapter implements EmailProviderAdapter {
@@ -179,6 +190,25 @@ export class ResendEmailAdapter implements EmailProviderAdapter {
       };
     }
 
+    // Unsubscribe preparation — at SEND time only (stored templates
+    // and drafts are never mutated; the recorded message keeps the
+    // caller's original body). Every outbound email gets a working
+    // one-click unsubscribe when signing + a public URL are
+    // available; when production configuration makes that impossible,
+    // no broken link is emitted and the result message says why.
+    const prep = buildUnsubscribeHeaders(
+      { workspaceId: input.workspaceId, email: input.to },
+      this.deps.unsubscribeEnv
+    );
+    const bodies = appendUnsubscribeFooter(
+      { text: input.text, html: input.html },
+      prep.url
+    );
+    const headers: Record<string, string> = {
+      ...(input.headers ?? {}),
+      ...prep.headers,
+    };
+
     const sender =
       this.deps.sender ?? sdkSender(process.env.RESEND_API_KEY as string);
     const from = input.from ?? (process.env.EMAIL_FROM as string);
@@ -186,9 +216,10 @@ export class ResendEmailAdapter implements EmailProviderAdapter {
       from,
       to: input.to,
       subject: input.subject,
-      html: input.html,
-      text: input.text,
+      html: bodies.html,
+      text: bodies.text,
       replyTo: input.replyTo,
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
     });
 
     if (result.error || !result.id) {
@@ -206,7 +237,9 @@ export class ResendEmailAdapter implements EmailProviderAdapter {
       status: "sent",
       provider: this.provider,
       providerMessageId: result.id,
-      message: `Email accepted by Resend (message ID ${result.id}). Delivery is confirmed separately via webhook events.`,
+      message:
+        `Email accepted by Resend (message ID ${result.id}). Delivery is confirmed separately via webhook events.` +
+        (prep.warning ? ` ${prep.warning}` : ""),
     };
   }
 }

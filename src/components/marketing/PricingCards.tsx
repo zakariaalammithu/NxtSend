@@ -1,58 +1,45 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Check, Linkedin, Zap, Briefcase, Gem } from "lucide-react";
+import {
+  AGENCY_EXTRA_SEAT_PRICES,
+  AGENCY_PRICES,
+  AVATAR_PRICES,
+  SEAT_PRICES,
+  formatAnnualTotal,
+  formatPrice,
+  priceFor,
+} from "@/lib/marketing-prices";
+import { useBilling } from "./BillingContext";
+import { BillingToggle } from "./BillingToggle";
 
 /**
  * Pricing page plan cards (mirror: aimfox.com/pricing).
  *
  * Layout and card treatment match the homepage pricing section: two
- * artwork cards on top (Outreach seat $49, Agency $499) over the
- * mirror's aurora backgrounds (public/images/pricing/card-bg-1/2.webp)
- * and one wide artwork card below (Outreach avatar $387, card-bg-3).
+ * artwork cards on top (Outreach seat, Agency) over the mirror's
+ * aurora backgrounds (public/images/pricing/card-bg-1/2.webp) and one
+ * wide artwork card below (Outreach avatar, card-bg-3).
  *
- * The mirror shows a Monthly / Yearly ("up to -25%") billing toggle, but
- * its static HTML only contains the monthly price set ($49 / $499 /
- * $387) — yearly figures are computed by JS on the live site and are not
- * present in the download. The toggle therefore switches selection
- * state only; no yearly prices are invented.
+ * Prices come from the shared model in src/lib/marketing-prices.ts.
+ * The Monthly / Yearly toggle ("up to -25%") switches every figure on
+ * the page: billing state lives in the page-level BillingProvider, so
+ * this main toggle, the avatar card's mini toggle and the comparison
+ * table header all flip together. Yearly mode shows the exact
+ * monthly-equivalent figure plus a "billed annually" caption with the
+ * annual total.
  */
 export function PricingCards() {
-  const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
+  const { billing, setBilling } = useBilling();
+  const yearly = billing === "yearly";
 
   return (
     <div>
       {/* Billing cycle toggle (mirror) */}
       <div className="flex justify-center">
-        <div className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-black-800 p-1">
-          <button
-            type="button"
-            onClick={() => setBilling("monthly")}
-            className={`rounded-full px-4 py-1.5 text-13 transition-colors ${
-              billing === "monthly"
-                ? "bg-black-900 font-bold text-white ring-1 ring-white/20"
-                : "font-semibold text-white/70"
-            }`}
-          >
-            Monthly
-          </button>
-          <button
-            type="button"
-            onClick={() => setBilling("yearly")}
-            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-13 transition-colors ${
-              billing === "yearly"
-                ? "bg-black-900 font-bold text-white ring-1 ring-white/20"
-                : "font-semibold text-white/70"
-            }`}
-          >
-            Yearly
-            <span className="rounded-full bg-purple-600 px-2 py-0.5 text-10 font-bold text-white">
-              up to -25%
-            </span>
-          </button>
-        </div>
+        <BillingToggle billing={billing} onChange={setBilling} />
       </div>
 
       <div className="mx-auto mt-14 grid max-w-5xl grid-cols-1 gap-6 lg:grid-cols-2">
@@ -76,13 +63,19 @@ export function PricingCards() {
             </p>
             <div className="mt-7 flex flex-wrap items-end gap-x-2.5 gap-y-2">
               <span className="text-54 font-semibold leading-none text-white">
-                $49
+                {formatPrice(priceFor(SEAT_PRICES, billing))}
               </span>
               <span className="pb-1 text-15 text-white/60">/mo</span>
               <span className="mb-1 rounded-full border border-purple-400/40 bg-purple-600/30 px-2.5 py-0.5 text-11 font-semibold text-purple-100">
                 per seat
               </span>
             </div>
+            {yearly && (
+              <p className="mt-3 text-13 text-white/60">
+                Billed annually — {formatAnnualTotal(SEAT_PRICES.yearlyTotal)}
+                /year
+              </p>
+            )}
 
             <Link
               href="/signup"
@@ -150,13 +143,22 @@ export function PricingCards() {
               <div className="text-13 text-white/60">From:</div>
               <div className="mt-1 flex flex-wrap items-end gap-x-2.5 gap-y-2">
                 <span className="text-54 font-semibold leading-none text-white">
-                  $499
+                  {formatPrice(priceFor(AGENCY_PRICES, billing))}
                 </span>
                 <span className="pb-1 text-15 text-white/60">/20 seats</span>
                 <span className="mb-1 rounded-full border border-purple-400/40 bg-purple-600/30 px-2.5 py-0.5 text-11 font-semibold text-purple-100">
-                  +$20 per new seat
+                  +{formatPrice(priceFor(AGENCY_EXTRA_SEAT_PRICES, billing))}{" "}
+                  per new seat
                 </span>
               </div>
+              {yearly && (
+                <p className="mt-3 text-13 text-white/60">
+                  {formatAnnualTotal(AGENCY_PRICES.yearlyTotal)} billed
+                  annually · extra seats{" "}
+                  {formatPrice(AGENCY_EXTRA_SEAT_PRICES.yearlyMonthlyEq)}/mo
+                  billed annually
+                </p>
+              )}
             </div>
 
             <Link
@@ -211,13 +213,19 @@ export function PricingCards() {
               </p>
               <div className="mt-7 flex flex-wrap items-end gap-x-2.5 gap-y-2">
                 <span className="text-54 font-semibold leading-none text-white">
-                  $387
+                  {formatPrice(priceFor(AVATAR_PRICES, billing))}
                 </span>
                 <span className="pb-1 text-15 text-white/60">/month</span>
                 <span className="mb-1 rounded-full border border-purple-400/40 bg-purple-600/30 px-2.5 py-0.5 text-11 font-semibold text-purple-100">
                   3 profiles included
                 </span>
               </div>
+              {yearly && (
+                <p className="mt-3 text-13 text-white/60">
+                  {formatAnnualTotal(AVATAR_PRICES.yearlyTotal)} billed
+                  annually
+                </p>
+              )}
               <Link
                 href="/avatars"
                 className="mt-8 flex h-12 w-full items-center justify-center rounded-full border border-white/15 bg-white/10 text-15 font-semibold text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20"
@@ -228,29 +236,11 @@ export function PricingCards() {
 
             <div className="md:pt-1">
               <div className="flex md:justify-end">
-                <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-black-900/40 p-1 backdrop-blur-md">
-                  <span
-                    className={`rounded-full px-3 py-1 text-11 ${
-                      billing === "monthly"
-                        ? "bg-black-900 font-bold text-white ring-1 ring-white/20"
-                        : "font-semibold text-white/70"
-                    }`}
-                  >
-                    Monthly
-                  </span>
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-11 ${
-                      billing === "yearly"
-                        ? "bg-black-900 font-bold text-white ring-1 ring-white/20"
-                        : "font-semibold text-white/70"
-                    }`}
-                  >
-                    Yearly
-                    <span className="rounded-full bg-purple-600 px-1.5 py-px text-9 font-bold text-white">
-                      up to -25%
-                    </span>
-                  </span>
-                </span>
+                <BillingToggle
+                  size="sm"
+                  billing={billing}
+                  onChange={setBilling}
+                />
               </div>
               <div className="mt-6 text-15 font-bold text-white">
                 Built to add capacity

@@ -3,6 +3,8 @@
  *
  * One SAFE, read-only, documented verification call per provider:
  *   resend      Resend SDK: domains.list()
+ *   warmup      Instantly API v2: GET /api/v2/accounts?limit=1
+ *               (read-only; warm-up runs in Instantly, never here)
  *   stripe      Stripe SDK: accounts.retrieve()
  *   openai      GET https://api.openai.com/v1/models (Bearer)
  *   anthropic   GET https://api.anthropic.com/v1/models (x-api-key)
@@ -30,7 +32,15 @@
 import { isConfiguredValue } from "@/lib/env";
 import { getDataMode, isSupabaseConfigured, type DataMode } from "@/lib/data/mode";
 import { getEmailState } from "@/lib/email/state";
+import {
+  extractEmailDomain,
+  listResendDomains,
+  matchEmailFromDomain,
+  type ResendDomainInfo,
+} from "@/lib/email/domains";
 import { getBillingState } from "@/lib/billing/state";
+import { NotConfiguredLinkedInAdapter } from "@/lib/linkedin/not-configured";
+import { InstantlyWarmupAdapter } from "@/lib/warmup/instantly";
 import { isPixelConfigured } from "@/lib/analytics/pixel";
 import type { CenterStatus, VerifyOutcome } from "./types";
 
@@ -39,8 +49,16 @@ export interface VerifyDeps {
   mode?: DataMode;
   /** Injectable fetch for the HTTP-based verifications (tests). */
   fetchFn?: typeof fetch;
-  /** Injectable Resend domains.list (tests). Default: real SDK call. */
-  resendListDomains?: () => Promise<{ error: string | null }>;
+  /**
+   * Injectable Resend domain status (tests). Default: the real SDK
+   * list (+ record detail for the EMAIL_FROM domain). When a fake
+   * returns no `domains`, the verdict falls back to the key-acceptance
+   * message only — domain verification is never claimed without data.
+   */
+  resendListDomains?: (apiKey: string) => Promise<{
+    domains?: ResendDomainInfo[];
+    error: string | null;
+  }>;
   /** Injectable Stripe accounts.retrieve (tests). Default: real SDK call. */
   stripeRetrieveAccount?: () => Promise<{ id: string }>;
   /** Whether the caller's workspace has an enabled webhook subscription. */
@@ -50,6 +68,18 @@ export interface VerifyDeps {
    * (route-composed; simulated in demo mode). Return = delivery status.
    */
   dispatchTestEvent?: () => Promise<{ status: string }>;
+  /**
+   * Mailbox verification (route-composed; needs the caller's
+   * workspace + service role): performs the REAL OAuth check —
+   * valid token (refreshing if needed) + provider profile re-fetch
+   * matched against the connected mailbox. See
+   * src/lib/oauth/service.ts verifyOAuthConnection.
+   */
+  mailboxVerify?: (provider: "google" | "microsoft") => Promise<{
+    attempted: boolean;
+    ok: boolean;
+    message: string;
+  }>;
 }
 
 const META_MODEL_NOTES =
@@ -183,21 +213,95 @@ export async function verifyIntegration(
           "Resend is not fully configured (RESEND_API_KEY + EMAIL_FROM are both required) — no verification call was made."
         );
       }
+      const emailFrom = env.EMAIL_FROM;
+      const fromDomain = extractEmailDomain(emailFrom);
       const listDomains =
         deps.resendListDomains ??
-        (async () => {
-          const { Resend } = await import("resend");
-          const client = new Resend(env.RESEND_API_KEY as string);
-          const { error } = await client.domains.list();
-          return { error: error ? `${error.name}: ${error.message}` : null };
-        });
-      const { error } = await listDomains();
+        (async (apiKey: string) =>
+          listResendDomains(apiKey, { detailDomain: fromDomain }));
+      const { domains, error } = await listDomains(
+        env.RESEND_API_KEY as string
+      );
       if (error) {
         return outcome(id, "Error", false, true,
           `Resend rejected the verification call: ${error}. Check RESEND_API_KEY.`);
       }
+      if (!domains) {
+        // The verifier ran without domain data: only key acceptance is
+        // established — domain verification is NOT claimed.
+        return outcome(id, "Connected and Verified", true, true,
+          "Resend accepted the API key (domains list succeeded). Sending still depends on a verified domain matching EMAIL_FROM.");
+      }
+      const match = matchEmailFromDomain(domains, emailFrom);
+      if (match.state === "verified" && match.domain) {
+        return outcome(id, "Connected and Verified", true, true,
+          `Resend accepted the API key, and the EMAIL_FROM domain (${match.domain.name}) is verified at Resend — sends from it are accepted by the provider.`);
+      }
+      if (match.state === "not_verified" && match.domain) {
+        return outcome(id, "Configuration Required", false, true,
+          `Resend accepted the key, but the EMAIL_FROM domain (${match.domain.name}) is not verified at Resend — its provider status is "${match.domain.status}". Resend rejects sends from unverified domains; add the domain's DNS records in Resend and re-verify before sending.`);
+      }
+      if (match.state === "not_listed") {
+        return outcome(id, "Configuration Required", false, true,
+          `Resend accepted the key, but the EMAIL_FROM domain (${match.fromDomain}) is not among the Resend account's domains (${domains.length === 0 ? "the account has no domains yet" : domains.map((d) => d.name).join(", ")}). Add and verify that domain in Resend — sends from it will be rejected until then.`);
+      }
       return outcome(id, "Connected and Verified", true, true,
         "Resend accepted the API key (domains list succeeded). Sending still depends on a verified domain matching EMAIL_FROM.");
+    }
+
+    case "gmail":
+    case "microsoft": {
+      // The mailbox Test Connection is a REAL provider check: the
+      // stored grant's token is validated (refreshed when needed)
+      // and the provider profile is re-fetched and matched to the
+      // connected mailbox (route-composed mailboxVerify). With no
+      // connection there is nothing to call — attempted stays false.
+      const provider = id === "gmail" ? "google" : "microsoft";
+      const label = provider === "google" ? "Gmail" : "Outlook (Microsoft 365)";
+      if (!deps.mailboxVerify) {
+        return outcome(id, "Not Connected", false, false,
+          `No ${label} mailbox check is available in this context (workspace service role required). Connect a mailbox from this page in live mode first.`);
+      }
+      const result = await deps.mailboxVerify(provider);
+      if (!result.attempted) {
+        const notConfigured = /not configured/i.test(result.message);
+        return outcome(
+          id,
+          notConfigured ? "Configuration Required" : "Not Connected",
+          false,
+          false,
+          result.message
+        );
+      }
+      return result.ok
+        ? outcome(id, "Connected and Verified", true, true, result.message)
+        : outcome(id, "Error", false, true, result.message);
+    }
+
+    case "warmup": {
+      // Read-only check against the warm-up provider: the adapter lists
+      // the Instantly accounts (limit=1) — key presence alone never
+      // verifies; only Instantly's actual acceptance counts.
+      const adapter = new InstantlyWarmupAdapter({
+        env: { INSTANTLY_API_KEY: env.INSTANTLY_API_KEY },
+        mode,
+        fetchFn,
+      });
+      const result = await adapter.verifyConnection();
+      if (!result.attempted) {
+        return outcome(
+          id,
+          result.state === "configuration_required"
+            ? "Configuration Required"
+            : "Not Connected",
+          false,
+          false,
+          result.message
+        );
+      }
+      return result.ok
+        ? outcome(id, "Connected and Verified", true, true, result.message)
+        : outcome(id, "Error", false, true, result.message);
     }
 
     case "stripe": {
@@ -329,9 +433,34 @@ export async function verifyIntegration(
       );
     }
 
-    case "linkedin":
-      return outcome(id, "Configuration Required", false, false,
-        "Authorized provider required: no compliant LinkedIn automation API is integrated, so there is nothing safe to verify. LinkedIn stays in Demo Mode until an authorized provider adapter is implemented.");
+    case "linkedin": {
+      // No outbound call is possible — there is no provider to call.
+      // The refusal wording comes from the ONE LinkedIn seam's
+      // adapter (src/lib/linkedin), asked for a health check it
+      // cannot perform live; its message is the Test Connection
+      // result, verbatim.
+      const adapter = new NotConfiguredLinkedInAdapter({
+        env: {
+          LINKEDIN_PROVIDER: env.LINKEDIN_PROVIDER,
+          LINKEDIN_PROVIDER_API_KEY: env.LINKEDIN_PROVIDER_API_KEY,
+        },
+        mode,
+      });
+      const refusal = await adapter.sendMessage({
+        accountId: "test-connection",
+        leadId: "test-connection",
+        body: "",
+      });
+      return outcome(
+        id,
+        "Configuration Required",
+        false,
+        false,
+        refusal.ok
+          ? "No LinkedIn provider is configured — there is nothing to verify against."
+          : refusal.message
+      );
+    }
 
     case "muse-ai":
       return outcome(id, "Unsupported / No Documented API", false, false,

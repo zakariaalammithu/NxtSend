@@ -43,6 +43,10 @@ Open **SQL Editor** in the Supabase dashboard and run each file from
 | 8 | `008_referrals.sql` | `referrals` table (capture records; rewards are NOT configured — see the Referral page) |
 | 9 | `009_user_preferences.sql` | `user_preferences` table (profile bio + notification preferences) |
 | 10 | `010_sequence_executor.sql` | `campaign_enrollments.last_step_at` + `campaign_step_executions` (the sequence executor's at-most-once claim + attempt log) |
+| 11 | `011_campaign_config_step_types.sql` | `campaigns.config` JSONB (wizard description / audience source / warm-up limits persist live) + `step_type` enum values `like_post` / `view_profile` / `endorse_skills` (LinkedIn touch steps — recorded skipped by the executor, like all LinkedIn steps) + `connected_accounts` table (per-channel sending accounts: warm-up state, `daily_limits` JSONB, sender identity fields behind the `{my_*}` template variables; workspace RLS) + `campaigns.sender_account_id` / `campaigns.email_account_id` (nullable, ON DELETE SET NULL) |
+| 12 | `012_notifications.sql` | `notifications` table (in-app notifications with read state; workspace RLS — members read/mark-read, creation is service-role only). Powers the dashboard bell and reply-arrival notifications created by inbound ingestion (P5 Stage D) |
+| 13 | `013_connected_account_provider_health.sql` | `connected_accounts` gains provider identity + auth health: `provider_account_id`, `auth_status` (`ok` / `needs_reconnect` / `expired` / `error` / `not_connected`, backfilled `ok` for rows already marked `connected`), `last_sync_at`, `last_error`. Powers the account health + reconnect surfaces; written only by a provider integration (P5 Stage F) |
+| 14 | `014_oauth_connections.sql` | `oauth_connections` table (P5 Stage G): the encrypted OAuth token vault for connected Gmail / Outlook mailboxes — workspace + `connected_accounts` FKs (CASCADE), provider CHECK (`google` / `microsoft`), mailbox address, scopes, `access_token_enc` / `refresh_token_enc` (AES-256-GCM ciphertext only), token expiry, grant status. **RLS enabled with NO client policies — service-role only by construction**; the UI reads metadata through guarded API routes that never return token fields |
 
 Do not skip or reorder — later migrations depend on earlier helpers
 (`is_workspace_member`, `is_workspace_admin`).
@@ -71,6 +75,7 @@ and treated as *not configured*.
 |---|---|---|
 | `NEXT_PUBLIC_APP_URL` | Yes | Absolute base URL for links/redirects (checkout success/cancel, password reset) |
 | `NODE_ENV` | — | `production` in production |
+| `NEXT_PUBLIC_DEMO_MODE` | Optional | Set to `true` to force the Demo Mode banner even when Supabase is configured (banner override only — it does not switch the data mode) |
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes (live mode) | Supabase project URL (public) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes (live mode) | Supabase anon key (public, RLS-protected) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes (live mode) | ⚠️ Server-only. Admin API, webhooks, jobs, billing — bypasses RLS |
@@ -93,6 +98,9 @@ and treated as *not configured*.
 | `META_MODEL` | Optional | Override (default `muse-spark-1.3`) |
 | `CRON_SECRET` | For jobs | Protects `/api/jobs/run`; while unset the worker refuses (503). Generate: `openssl rand -hex 32` |
 | `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` / `LINKEDIN_REDIRECT_URI` | — | Reserved. **No authorized LinkedIn provider is integrated yet** — LinkedIn actions stay in Demo Mode regardless (see §11) |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | For Gmail mailboxes | Google Cloud OAuth 2.0 Web client (server-only secret) — §15. Callback: `<NEXT_PUBLIC_APP_URL>/api/oauth/google/callback` |
+| `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | For Outlook mailboxes | Azure app registration (server-only secret value) — §15. Callback: `<NEXT_PUBLIC_APP_URL>/api/oauth/microsoft/callback` |
+| `TOKEN_ENCRYPTION_KEY` | For mailbox OAuth | ⚠️ Server-only. AES-256-GCM key for the OAuth token vault (migration 014) — exactly 32 bytes, base64. Generate: `openssl rand -base64 32`. Also derives the OAuth state + fallback unsubscribe signing keys. **Rotating it invalidates every stored grant — mailboxes must reconnect** |
 
 ## 5. Create the first Super Admin (bootstrap)
 
@@ -149,10 +157,16 @@ files it into the matching conversation. To enable real replies:
    or enable receiving on a verified domain and add the **MX record**
    Resend shows to that domain's DNS. Without one of these, no inbound
    mail exists and no `email.received` events are ever sent.
-2. **Make replies land on the receiving domain.** Point the
-   reply-to of your campaigns (or the sending address itself) at an
-   address on the receiving domain. Replies addressed to a
-   sending-only domain never reach Resend.
+2. **Make replies land on the receiving domain.** Set
+   **`EMAIL_REPLY_TO`** to an address on the receiving domain. The
+   sequence executor and the Inbox reply service pass it as the
+   Reply-To on every outbound email (P5 Stage C), so replies are
+   addressed to the receiving domain and flow back into the Inbox.
+   While `EMAIL_REPLY_TO` is unset, no Reply-To is set and replies go
+   to the `EMAIL_FROM` address — the Inbox then only works if the From
+   domain itself is also a receiving domain. The Resend integration
+   page shows the current routing ("Reply routing & unsubscribe"
+   panel) and warns while it is unset.
 3. **Subscribe the webhook to inbound:** the same endpoint
    (`https://<your-domain>/api/webhooks/resend`, same
    `RESEND_WEBHOOK_SECRET`) must also be subscribed to the
@@ -175,6 +189,99 @@ files it into the matching conversation. To enable real replies:
    an unread conversation within seconds. LinkedIn conversations remain
    read-only until an authorized LinkedIn provider is connected —
    there is no equivalent inbound path for LinkedIn today.
+
+### Domain authentication & deliverability (SPF / DKIM / DMARC)
+
+Authentication is what lets receiving servers trust that mail from
+your domain really came through your provider. It is a prerequisite
+for reliable delivery — it is **not** a guarantee of inbox placement,
+and nothing in this app will ever claim one: placement also depends
+on sender reputation, list quality and engagement history.
+
+**Records to add** (always copy the exact values from the Resend
+dashboard for YOUR domain — they are account-specific):
+
+1. **DKIM** — a TXT record at host `resend._domainkey` on your domain
+   containing the public key Resend shows (`v=DKIM1; k=rsa; p=...`).
+   Publish the full value; a truncated key silently fails.
+2. **SPF** — Resend publishes its SPF on the `send` subdomain: a TXT
+   record `v=spf1 include:amazonses.com ~all` at host `send`, plus the
+   MX record Resend shows there (`feedback-smtp.<region>.amazonses.com`,
+   priority 10) for bounce handling. If you also send from the root
+   domain with another provider, that provider's SPF lives on the root
+   — never publish two `v=spf1` records on the same name; merge them
+   into one instead.
+3. **DMARC** — a TXT record at host `_dmarc`:
+   `v=DMARC1; p=none; rua=mailto:dmarc-reports@yourdomain.com`.
+   Start at `p=none` (monitor only), read the aggregate reports for a
+   few weeks, then tighten to `p=quarantine` and finally `p=reject`.
+   DMARC only "sees" your mail once SPF or DKIM aligns with the
+   EMAIL_FROM domain — which is exactly what Resend's records above
+   provide.
+
+**Verify in the app:** Integration Center → **Email / Resend** (or
+Admin → Integrations → Email) → the **Email authentication** panel →
+**Run check**. It performs real public-DNS lookups for the EMAIL_FROM
+domain (or any domain you type) and shows the SPF/DKIM/DMARC verdicts
+with the actual records found, plus whether the EMAIL_FROM domain is
+verified at Resend. The **Test Connection** button now reports the
+same provider match: if the EMAIL_FROM domain is unverified or missing
+at Resend, the result is a "Configuration Required" warning, because
+Resend rejects sends from unverified domains. DNS changes can take a
+while to propagate — if a record you just added shows "not found",
+wait and re-run rather than adding duplicates.
+
+**Replies and the receiving domain:** the Inbox only receives mail
+addressed to a Resend **receiving** domain (see "Receiving replies"
+above — it needs its own MX setup). Set `EMAIL_REPLY_TO` to an
+address on that receiving domain (step 2 above): every outbound email
+then carries it as Reply-To, so replies reliably reach the Inbox
+regardless of which domain you send from. While it is unset, replies
+go to the `EMAIL_FROM` address — fine only when the From domain is
+itself a receiving domain.
+
+**Unsubscribe (built in, P5 Stage C):** every outbound email —
+campaign steps and Inbox replies — carries, added at send time by the
+adapter (stored templates are never modified):
+
+- a `List-Unsubscribe` header with the one-click HTTPS URL (plus a
+  `mailto:` to `EMAIL_REPLY_TO` when set) and
+  `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058), and
+- a visible unsubscribe line in the footer (text and HTML versions).
+
+The URL is `https://<NEXT_PUBLIC_APP_URL>/api/unsubscribe/<token>`,
+where the token is a stateless HMAC-SHA256 signature over the
+workspace + recipient — no database lookup, no account needed to
+unsubscribe. Signing key resolution: **`UNSUBSCRIBE_SECRET`** when
+set; otherwise the key is **derived from `SUPABASE_SERVICE_ROLE_KEY`**
+(links keep working, but rotating the service-role key invalidates
+older links — set the dedicated secret for a stable key). Fail-safe
+by design: in production with **neither** secret available, or with
+`NEXT_PUBLIC_APP_URL` unset/localhost, sends omit the URL and the
+send result says so — an invalid unsubscribe link is never emitted.
+Clicking the link opens a confirmation page (GET never unsubscribes —
+mail scanners prefetch links); confirming, or the mail client's
+one-click POST, adds the address to the workspace suppression list
+with reason `unsubscribed` and stops the lead's active sequence
+enrollments. Manage the list at **Dashboard → Email → Suppression
+list** (or Integration Center → Email / Resend → "Reply routing &
+unsubscribe"): add or remove addresses — removing one re-enables
+sending to it, so removal asks for confirmation.
+
+**Bounce/complaint hygiene:** already automatic — the signed Resend
+webhook feeds `email_events`, bounces and complaints add the address
+to the suppression list, and every send checks suppression first
+(fail closed). There is intentionally **no built-in warm-up feature**:
+warm-up services that generate artificial engagement manipulate
+filters and can damage a domain; if you warm a new domain, use a
+reputable provider's own programme and ramp sending volume gradually.
+
+**While composing:** the sequence email editor and the Inbox reply
+composer show dismissible "deliverability hints" (ALL-CAPS subjects,
+link-heavy text, known URL shorteners, spam-associated phrasing).
+They are heuristics only — they never block a send and are not a spam
+score. (There is no "missing unsubscribe" hint: the real unsubscribe
+footer + headers are appended at send time — see "Unsubscribe" above.)
 
 ## 7. Billing (Stripe)
 
@@ -297,9 +404,20 @@ producer UI yet); an empty queue is a normal state.
   submits it for Meta's review) — the Integration Center's Muse.ai
   page carries the pre-classified tool manifest and the readiness
   checklist. **Not implemented, and not fakeable.**
-- **Sequence execution** (actually sending LinkedIn/email steps):
-  persistence, lifecycle and activity logs are real; execution arrives
-  with the providers above.
+- **Sequence execution:** IMPLEMENTED for email (this bullet replaces
+  an older, stale note). The executor (migration 010) claims due
+  steps with at-most-once semantics and really sends **email** steps
+  through the Resend adapter — or, since P5 Stage G, through the
+  campaign's selected Gmail / Outlook mailbox when one is
+  OAuth-connected (§15) — suppression check first (fail closed),
+  plan limits enforced, and stop rules honoured (a reply, bounce,
+  complaint or unsubscribe stops the contact's sequence). **LinkedIn
+  steps are recorded as `skipped`** with an explicit reason, because
+  no authorized LinkedIn provider is integrated (see the first
+  bullet). "If connected" condition branches are stored in the step
+  configuration but are **not evaluated** by the executor yet — a
+  condition step is recorded as elapsed with that stated in its
+  detail. Nothing about LinkedIn delivery is simulated or claimed.
 
 ## 12. Deploy to Vercel
 
@@ -381,6 +499,12 @@ only presence booleans):
   requires a workspace **owner/admin**. Performs ONE safe read-only
   verification call; real attempts are recorded on the workspace's
   `integrations` row (migration 006) so the result survives reloads.
+- `GET /api/oauth/connections` — mailbox OAuth **metadata only**
+  (provider, mailbox address, grant status, token expiry, scopes;
+  never token fields), plus per-provider configuration booleans.
+  `POST /api/oauth/connections/disconnect` disconnects (owner/admin
+  in live mode). `GET /api/oauth/google|microsoft/connect` +
+  `/callback` run the OAuth flows themselves (§15).
 
 **Status vocabulary (exact):** `Connected and Verified` ·
 `Connected but Not Verified` · `Configuration Required` ·
@@ -403,6 +527,8 @@ the moment its configuration is removed.
 | Outbound Webhooks | none (subscription is per-workspace, in the app) | Test Connection dispatches a signed `nxtsend.test` event through the delivery pipeline (Demo Mode: simulated, logged, never actually sent) | Your receiver URL (n8n Webhook node / Zapier Catch Hook), configured in the hub's Webhooks section (§10) |
 | Background Jobs | `CRON_SECRET` | No remote check — smoke-test `POST /api/jobs/run` with `Authorization: Bearer <CRON_SECRET>` (§10) | — |
 | LinkedIn | `LINKEDIN_CLIENT_ID/SECRET/REDIRECT_URI` (reserved, inert) | Nothing to verify: no authorized provider is integrated; LinkedIn stays in Demo Mode (§11) | — |
+| Gmail | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY` | Test Connection re-fetches the Google userinfo + Gmail profile with the stored grant (refreshing the access token when needed) and confirms it still describes the connected mailbox (§15). "Connected and Verified" comes from the stored grant — created only by a completed OAuth exchange + profile fetch; env presence alone is never a connection | Redirect URI (not a webhook): `<NEXT_PUBLIC_APP_URL>/api/oauth/google/callback` registered in Google Cloud Console (§15.2) |
+| Outlook (Microsoft 365) | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY` | Test Connection re-fetches Graph `/me` with the stored grant (refreshing when needed) and confirms the connected mailbox (§15) | Redirect URI (not a webhook): `<NEXT_PUBLIC_APP_URL>/api/oauth/microsoft/callback` registered in Azure (§15.3) |
 | Muse.ai | none | Nothing to verify: **no documented public API exists for the Muse agent** — see below | — |
 | Google Sheets / CRM / Email verification | none | Not implemented yet — the detail pages state what implementation requires | — |
 
@@ -458,6 +584,138 @@ credential Meta never issues to us.
   while the configuration they verified is still present.
 - Verify returns 403 in the app → the caller is a workspace member,
   not an owner/admin; verification is admin-gated in live mode.
+
+## 15. Mailbox OAuth — Gmail & Outlook (Microsoft 365)
+
+Workspaces can connect a real Gmail / Google Workspace or Outlook /
+Microsoft 365 mailbox by OAuth and send campaign email + inbox
+replies **from that mailbox**. This is real authorization-code OAuth
+against Google / the Microsoft identity platform — NxtSend never
+asks for a mailbox password or an app password, and no "Connected"
+state exists until the provider consent, code exchange and profile
+fetch have ALL succeeded.
+
+How it behaves once connected:
+
+- The mailbox appears as an email account in **Connected Accounts**
+  and in the Integration Center (**Gmail** / **Outlook (Microsoft
+  365)**) with its recorded health (`ok` / `needs_reconnect` / …).
+- A campaign whose **email account** is that mailbox sends its email
+  steps through the mailbox (Gmail API / Microsoft Graph), From =
+  the mailbox address. Inbox replies route the same way when the
+  conversation's campaign used the mailbox (or when it is the
+  workspace's only OAuth mailbox). Resend remains the default for
+  every other campaign.
+- A selected mailbox that is disconnected / expired /
+  `needs_reconnect` makes the send **fail honestly** — the executor
+  never silently falls back to Resend, because that would change
+  the From identity the campaign selected.
+- Suppression checks and the Stage-C unsubscribe headers + footer
+  apply to mailbox sends exactly as they do to Resend sends.
+- Access tokens refresh automatically; a failed refresh marks the
+  mailbox `needs_reconnect` and sends stop until it is reconnected.
+- Tokens are stored **AES-256-GCM encrypted** (migration 014,
+  service-role-only table). No API route or UI ever returns token
+  material — only metadata (mailbox address, status, token expiry).
+- Disconnect deletes the stored tokens and marks the account
+  disconnected. For Gmail it also revokes the grant at Google (best
+  effort, reported in the result). **Microsoft provides no
+  revocation endpoint** for this flow — also remove the app's
+  consent in the Microsoft account if you want the grant gone there.
+- Note on Microsoft message IDs: Graph's `POST /me/sendMail` returns
+  202 with **no** message id, and NxtSend records `sent` only with a
+  provider id — so the adapter creates the message first
+  (`POST /me/messages`, which returns the provider-assigned id) and
+  then sends it (`POST /me/messages/{id}/send`). The recorded id is
+  always the real provider-assigned one; nothing is invented.
+
+Demo Mode: mailbox connection is **disabled** — the panels explain
+what live setup is required. Nothing can be connected or faked in
+Demo Mode.
+
+### 15.1 Generate the token encryption key
+
+```bash
+openssl rand -base64 32
+```
+
+Set the output as `TOKEN_ENCRYPTION_KEY` (Vercel → Project →
+Settings → Environment Variables, server-side). It must decode to
+exactly 32 bytes; a missing/malformed key makes mailbox connection
+fail closed with a configuration error. **Rotating the key
+invalidates all stored grants** (they can no longer be decrypted) —
+every connected mailbox must reconnect afterwards.
+
+### 15.2 Google Cloud Console — Gmail OAuth app
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+   → create (or pick) a project for NxtSend.
+2. **APIs & Services → Library** → enable the **Gmail API**.
+3. **APIs & Services → OAuth consent screen**: user type
+   **External**; fill in the app name (NxtSend), support email and
+   developer contact. Add the scopes NxtSend requests:
+   `openid`, `email`, `profile`,
+   `https://www.googleapis.com/auth/gmail.send`,
+   `https://www.googleapis.com/auth/gmail.readonly`.
+   While the app is in **Testing** publishing status, add every
+   mailbox owner as a **test user** (grants for test users expire
+   after 7 days — publish the app, completing Google's verification
+   for the restricted Gmail scopes, for durable production use).
+4. **APIs & Services → Credentials → Create credentials → OAuth
+   client ID** → application type **Web application**. Under
+   **Authorized redirect URIs** add EXACTLY:
+
+   ```
+   <NEXT_PUBLIC_APP_URL>/api/oauth/google/callback
+   ```
+
+   e.g. `https://nxtsend-seven.vercel.app/api/oauth/google/callback`
+   for the current deployment — it must match the deployed
+   `NEXT_PUBLIC_APP_URL` character for character (a mismatch is the
+   `redirect_uri_mismatch` error).
+5. Copy the **Client ID** → `GOOGLE_CLIENT_ID` and the **Client
+   secret** → `GOOGLE_CLIENT_SECRET` in Vercel.
+
+### 15.3 Azure — Outlook / Microsoft 365 app registration
+
+1. Go to [portal.azure.com](https://portal.azure.com) → **Microsoft
+   Entra ID → App registrations → New registration**. Name it
+   NxtSend; supported account types: **Accounts in any
+   organizational directory and personal Microsoft accounts** (this
+   matches the `common` tenant the flow uses).
+2. **Redirect URI**: platform **Web**, value EXACTLY:
+
+   ```
+   <NEXT_PUBLIC_APP_URL>/api/oauth/microsoft/callback
+   ```
+3. **API permissions → Add a permission → Microsoft Graph →
+   Delegated permissions**: `User.Read`, `Mail.Send`, `Mail.Read`,
+   `offline_access` (plus `openid` / `profile` / `email`, added by
+   the flow itself). Organizational tenants may require admin
+   consent for these.
+4. **Certificates & secrets → New client secret** — copy the secret
+   **Value** (shown once) → `MICROSOFT_CLIENT_SECRET`; the
+   **Application (client) ID** from the Overview page →
+   `MICROSOFT_CLIENT_ID` in Vercel.
+
+### 15.4 Vercel env checklist (mailbox OAuth)
+
+```
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+MICROSOFT_CLIENT_ID=...
+MICROSOFT_CLIENT_SECRET=...
+TOKEN_ENCRYPTION_KEY=<output of openssl rand -base64 32>
+NEXT_PUBLIC_APP_URL=https://<your deployed origin>   (already set for billing)
+```
+
+Redeploy after setting them, open **Dashboard → Integrations →
+Gmail** (or **Outlook (Microsoft 365)**), and use **Connect** in the
+Connected mailbox panel. You consent on the provider's own screen;
+on success you land back on Connected Accounts with a confirmation
+notice, and the mailbox is selectable as a campaign's email
+account. Use **Test Connection** any time to re-validate the stored
+grant against the provider.
 
 ## Appendix — Muse.ai research note (2026-10-18)
 

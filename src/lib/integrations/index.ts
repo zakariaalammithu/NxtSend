@@ -2,17 +2,20 @@ import type { IntegrationStatus } from "@/types";
 import type {
   AdapterResult,
   EmailAdapter,
-  LinkedInAdapter,
   StripeAdapter,
 } from "./types";
-import { demoLinkedInAdapter } from "./linkedin/demo";
 import { demoEmailAdapter } from "./email/demo";
 import { demoStripeAdapter } from "./stripe/demo";
 
 export * from "./types";
-export { demoLinkedInAdapter } from "./linkedin/demo";
 export { demoEmailAdapter } from "./email/demo";
 export { demoStripeAdapter } from "./stripe/demo";
+
+// NOTE (P5 Stage F): the legacy LinkedIn adapter that lived here —
+// a demo class, a throwing live stub, and a caller-less factory —
+// has been RETIRED. There is exactly ONE LinkedIn seam now:
+// LinkedInProviderAdapter in src/lib/linkedin (createLinkedInAdapter).
+// Nothing in this legacy module speaks for LinkedIn anymore.
 
 /**
  * Error thrown when a production adapter method is called before its external client is wired.
@@ -35,29 +38,6 @@ import { getBillingState } from "@/lib/billing/state";
 // ----------------------------------------------------------------------------
 // Production Adapter Stubs
 // ----------------------------------------------------------------------------
-
-class LiveLinkedInStub implements LinkedInAdapter {
-  async sendConnectionRequest(): Promise<AdapterResult> {
-    throw new NotImplementedError("Real adapter not yet configured");
-  }
-
-  async sendMessage(): Promise<AdapterResult> {
-    throw new NotImplementedError("Real adapter not yet configured");
-  }
-
-  async getConversations(): Promise<AdapterResult> {
-    throw new NotImplementedError("Real adapter not yet configured");
-  }
-
-  getStatus(): IntegrationStatus {
-    // Stage 2c honesty fix (was F10): this stub is only constructed
-    // when LinkedIn env vars exist, but every action throws — no
-    // authorized provider is integrated yet, so reporting "connected"
-    // would be false. "error" is the honest state until a real
-    // provider adapter replaces this stub.
-    return "error";
-  }
-}
 
 class LiveEmailStub implements EmailAdapter {
   async sendEmail(): Promise<AdapterResult> {
@@ -111,34 +91,18 @@ class LiveStripeStub implements StripeAdapter {
 // ----------------------------------------------------------------------------
 
 /**
- * Returns the active LinkedInAdapter instance.
- * Defaults safely to DemoLinkedInAdapter unless valid LinkedIn API credentials are provided.
- *
- * @returns LinkedInAdapter implementation.
- */
-export function getLinkedInAdapter(): LinkedInAdapter {
-  const isLinkedInConfigured =
-    isConfigured(process.env.LINKEDIN_CLIENT_ID) ||
-    isConfigured(process.env.LINKEDIN_ACCESS_TOKEN) ||
-    isConfigured(process.env.UNIPHORE_API_KEY);
-
-  if (isLinkedInConfigured) {
-    return new LiveLinkedInStub();
-  }
-
-  return demoLinkedInAdapter;
-}
-
-/**
  * Returns the active EmailAdapter instance.
- * Defaults safely to DemoEmailAdapter unless valid Resend or SMTP credentials are provided.
+ * Defaults safely to DemoEmailAdapter unless a Resend key is present
+ * (the stub itself refuses to send — real sending is workspace-scoped
+ * in src/lib/email). NOTE: this legacy factory currently has no
+ * callers. The former EMAIL_SERVER_HOST (SMTP) read was removed in
+ * P5: no SMTP transport exists in the codebase; sending is
+ * Resend-only.
  *
  * @returns EmailAdapter implementation.
  */
 export function getEmailAdapter(): EmailAdapter {
-  const isEmailConfigured =
-    isConfigured(process.env.RESEND_API_KEY) ||
-    isConfigured(process.env.EMAIL_SERVER_HOST);
+  const isEmailConfigured = isConfigured(process.env.RESEND_API_KEY);
 
   if (isEmailConfigured) {
     return new LiveEmailStub();

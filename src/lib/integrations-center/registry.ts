@@ -63,11 +63,14 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
       { name: "RESEND_API_KEY", required: true, visibility: "server-only", purpose: "API key from resend.com/api-keys, with sending permission. " + VERCEL_HINT },
       { name: "EMAIL_FROM", required: true, visibility: "server-only", purpose: "Verified sender identity, e.g. NxtSend <hello@yourdomain.com> — the domain must be verified in Resend. " + VERCEL_HINT },
       { name: "RESEND_WEBHOOK_SECRET", required: false, visibility: "server-only", purpose: "Svix signing secret for the delivery webhook. While unset, /api/webhooks/resend REJECTS events (503) instead of accepting them unverified. " + VERCEL_HINT },
+      { name: "EMAIL_REPLY_TO", required: false, visibility: "server-only", purpose: "Reply-To for all outbound email (campaign steps + inbox replies) — an address on your receiving domain, so replies reach the Inbox. While unset, replies go to EMAIL_FROM. " + VERCEL_HINT },
+      { name: "UNSUBSCRIBE_SECRET", required: false, visibility: "server-only", purpose: "HMAC secret signing the one-click unsubscribe links in every outbound email. While unset, the key is derived from SUPABASE_SERVICE_ROLE_KEY; while both are unset, sends omit the unsubscribe URL and warn instead of emitting an invalid link. " + VERCEL_HINT },
     ],
     capabilities: [
       "Send email with suppression enforcement before every send",
       "Delivery, bounce and complaint tracking via signed webhooks (bounces auto-suppress)",
       "Inbound reply ingestion (requires a Resend receiving domain — see SETUP.md §6)",
+      "One-click unsubscribe (RFC 8058 List-Unsubscribe) + footer link on every outbound email; unsubscribes land on the suppression list",
     ],
     setupSteps: [
       "Create a Resend account and verify your sending domain (SPF/DKIM records).",
@@ -87,6 +90,112 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
       notes:
         "Register this URL in the Resend dashboard (Webhooks) and subscribe to the delivery event types (email.delivered, email.bounced, email.complained, …) plus email.received if you configured a receiving domain. Signing uses the Svix scheme; the secret goes in RESEND_WEBHOOK_SECRET.",
     },
+    verifySupported: true,
+  },
+  {
+    id: "gmail",
+    name: "Gmail",
+    category: "Outreach & email",
+    tagline: "Send campaign + inbox email from a real Gmail / Google Workspace mailbox via OAuth.",
+    description:
+      "Gmail mailboxes connect with Google's OAuth 2.0 authorization-code flow — the mailbox owner consents on Google's own screen; NxtSend never sees or asks for a password or app password. The returned tokens are encrypted at rest (AES-256-GCM, keyed by TOKEN_ENCRYPTION_KEY) in the service-role-only oauth_connections table (migration 014) and are never exposed to the browser. Once connected, a campaign whose selected email account is this mailbox sends through the Gmail API with From = the mailbox address — including the same one-click unsubscribe headers and suppression enforcement as Resend sends. Picking a disconnected mailbox refuses the send honestly; there is no silent fallback to Resend. Access tokens refresh automatically; a failed refresh marks the mailbox 'needs reconnect'.",
+    docsUrl: "https://developers.google.com/gmail/api/guides",
+    kind: "adapter",
+    envVars: [
+      { name: "GOOGLE_CLIENT_ID", required: true, visibility: "server-only", purpose: "OAuth client ID from the Google Cloud Console (APIs & Services → Credentials → OAuth 2.0 Client ID, type Web application). " + VERCEL_HINT },
+      { name: "GOOGLE_CLIENT_SECRET", required: true, visibility: "server-only", purpose: "The OAuth client's secret (shown once by Google — store it here, server-side only). " + VERCEL_HINT },
+      { name: "TOKEN_ENCRYPTION_KEY", required: true, visibility: "server-only", purpose: "AES-256 key encrypting the stored OAuth tokens (base64 of 32 bytes; generate: openssl rand -base64 32). Shared with the Outlook entry. While unset/malformed, mailbox connect refuses before any redirect. " + VERCEL_HINT },
+    ],
+    capabilities: [
+      "OAuth connect / disconnect for Gmail + Google Workspace mailboxes (consent on Google's screen — no passwords, ever)",
+      "Campaign email steps + inbox replies sent From the connected mailbox (Gmail API), chosen per campaign via its email account",
+      "One-click unsubscribe (RFC 8058) + suppression enforcement before every send — identical to Resend sends",
+      "Automatic access-token refresh; failed refresh → recorded 'needs reconnect' state, never a silent fallback",
+    ],
+    setupSteps: [
+      "In the Google Cloud Console, create (or pick) a project and enable the Gmail API (APIs & Services → Library → Gmail API).",
+      "Configure the OAuth consent screen (APIs & Services → OAuth consent screen): External, app name NxtSend, your support email; add the scopes https://www.googleapis.com/auth/gmail.send and https://www.googleapis.com/auth/gmail.readonly (plus openid/email/profile, which the flow requests). While the app is in Google's 'Testing' mode only listed test users can connect — submit for verification before connecting production mailboxes.",
+      "Create credentials: APIs & Services → Credentials → Create Credentials → OAuth client ID → Web application. Under 'Authorized redirect URIs' add the callback URL shown in the Connected mailbox panel below (in production: https://<your-app-domain>/api/oauth/google/callback).",
+      "Set GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET and TOKEN_ENCRYPTION_KEY (openssl rand -base64 32) in Vercel, then redeploy.",
+      "Use the Connect button in the Connected mailbox panel below and complete Google's consent. The connection exists only after Google returns and the mailbox profile is fetched — the panel then shows the connected address.",
+      "In a campaign, select this mailbox as the email account (Connected Accounts / campaign wizard Step 1) — its steps send From the mailbox; inbox replies route through it too.",
+    ],
+    troubleshooting: [
+      "Connect returns 'not_configured': one of GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / TOKEN_ENCRYPTION_KEY is missing or still a placeholder, or NEXT_PUBLIC_APP_URL is not the public origin in production — the panel lists the missing names.",
+      "Google shows 'redirect_uri_mismatch': the callback URL registered in the Google Cloud Console does not exactly match the one in the panel (scheme, domain, path — no trailing slash).",
+      "Google shows 'access_blocked' / unverified app: the consent screen is in Testing mode and your Google account is not a listed test user, or the app has not passed verification for the Gmail scopes.",
+      "Mailbox shows 'needs reconnect': the access token expired and the refresh failed (grant revoked, password/security change, or the app was deauthorized) — reconnect from the panel; sends from this mailbox refuse until then.",
+      "Disconnect: use the Disconnect button in the panel — it deletes the stored tokens and revokes the grant at Google (best effort, reported in the response).",
+    ],
+    verifySupported: true,
+  },
+  {
+    id: "microsoft",
+    name: "Outlook (Microsoft 365)",
+    category: "Outreach & email",
+    tagline: "Send campaign + inbox email from a real Outlook / Microsoft 365 mailbox via OAuth.",
+    description:
+      "Outlook and Microsoft 365 mailboxes connect with the Microsoft identity platform's OAuth 2.0 authorization-code flow (tenant 'common' — work/school and personal accounts) — the mailbox owner consents on Microsoft's own screen; NxtSend never sees or asks for a password. Tokens are encrypted at rest (AES-256-GCM, keyed by TOKEN_ENCRYPTION_KEY) in the service-role-only oauth_connections table (migration 014) and never exposed to the browser. Once connected, a campaign whose selected email account is this mailbox sends through Microsoft Graph with From = the mailbox address — including the same one-click unsubscribe headers and suppression enforcement as Resend sends. Graph note: Graph's simple sendMail call returns no message ID, so sends use Graph's create-message + send flow and record the provider-assigned message ID. Picking a disconnected mailbox refuses the send honestly; there is no silent fallback to Resend.",
+    docsUrl: "https://learn.microsoft.com/en-us/graph/api/user-sendmail",
+    kind: "adapter",
+    envVars: [
+      { name: "MICROSOFT_CLIENT_ID", required: true, visibility: "server-only", purpose: "Application (client) ID from the Azure app registration (Azure Portal → App registrations). " + VERCEL_HINT },
+      { name: "MICROSOFT_CLIENT_SECRET", required: true, visibility: "server-only", purpose: "Client secret VALUE from the app registration (Certificates & secrets) — copy it at creation; Azure shows it once. " + VERCEL_HINT },
+      { name: "TOKEN_ENCRYPTION_KEY", required: true, visibility: "server-only", purpose: "AES-256 key encrypting the stored OAuth tokens (base64 of 32 bytes; generate: openssl rand -base64 32). Shared with the Gmail entry. While unset/malformed, mailbox connect refuses before any redirect. " + VERCEL_HINT },
+    ],
+    capabilities: [
+      "OAuth connect / disconnect for Outlook.com + Microsoft 365 mailboxes (consent on Microsoft's screen — no passwords, ever)",
+      "Campaign email steps + inbox replies sent From the connected mailbox (Microsoft Graph), chosen per campaign via its email account",
+      "One-click unsubscribe (RFC 8058) + suppression enforcement before every send — identical to Resend sends",
+      "Automatic access-token refresh (refresh tokens rotate and are re-stored encrypted); failed refresh → recorded 'needs reconnect' state",
+    ],
+    setupSteps: [
+      "In the Azure Portal → App registrations → New registration: name it NxtSend, and choose 'Accounts in any organizational directory and personal Microsoft accounts' (the flow uses tenant 'common').",
+      "Under the registration's Authentication → Add a platform → Web, add the redirect URI shown in the Connected mailbox panel below (in production: https://<your-app-domain>/api/oauth/microsoft/callback).",
+      "Under API permissions → Add a permission → Microsoft Graph → Delegated permissions, add: User.Read, Mail.Send, Mail.Read and offline_access (offline_access is what makes Microsoft issue a refresh token). Grant admin consent if your tenant requires it.",
+      "Under Certificates & secrets → New client secret, create a secret and copy its VALUE immediately (shown once).",
+      "Set MICROSOFT_CLIENT_ID (the Application (client) ID) + MICROSOFT_CLIENT_SECRET (the value) and TOKEN_ENCRYPTION_KEY (openssl rand -base64 32) in Vercel, then redeploy.",
+      "Use the Connect button in the Connected mailbox panel below and complete Microsoft's consent. The connection exists only after Microsoft returns and the Graph profile is fetched — the panel then shows the connected address.",
+    ],
+    troubleshooting: [
+      "Connect returns 'not_configured': one of MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET / TOKEN_ENCRYPTION_KEY is missing or still a placeholder, or NEXT_PUBLIC_APP_URL is not the public origin in production — the panel lists the missing names.",
+      "Microsoft error AADSTS50011 (redirect URI mismatch): the URI registered in the app registration does not exactly match the one in the panel.",
+      "Microsoft error AADSTS65001 (consent required): a tenant admin must grant consent for the Graph permissions, or the user must consent first in an admin-approved flow.",
+      "Mailbox shows 'needs reconnect': the refresh token expired or was revoked (Microsoft refresh tokens rotate; a security event can invalidate them) — reconnect from the panel; sends from this mailbox refuse until then.",
+      "Disconnect: use the Disconnect button in the panel — it deletes the stored tokens and marks the account disconnected. Microsoft provides no revocation endpoint for this flow, so also remove the app's consent in the Microsoft account (microsoft.com → Privacy → Apps and services) if you want the grant gone there too.",
+    ],
+    verifySupported: true,
+  },
+  {
+    id: "warmup",
+    name: "Email Warm-up (Instantly)",
+    category: "Outreach & email",
+    tagline: "Mailbox warm-up status from Instantly — the provider runs warm-up; NxtSend only reports its data.",
+    description:
+      "Email warm-up is provided ENTIRELY by Instantly, an external warm-up provider: mailboxes are connected to Instantly, and Instantly's own network performs the gradual sending-volume ramp inside its infrastructure. NxtSend never sends, opens, replies to, or clicks warm-up mail, and it never computes a warm-up score — this integration only READS the status Instantly's API reports (per-mailbox warm-up state, provider-set daily limits and ramp, provider-reported activity totals). Until an Instantly API key is configured and verified, warm-up reads Unavailable — nothing in NxtSend simulates a running warm-up. Warm-up is enabled or paused in Instantly's own dashboard; this adapter deliberately does not call Instantly's warm-up enable/disable endpoints.",
+    docsUrl: "https://developer.instantly.ai/",
+    kind: "adapter",
+    envVars: [
+      { name: "INSTANTLY_API_KEY", required: true, visibility: "server-only", purpose: "Instantly API v2 key (Instantly → Settings → Integrations → API), with the accounts:read scope. Used ONLY for read-only warm-up status calls — NxtSend never sends mail or changes warm-up settings through Instantly. " + VERCEL_HINT },
+    ],
+    capabilities: [
+      "Per-mailbox warm-up status read from Instantly's API (active / paused / provider-reported issues)",
+      "Provider-set warm-up daily limit + ramp setting, shown verbatim",
+      "Provider-reported warm-up activity totals (sent / received / landed in inbox / landed in spam) and Instantly's own health score",
+    ],
+    setupSteps: [
+      "Create an Instantly account — warm-up is included with the Outreach plans (Growth: $47/month, or $37.60/month billed annually; a 14-day free trial is offered). API access starts at the Growth plan.",
+      "In Instantly, connect the mailboxes you want warmed and enable warm-up for them there — warm-up runs on Instantly's network, not through NxtSend.",
+      "In Instantly → Settings → Integrations → API, create an API key with the accounts:read scope.",
+      "Set INSTANTLY_API_KEY here (server-side env) and redeploy.",
+      "Use Test Connection — it lists your Instantly accounts (read-only) to prove the key and scope work.",
+    ],
+    troubleshooting: [
+      "Unavailable / Not Connected: INSTANTLY_API_KEY is unset — warm-up cannot be reported without the provider connection, and NxtSend never fakes it.",
+      "Verification fails with HTTP 401: the key is invalid, revoked, or lacks the accounts:read scope.",
+      "Verification fails with HTTP 402: the Instantly workspace has no active paid plan — API access requires one.",
+      "A mailbox shows no analytics: Instantly returned none for it (e.g. warm-up not enabled for that mailbox in Instantly) — enable it in Instantly's dashboard.",
+    ],
     verifySupported: true,
   },
   {
@@ -334,10 +443,12 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     category: "Outreach & email",
     tagline: "LinkedIn outreach — requires an authorized provider; currently Demo Mode only.",
     description:
-      "LinkedIn's official API does not support outreach automation (connection requests, inbox messaging at scale), and NxtSend does not scrape, automate browsers, or use session cookies. Until an AUTHORIZED LinkedIn provider (a partner API with its own compliance model) is integrated, LinkedIn campaigns and inbox threads run in Demo Mode: data is labelled simulated, and sending a LinkedIn reply is refused with an explicit 'authorized integration required' state. The OAuth variables below are reserved for a future provider flow — setting them does NOT connect anything (the callback route does not exist yet).",
+      "LinkedIn's official API does not support outreach automation (connection requests, inbox messaging at scale), and NxtSend does not scrape, automate browsers, or use session cookies. Until an AUTHORIZED LinkedIn provider (a partner API with its own compliance model) is integrated, LinkedIn campaigns and inbox threads run in Demo Mode: data is labelled simulated, LinkedIn steps are recorded SKIPPED by the executor (never simulated as sent), and sending a LinkedIn reply is refused with an explicit 'authorized integration required' state (HTTP 422). The provider adapter seam is src/lib/linkedin (LinkedInProviderAdapter) — today its only implementation refuses honestly. Connected accounts carry provider identity + authorization health (migration 013: provider_account_id, auth_status, last_sync_at, last_error), shown on the Connected Accounts and LinkedIn pages. The variables below are RESERVED for the provider integration — setting them does NOT connect anything: no vendor adapter is implemented yet, and credentials alone never flip the status to Connected.",
     docsUrl: "https://learn.microsoft.com/en-us/linkedin/",
     kind: "info",
     envVars: [
+      { name: "LINKEDIN_PROVIDER", required: false, visibility: "server-only", purpose: "RESERVED — the name/key of the LinkedIn-approved outreach provider the owner procured (e.g. a LinkedIn partner API). Recorded so the future adapter knows which vendor to load; setting it today changes nothing." },
+      { name: "LINKEDIN_PROVIDER_API_KEY", required: false, visibility: "server-only", purpose: "RESERVED — the API key issued by that approved provider. Server-only; never rendered anywhere. Setting it today connects nothing — no vendor adapter is implemented behind src/lib/linkedin yet." },
       { name: "LINKEDIN_CLIENT_ID", required: false, visibility: "server-only", purpose: "Reserved for a future authorized-provider OAuth flow. Setting it today changes nothing." },
       { name: "LINKEDIN_CLIENT_SECRET", required: false, visibility: "server-only", purpose: "Reserved — see LINKEDIN_CLIENT_ID." },
       { name: "LINKEDIN_REDIRECT_URI", required: false, visibility: "server-only", purpose: "Reserved — the callback route it points to does not exist yet." },
@@ -345,14 +456,17 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     capabilities: [
       "Demo Mode: simulated accounts, campaigns and inbox threads (clearly labelled)",
       "Refused-by-design: LinkedIn sends until an authorized provider is integrated",
+      "Account health + reconnect states (migration 013) shown on Connected Accounts and the LinkedIn page",
     ],
     setupSteps: [
-      "Choose an authorized LinkedIn outreach provider (partner API) and obtain its API documentation + credentials.",
-      "Implement its adapter behind the existing LinkedIn integration interface (src/lib/integrations/linkedin) with the same honest-state rules as the other adapters.",
-      "Until then there is nothing to configure — this entry exists so the limitation is explicit, not hidden.",
+      "Procure an account with an authorized LinkedIn outreach provider (a LinkedIn partner API with its own compliance model) and obtain its API documentation + credentials.",
+      "Set LINKEDIN_PROVIDER and LINKEDIN_PROVIDER_API_KEY (Vercel, server-side) so the configuration records which provider was procured.",
+      "Implement that provider's adapter behind LinkedInProviderAdapter (src/lib/linkedin) with the same honest-state rules as the other adapters — only then can the status become Connected, after a real verification call succeeds.",
+      "Until then there is nothing further to configure — this entry exists so the limitation is explicit, not hidden.",
     ],
     troubleshooting: [
       "Any LinkedIn status other than Demo Mode / Configuration Required would be fabricated — report it as a bug.",
+      "Credentials present but still Configuration Required: expected in this build — no vendor adapter is implemented yet; the status message says so.",
       "Inbox LinkedIn threads are readable demo data; the composer is disabled by design.",
     ],
     notImplementedNote:

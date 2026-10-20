@@ -18,10 +18,12 @@
 
 import type {
   Campaign,
+  CampaignAudienceSource,
   CampaignStatus,
   CampaignStep,
   CampaignType,
   StepType,
+  WarmupLimits,
 } from "@/types";
 import { createClient } from "@/lib/supabase/client";
 import { MOCK_CAMPAIGNS, MOCK_CAMPAIGN_STEPS } from "@/lib/db/mock/data";
@@ -50,6 +52,26 @@ export interface CreateCampaignInput {
   type: CampaignType;
   status?: CampaignStatus;
   steps: CampaignStepDraft[];
+  /**
+   * Wizard metadata (description, audience source, warm-up limits).
+   * The demo backend persists these on the campaign record; the
+   * Supabase backend persists them in the `campaigns.config` JSONB
+   * column (migration 011 — until 011 is applied to a live project,
+   * live create/update of these fields fails at the database and the
+   * classic columns still save once 011 is in place).
+   */
+  description?: string;
+  audience_source?: CampaignAudienceSource | null;
+  warmup_limits?: WarmupLimits;
+  /**
+   * Connected accounts the campaign sends from (migration 011
+   * columns on `campaigns`). The demo backend stores them on the
+   * record; the Supabase backend writes the columns (only when the
+   * caller provides them, so classic creates keep working before
+   * 011 is applied).
+   */
+  sender_account_id?: string | null;
+  email_account_id?: string | null;
 }
 
 export interface ActivityEntry {
@@ -82,7 +104,12 @@ export interface CampaignsRepository {
   createCampaign(workspaceId: string, input: CreateCampaignInput): Promise<Campaign>;
   updateCampaign(
     id: string,
-    patch: Partial<Pick<Campaign, "name" | "type" | "status">>
+    patch: Partial<
+      Pick<
+        Campaign,
+        "name" | "type" | "status" | "description" | "audience_source" | "warmup_limits" | "sender_account_id" | "email_account_id"
+      >
+    >
   ): Promise<Campaign>;
   replaceCampaignSteps(
     campaignId: string,
@@ -113,6 +140,12 @@ export interface CampaignsRepository {
     campaignId: string,
     leadIds: string[]
   ): Promise<{ enrolled: number; skipped: number }>;
+  /**
+   * Removes one lead's enrollment from a campaign (the lead record
+   * itself is kept). Used by the wizard's Step 4 audience review.
+   * Removing a missing enrollment is a no-op.
+   */
+  removeEnrollment(campaignId: string, leadId: string): Promise<void>;
   listEnrollments(campaignId: string): Promise<EnrollmentRecord[]>;
   /**
    * Advances/mutates one enrollment. Used by the sequence executor
@@ -213,6 +246,23 @@ class DemoCampaignsRepository implements CampaignsRepository {
       created_by: DEMO_USER_ID,
       created_at: now,
       updated_at: now,
+      // Wizard metadata persists in the demo store (the Supabase
+      // backend stores the same fields in `campaigns.config`, 011).
+      ...(input.description !== undefined
+        ? { description: input.description }
+        : {}),
+      ...(input.audience_source !== undefined
+        ? { audience_source: input.audience_source }
+        : {}),
+      ...(input.warmup_limits !== undefined
+        ? { warmup_limits: input.warmup_limits }
+        : {}),
+      ...(input.sender_account_id !== undefined
+        ? { sender_account_id: input.sender_account_id }
+        : {}),
+      ...(input.email_account_id !== undefined
+        ? { email_account_id: input.email_account_id }
+        : {}),
     };
     const campaigns = this.loadCampaigns();
     campaigns.unshift(campaign);
@@ -229,7 +279,12 @@ class DemoCampaignsRepository implements CampaignsRepository {
 
   async updateCampaign(
     id: string,
-    patch: Partial<Pick<Campaign, "name" | "type" | "status">>
+    patch: Partial<
+      Pick<
+        Campaign,
+        "name" | "type" | "status" | "description" | "audience_source" | "warmup_limits" | "sender_account_id" | "email_account_id"
+      >
+    >
   ): Promise<Campaign> {
     const campaigns = this.loadCampaigns();
     const idx = campaigns.findIndex((c) => c.id === id);
@@ -296,6 +351,11 @@ class DemoCampaignsRepository implements CampaignsRepository {
         content: s.content,
         config: s.config,
       })),
+      description: source.description,
+      audience_source: source.audience_source ?? undefined,
+      warmup_limits: source.warmup_limits,
+      sender_account_id: source.sender_account_id,
+      email_account_id: source.email_account_id,
     });
     await this.appendActivity(workspaceId, {
       campaign_id: copy.id,
@@ -385,6 +445,15 @@ class DemoCampaignsRepository implements CampaignsRepository {
     return { enrolled: fresh.length, skipped: leadIds.length - fresh.length };
   }
 
+  async removeEnrollment(campaignId: string, leadId: string): Promise<void> {
+    saveDemoCollection(
+      DEMO_ENROLLMENTS_KEY,
+      this.loadEnrollments().filter(
+        (e) => !(e.campaign_id === campaignId && e.lead_id === leadId)
+      )
+    );
+  }
+
   async listEnrollments(campaignId: string): Promise<EnrollmentRecord[]> {
     return this.loadEnrollments()
       .filter((e) => e.campaign_id === campaignId)
@@ -413,7 +482,29 @@ class DemoCampaignsRepository implements CampaignsRepository {
 
 type Row = Record<string, unknown>;
 
+/** Builds the `campaigns.config` JSONB payload from wizard metadata. */
+function configFromMetadata(input: {
+  description?: string;
+  audience_source?: CampaignAudienceSource | null;
+  warmup_limits?: WarmupLimits;
+}): Record<string, unknown> {
+  const config: Record<string, unknown> = {};
+  if (input.description !== undefined) config.description = input.description;
+  if (input.audience_source !== undefined)
+    config.audience_source = input.audience_source;
+  if (input.warmup_limits !== undefined)
+    config.warmup_limits = input.warmup_limits;
+  return config;
+}
+
 function rowToCampaign(row: Row): Campaign {
+  // Wizard metadata (description / audience source / warm-up limits)
+  // lives in the `campaigns.config` JSONB column (migration 011) and
+  // is read back out of the `config` object when present.
+  const config =
+    row.config && typeof row.config === "object"
+      ? (row.config as Record<string, unknown>)
+      : {};
   return {
     id: String(row.id),
     workspace_id: String(row.workspace_id),
@@ -423,6 +514,31 @@ function rowToCampaign(row: Row): Campaign {
     created_by: String(row.created_by ?? ""),
     created_at: String(row.created_at ?? new Date().toISOString()),
     updated_at: String(row.updated_at ?? new Date().toISOString()),
+    ...(typeof config.description === "string"
+      ? { description: config.description }
+      : {}),
+    ...(config.audience_source &&
+    typeof config.audience_source === "object"
+      ? {
+          audience_source: config.audience_source as CampaignAudienceSource,
+        }
+      : {}),
+    ...(config.warmup_limits && typeof config.warmup_limits === "object"
+      ? { warmup_limits: config.warmup_limits as WarmupLimits }
+      : {}),
+    // Account references are real columns (migration 011); rows from
+    // a pre-011 select simply lack the keys and stay undefined.
+    ...(row.sender_account_id !== undefined
+      ? {
+          sender_account_id:
+            (row.sender_account_id as string | null) ?? null,
+        }
+      : {}),
+    ...(row.email_account_id !== undefined
+      ? {
+          email_account_id: (row.email_account_id as string | null) ?? null,
+        }
+      : {}),
   };
 }
 
@@ -526,6 +642,8 @@ class SupabaseCampaignsRepository implements CampaignsRepository {
   ): Promise<Campaign> {
     const supabase = this.client();
     const createdBy = await this.actorId();
+    // Wizard metadata persists in the `config` JSONB column
+    // (migration 011); rowToCampaign reads it back on every load.
     const { data, error } = await supabase
       .from("campaigns")
       .insert({
@@ -534,6 +652,15 @@ class SupabaseCampaignsRepository implements CampaignsRepository {
         type: input.type,
         status: input.status ?? "draft",
         created_by: createdBy,
+        config: configFromMetadata(input),
+        // Account reference columns (migration 011) — written only
+        // when the caller provides them.
+        ...(input.sender_account_id !== undefined
+          ? { sender_account_id: input.sender_account_id }
+          : {}),
+        ...(input.email_account_id !== undefined
+          ? { email_account_id: input.email_account_id }
+          : {}),
       })
       .select("*")
       .single();
@@ -551,11 +678,46 @@ class SupabaseCampaignsRepository implements CampaignsRepository {
 
   async updateCampaign(
     id: string,
-    patch: Partial<Pick<Campaign, "name" | "type" | "status">>
+    patch: Partial<
+      Pick<
+        Campaign,
+        "name" | "type" | "status" | "description" | "audience_source" | "warmup_limits" | "sender_account_id" | "email_account_id"
+      >
+    >
   ): Promise<Campaign> {
+    const dbPatch: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+    if (patch.name !== undefined) dbPatch.name = patch.name;
+    if (patch.type !== undefined) dbPatch.type = patch.type;
+    if (patch.status !== undefined) dbPatch.status = patch.status;
+    // Account references are plain columns (migration 011); null
+    // clears the reference (e.g. after the account was deleted).
+    if (patch.sender_account_id !== undefined)
+      dbPatch.sender_account_id = patch.sender_account_id;
+    if (patch.email_account_id !== undefined)
+      dbPatch.email_account_id = patch.email_account_id;
+    // Wizard metadata merges into the existing `config` JSONB
+    // (migration 011) so updating one field never wipes the others.
+    const metadata = configFromMetadata(patch);
+    if (Object.keys(metadata).length > 0) {
+      const { data: existing, error: readError } = await this.client()
+        .from("campaigns")
+        .select("config")
+        .eq("id", id)
+        .maybeSingle();
+      if (readError) {
+        throw new Error(`Failed to update campaign: ${readError.message}`);
+      }
+      const existingConfig =
+        existing?.config && typeof existing.config === "object"
+          ? (existing.config as Record<string, unknown>)
+          : {};
+      dbPatch.config = { ...existingConfig, ...metadata };
+    }
     const { data, error } = await this.client()
       .from("campaigns")
-      .update({ ...patch, updated_at: new Date().toISOString() })
+      .update(dbPatch)
       .eq("id", id)
       .select("*")
       .single();
@@ -628,6 +790,11 @@ class SupabaseCampaignsRepository implements CampaignsRepository {
         content: s.content,
         config: s.config,
       })),
+      description: source.description,
+      audience_source: source.audience_source ?? undefined,
+      warmup_limits: source.warmup_limits,
+      sender_account_id: source.sender_account_id,
+      email_account_id: source.email_account_id,
     });
     await this.logActivity(workspaceId, {
       campaign_id: copy.id,
@@ -717,6 +884,15 @@ class SupabaseCampaignsRepository implements CampaignsRepository {
       });
     }
     return { enrolled, skipped: leadIds.length - enrolled };
+  }
+
+  async removeEnrollment(campaignId: string, leadId: string): Promise<void> {
+    const { error } = await this.client()
+      .from("campaign_enrollments")
+      .delete()
+      .eq("campaign_id", campaignId)
+      .eq("lead_id", leadId);
+    if (error) throw new Error(`Failed to remove enrollment: ${error.message}`);
   }
 
   async listEnrollments(campaignId: string): Promise<EnrollmentRecord[]> {

@@ -37,7 +37,7 @@ export default function DemoPage() {
       {/* ──────────────────────────────────────────────────────────────────── */}
       {/* HERO — headline + static product visual                             */}
       {/* ──────────────────────────────────────────────────────────────────── */}
-      <section className="relative bg-black-900 px-2.5 pt-4">
+      <section className="relative bg-black-900 px-2.5 pt-24 sm:pt-28">
         <div className="relative overflow-hidden rounded-5xl bg-white px-4 pt-12 pb-16 md:px-6 md:py-20 xl:rounded-8xl 2xl:px-40 2xl:py-28">
           <Image
             src="/images/demo/hero.webp"

@@ -26,6 +26,7 @@ export type EnvVarStatus = "present_valid" | "present_placeholder" | "missing";
 export type ConfigGroupId =
   | "core"
   | "email"
+  | "oauth"
   | "billing"
   | "ai"
   | "pixel"
@@ -44,6 +45,7 @@ export interface ConfigVarSpec {
 export const CONFIG_GROUP_LABELS: Record<ConfigGroupId, string> = {
   core: "Core (app + Supabase + bootstrap)",
   email: "Email (Resend)",
+  oauth: "Mailbox OAuth (Gmail / Outlook)",
   billing: "Billing (Stripe)",
   ai: "AI providers",
   pixel: "Meta Pixel",
@@ -55,6 +57,7 @@ export const CONFIG_CATALOG: ConfigVarSpec[] = [
   // ── Core ──────────────────────────────────────────────────────────
   { name: "NEXT_PUBLIC_APP_URL", group: "core", visibility: "public", requiredForLive: true, purpose: "Public base URL — auth redirects, Stripe return URLs, referral links. Must be the production origin in production." },
   { name: "NODE_ENV", group: "core", visibility: "server", requiredForLive: false, purpose: "Runtime mode (development / production). Set automatically by Vercel; listed for completeness." },
+  { name: "NEXT_PUBLIC_DEMO_MODE", group: "core", visibility: "public", requiredForLive: false, purpose: "Set to \"true\" to force the Demo Mode banner even when Supabase is configured (banner override only — it does not switch the data mode)." },
   { name: "NEXT_PUBLIC_SUPABASE_URL", group: "core", visibility: "public", requiredForLive: true, purpose: "Supabase project URL (database + auth)." },
   { name: "NEXT_PUBLIC_SUPABASE_ANON_KEY", group: "core", visibility: "public", requiredForLive: true, purpose: "Supabase anon key (RLS-scoped client access)." },
   { name: "SUPABASE_SERVICE_ROLE_KEY", group: "core", visibility: "server", requiredForLive: true, purpose: "Supabase service role — admin APIs, webhooks, worker. Bypasses RLS; server only." },
@@ -64,6 +67,16 @@ export const CONFIG_CATALOG: ConfigVarSpec[] = [
   { name: "RESEND_API_KEY", group: "email", visibility: "server", requiredForLive: false, purpose: "Resend API key for outbound email (adapter + sequence executor)." },
   { name: "EMAIL_FROM", group: "email", visibility: "server", requiredForLive: false, purpose: "Verified sender address/domain for outbound email." },
   { name: "RESEND_WEBHOOK_SECRET", group: "email", visibility: "server", requiredForLive: false, purpose: "Svix signing secret verifying Resend delivery/inbound webhooks. Webhook rejects events while unset." },
+  { name: "EMAIL_REPLY_TO", group: "email", visibility: "server", requiredForLive: false, purpose: "Reply-To for all outbound email (executor + inbox replies). Set to an address on the receiving domain so replies reach the Inbox; unset means replies go to EMAIL_FROM." },
+  { name: "UNSUBSCRIBE_SECRET", group: "email", visibility: "server", requiredForLive: false, purpose: "HMAC signing secret for one-click unsubscribe links. Unset → the key is derived from SUPABASE_SERVICE_ROLE_KEY; both unset in live mode → sends omit the unsubscribe URL and warn in the result." },
+  { name: "INSTANTLY_API_KEY", group: "email", visibility: "server", requiredForLive: false, purpose: "Instantly API v2 key (accounts:read scope) for READ-ONLY email warm-up status. Warm-up itself runs entirely on Instantly's network; unset → warm-up reads Unavailable, never simulated." },
+
+  // ── Mailbox OAuth ─────────────────────────────────────────────────
+  { name: "GOOGLE_CLIENT_ID", group: "oauth", visibility: "server", requiredForLive: false, purpose: "Google Cloud OAuth client ID (Web application) for Gmail mailbox connections. Callback: <NEXT_PUBLIC_APP_URL>/api/oauth/google/callback (SETUP.md §15)." },
+  { name: "GOOGLE_CLIENT_SECRET", group: "oauth", visibility: "server", requiredForLive: false, purpose: "Google OAuth client secret (server-only). Used only in the authorization-code exchange + token refresh." },
+  { name: "MICROSOFT_CLIENT_ID", group: "oauth", visibility: "server", requiredForLive: false, purpose: "Azure app registration Application (client) ID for Outlook / Microsoft 365 mailbox connections. Callback: <NEXT_PUBLIC_APP_URL>/api/oauth/microsoft/callback (SETUP.md §15)." },
+  { name: "MICROSOFT_CLIENT_SECRET", group: "oauth", visibility: "server", requiredForLive: false, purpose: "Azure app registration client secret VALUE (server-only). Used only in the authorization-code exchange + token refresh." },
+  { name: "TOKEN_ENCRYPTION_KEY", group: "oauth", visibility: "server", requiredForLive: false, purpose: "AES-256-GCM key (base64, 32 bytes) encrypting stored OAuth tokens in oauth_connections (migration 014). Generate: openssl rand -base64 32. Unset/malformed → mailbox connect refuses before any redirect." },
 
   // ── Billing ───────────────────────────────────────────────────────
   { name: "STRIPE_SECRET_KEY", group: "billing", visibility: "server", requiredForLive: false, purpose: "Stripe API secret (checkout + customer portal)." },
@@ -91,6 +104,8 @@ export const CONFIG_CATALOG: ConfigVarSpec[] = [
   { name: "CRON_SECRET", group: "jobs", visibility: "server", requiredForLive: true, purpose: "Authenticates POST/GET /api/jobs/run (Vercel Cron sends it as a Bearer token). The worker refuses to run while unset." },
 
   // ── Integrations ──────────────────────────────────────────────────
+  { name: "LINKEDIN_PROVIDER", group: "integrations", visibility: "server", requiredForLive: false, purpose: "RESERVED for the LinkedIn provider integration (src/lib/linkedin): the name/key of the LinkedIn-approved outreach provider the owner procured. Setting it connects nothing — no vendor adapter is implemented yet." },
+  { name: "LINKEDIN_PROVIDER_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "RESERVED — the approved provider's API key (server-only, never rendered). See LINKEDIN_PROVIDER." },
   { name: "LINKEDIN_CLIENT_ID", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Documented-demo only: no LinkedIn OAuth flow exists in the app (no authorized provider). Kept for the future provider integration." },
   { name: "LINKEDIN_CLIENT_SECRET", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Documented-demo only — see LINKEDIN_CLIENT_ID." },
   { name: "LINKEDIN_REDIRECT_URI", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Documented-demo only — the callback route does not exist yet." },

@@ -186,6 +186,118 @@ class FakeEmailStore implements EmailEventStore {
   }
 }
 
+describe("adapter unsubscribe preparation (P5 Stage C)", () => {
+  const unsubEnv = {
+    NODE_ENV: "test",
+    NEXT_PUBLIC_APP_URL: "https://app.nxtsend.example",
+    UNSUBSCRIBE_SECRET: "adapter-test-secret-0123456789abcdef",
+    EMAIL_REPLY_TO: "replies@reply.example.com",
+  };
+
+  function capturingSender() {
+    const sent: Array<Parameters<ResendSender["send"]>[0]> = [];
+    const sender: ResendSender = {
+      async send(payload) {
+        sent.push(payload);
+        return { id: "msg_headers", error: null };
+      },
+    };
+    return { sender, sent };
+  }
+
+  it("connected sends carry List-Unsubscribe (+ One-Click) headers and a footer; the caller's body is not mutated", async () => {
+    const { sender, sent } = capturingSender();
+    const adapter = new ResendEmailAdapter({
+      sender,
+      stateOverride: "connected",
+      adminClient: null,
+      suppressionCheck: async () => false,
+      unsubscribeEnv: unsubEnv,
+    });
+    const input = {
+      workspaceId: "ws_1",
+      from: "sender@example.com",
+      to: "lead@example.com",
+      subject: "Hello",
+      text: "Original body",
+    };
+    const result = await adapter.sendEmail(input);
+    expect(result.status).toBe("sent");
+    expect(sent).toHaveLength(1);
+    const payload = sent[0];
+    expect(payload.headers?.["List-Unsubscribe-Post"]).toBe(
+      "List-Unsubscribe=One-Click"
+    );
+    expect(payload.headers?.["List-Unsubscribe"]).toContain(
+      "<mailto:replies@reply.example.com>"
+    );
+    expect(payload.headers?.["List-Unsubscribe"]).toMatch(
+      /<https:\/\/app\.nxtsend\.example\/api\/unsubscribe\/[^>]+>/
+    );
+    expect(payload.text).toContain("Original body");
+    expect(payload.text).toMatch(
+      /Unsubscribe: https:\/\/app\.nxtsend\.example\/api\/unsubscribe\//
+    );
+    // The stored/caller body is never mutated by the send-time append.
+    expect(input.text).toBe("Original body");
+  });
+
+  it("suppress → the send is refused as suppressed; remove → the send is allowed (fixture sender)", async () => {
+    const suppressed = new Set<string>();
+    const { sender, sent } = capturingSender();
+    const adapter = new ResendEmailAdapter({
+      sender,
+      stateOverride: "connected",
+      adminClient: null,
+      suppressionCheck: async (_ws, email) => suppressed.has(email),
+      unsubscribeEnv: unsubEnv,
+    });
+    const input = {
+      workspaceId: "ws_1",
+      from: "sender@example.com",
+      to: "lead@example.com",
+      subject: "Hello",
+      text: "Body",
+    };
+
+    suppressed.add("lead@example.com");
+    const blocked = await adapter.sendEmail(input);
+    expect(blocked.status).toBe("suppressed");
+    expect(sent).toHaveLength(0); // provider never called
+
+    suppressed.delete("lead@example.com");
+    const allowed = await adapter.sendEmail(input);
+    expect(allowed.status).toBe("sent");
+    expect(sent).toHaveLength(1);
+  });
+
+  it("caller-supplied headers are merged, and List-* from the prep win", async () => {
+    const { sender, sent } = capturingSender();
+    const adapter = new ResendEmailAdapter({
+      sender,
+      stateOverride: "connected",
+      adminClient: null,
+      suppressionCheck: async () => false,
+      unsubscribeEnv: unsubEnv,
+    });
+    await adapter.sendEmail({
+      workspaceId: "ws_1",
+      from: "sender@example.com",
+      to: "lead@example.com",
+      subject: "Hello",
+      text: "Body",
+      headers: {
+        "X-Campaign": "camp_1",
+        "List-Unsubscribe": "<mailto:fake@example.com>",
+      },
+    });
+    expect(sent[0].headers?.["X-Campaign"]).toBe("camp_1");
+    expect(sent[0].headers?.["List-Unsubscribe"]).not.toContain(
+      "fake@example.com"
+    );
+  });
+});
+
 describe("verifySvixSignature", () => {
   const body = JSON.stringify({ type: "email.delivered", data: { email_id: "msg_1" } });
   const now = 1_760_000_000;

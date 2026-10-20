@@ -19,6 +19,12 @@ export interface SendEmailInput {
   /** Defaults to EMAIL_FROM. */
   from?: string;
   replyTo?: string;
+  /**
+   * Extra headers merged into the provider payload. The adapter adds
+   * the List-Unsubscribe / List-Unsubscribe-Post headers itself (see
+   * ./unsubscribe.ts); caller-supplied values win for any other key.
+   */
+  headers?: Record<string, string>;
   leadId?: string | null;
   campaignId?: string | null;
 }

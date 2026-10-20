@@ -16,7 +16,7 @@ import {
 } from "@/lib/webhooks/store";
 import { runDeliveryAttempt } from "@/lib/webhooks/dispatch";
 import { SupabaseExecutorStore } from "@/lib/executor/supabase-store";
-import { ResendEmailAdapter } from "@/lib/email";
+import { createCampaignRoutingAdapter } from "@/lib/email";
 
 export function createSupabaseJobsContext(admin: SupabaseClient): JobsContext {
   const webhookStore = createSupabaseWebhookStore(admin);
@@ -104,15 +104,20 @@ export function createSupabaseJobsContext(admin: SupabaseClient): JobsContext {
     },
     getSequenceExecutor() {
       // Live worker: the executor runs against the same service-role
-      // client, sending through the real email adapter (which derives
-      // its state from env and fails closed on suppression).
+      // client, sending through the mailbox-routing adapter
+      // (P5 Stage G): a campaign whose selected email account
+      // (campaigns.email_account_id) is an OAuth-connected Gmail /
+      // Outlook mailbox sends through that mailbox (From = the
+      // mailbox address); every other campaign sends through Resend.
+      // A selected mailbox whose grant is missing/inactive REFUSES
+      // (never a silent Resend fallback — the From identity would
+      // change). All adapters fail closed on suppression.
       // skipMessageRecord: the executor records the message itself
-      // (via the store's insertMessage, with the campaign link) — the
-      // shared getEmailProvider() adapter records its own row, which
-      // would double-record every sequence send.
+      // (via the store's insertMessage, with the campaign link) — an
+      // adapter recording its own row would double-record every send.
       return {
         store: new SupabaseExecutorStore(admin),
-        adapter: new ResendEmailAdapter({ skipMessageRecord: true }),
+        adapter: createCampaignRoutingAdapter(admin),
       };
     },
   };

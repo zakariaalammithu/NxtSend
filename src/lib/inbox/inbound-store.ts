@@ -15,6 +15,8 @@ import type {
   InboundLeadRef,
   InboundStore,
 } from "./inbound";
+import { buildReplyNotification } from "@/lib/notifications/core";
+import { createSupabaseNotificationStore } from "@/lib/notifications/store";
 
 type Row = Record<string, unknown>;
 
@@ -159,6 +161,22 @@ export function createSupabaseInboundStore(admin: SupabaseClient): InboundStore 
         .update({ last_message_at: at, updated_at: new Date().toISOString() })
         .eq("workspace_id", workspaceId)
         .eq("id", conversationId);
+    },
+
+    async notifyReplyReceived(input) {
+      // Service-role insert into `notifications` (migration 012) for
+      // the single workspace the matcher chose — never broadcast.
+      const store = createSupabaseNotificationStore(admin);
+      await store.insert(
+        buildReplyNotification({
+          workspaceId: input.workspaceId,
+          conversationId: input.conversationId,
+          senderName: input.senderName,
+          senderEmail: input.senderEmail,
+          subject: input.subject,
+          preview: input.preview,
+        })
+      );
     },
   };
 }

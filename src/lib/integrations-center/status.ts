@@ -16,7 +16,12 @@
 
 import { isConfiguredValue, type ProviderState } from "@/lib/env";
 import { getDataMode, isSupabaseConfigured, type DataMode } from "@/lib/data/mode";
+import { getOAuthConfigStatus, OAUTH_PROVIDER_LABELS } from "@/lib/oauth/config";
+import type { OAuthProvider } from "@/lib/oauth/types";
+import type { OAuthMailboxSummary } from "@/lib/oauth/store";
 import { getEmailState, isEmailFromConfigured } from "@/lib/email/state";
+import { getWarmupState, isWarmupConfigured } from "@/lib/warmup/state";
+import { describeLinkedInProvider } from "@/lib/linkedin/state";
 import { getBillingState } from "@/lib/billing/state";
 import { isPixelConfigured } from "@/lib/analytics/pixel";
 import { INTEGRATION_REGISTRY } from "./registry";
@@ -73,6 +78,12 @@ export interface IntegrationStatusOptions {
    * subscription. null = unknown (treated as not configured).
    */
   webhookConfigured?: boolean | null;
+  /**
+   * Per-OAuth-provider mailbox summaries for the caller's workspace
+   * (live mode, from oauth_connections metadata — never tokens).
+   * Absent/null = no connection is recorded for that provider.
+   */
+  oauthMailboxes?: Partial<Record<OAuthProvider, OAuthMailboxSummary | null>>;
 }
 
 interface DerivedStatus {
@@ -86,7 +97,8 @@ function deriveStatus(
   id: string,
   env: CenterEnv,
   mode: DataMode,
-  webhookConfigured: boolean | null
+  webhookConfigured: boolean | null,
+  oauthMailboxes?: Partial<Record<OAuthProvider, OAuthMailboxSummary | null>>
 ): DerivedStatus {
   const demo = mode === "demo";
   switch (id) {
@@ -143,6 +155,92 @@ function deriveStatus(
               : state === "demo"
                 ? "Demo Mode: no email is sent; sends are simulated and labelled."
                 : "No Resend configuration is present.",
+        configured,
+      };
+    }
+    case "gmail":
+    case "microsoft": {
+      // Mailbox OAuth: "Connected" can ONLY come from a stored
+      // connection — which itself exists only after a completed
+      // OAuth exchange + provider profile fetch (src/lib/oauth).
+      // Env configuration alone yields Not Connected /
+      // Configuration Required, never a connection claim. The
+      // completed exchange + profile fetch IS this integration's
+      // verification, so an active connection maps to
+      // "Connected and Verified".
+      const provider: OAuthProvider = id === "gmail" ? "google" : "microsoft";
+      const label = OAUTH_PROVIDER_LABELS[provider];
+      if (demo) {
+        return {
+          status: "Demo Mode",
+          message: `Demo Mode: ${label} mailboxes connect via OAuth in live mode only — nothing is connected or simulated here. Configure Supabase + the OAuth client (SETUP.md §15), then connect from this page in live mode.`,
+          configured: false,
+        };
+      }
+      const config = getOAuthConfigStatus(provider, env);
+      const summary = oauthMailboxes?.[provider] ?? null;
+      if (summary?.email && summary.connectionStatus === "active") {
+        if (summary.authStatus === "ok") {
+          return {
+            status: "Connected and Verified",
+            message: `${label} mailbox ${summary.email} is connected via OAuth (the connection was verified by the completed OAuth exchange and provider profile fetch). Sends from campaigns that select this mailbox go through it; Test Connection re-checks the grant against the provider.`,
+            configured: true,
+          };
+        }
+        return {
+          status: "Error",
+          message: `${label} mailbox ${summary.email} has a stored OAuth grant, but its recorded authorization state is "${summary.authStatus}" — reconnect the mailbox from this page. Sends from it refuse until then.`,
+          configured: false,
+        };
+      }
+      if (summary?.email) {
+        return {
+          status: "Error",
+          message: `${label} mailbox ${summary.email} has a recorded connection state of "${summary.connectionStatus}" — reconnect the mailbox from this page. Sends from it refuse until it is active again.`,
+          configured: false,
+        };
+      }
+      if (!config.clientConfigured && !config.vaultConfigured) {
+        const nothingSet = config.missing.length >= 3;
+        return {
+          status: nothingSet ? "Not Connected" : "Configuration Required",
+          message: nothingSet
+            ? `No ${label} OAuth configuration is present. Create the OAuth client (SETUP.md §15), set the variables below, then connect a mailbox from this page.`
+            : `${label} OAuth is partially configured — missing: ${config.missing.join(", ")}.`,
+          configured: false,
+        };
+      }
+      if (!config.ready) {
+        return {
+          status: "Configuration Required",
+          message: `${label} OAuth is partially configured — missing: ${config.missing.join(", ")}. Connect becomes available once the configuration is complete.`,
+          configured: false,
+        };
+      }
+      return {
+        status: "Not Connected",
+        message: `${label} OAuth client is configured, but no mailbox has been connected yet in this workspace. Use Connect in the Connected mailbox panel below — the connection completes only after the provider consent and profile fetch succeed.`,
+        configured: false,
+      };
+    }
+    case "warmup": {
+      const state = getWarmupState(
+        { INSTANTLY_API_KEY: env.INSTANTLY_API_KEY },
+        mode
+      );
+      const configured = isWarmupConfigured({
+        INSTANTLY_API_KEY: env.INSTANTLY_API_KEY,
+      });
+      return {
+        status: mapProviderState(state),
+        message:
+          state === "connected"
+            ? "INSTANTLY_API_KEY is configured. Use Test Connection to verify it against Instantly — warm-up status is read from Instantly's API only."
+            : state === "configuration_required"
+              ? "INSTANTLY_API_KEY is present but still a placeholder value — paste the real key from Instantly (Settings → Integrations → API)."
+              : state === "demo"
+                ? "Demo Mode: no Instantly connection exists, so warm-up is Unavailable — NxtSend never simulates a running warm-up."
+                : "Unavailable — provider not connected: no Instantly API key is configured, so no warm-up status can be reported.",
         configured,
       };
     }
@@ -244,18 +342,22 @@ function deriveStatus(
       };
     }
     case "linkedin": {
-      if (demo) {
-        return {
-          status: "Demo Mode",
-          message:
-            "Demo Mode: LinkedIn accounts, campaigns and inbox threads are simulated and labelled. Sending is refused by design.",
-          configured: false,
-        };
-      }
+      // The provider state comes from the ONE LinkedIn seam
+      // (src/lib/linkedin): demo in Demo Mode, Configuration Required
+      // in every live configuration of this build — even with
+      // provider credentials present, because no vendor adapter is
+      // implemented behind the seam yet. `configured` stays false:
+      // reserved variables never count as a connection.
+      const description = describeLinkedInProvider(
+        {
+          LINKEDIN_PROVIDER: env.LINKEDIN_PROVIDER,
+          LINKEDIN_PROVIDER_API_KEY: env.LINKEDIN_PROVIDER_API_KEY,
+        },
+        demo ? "demo" : "supabase"
+      );
       return {
-        status: "Configuration Required",
-        message:
-          "Authorized provider required: LinkedIn's official API does not support outreach automation and no compliant provider is integrated. The reserved OAuth variables do not connect anything by themselves.",
+        status: mapProviderState(description.state),
+        message: description.message,
         configured: false,
       };
     }
@@ -293,7 +395,13 @@ export function getIntegrationStatuses(
   const webhookConfigured = options.webhookConfigured ?? null;
 
   return INTEGRATION_REGISTRY.map((descriptor) => {
-    const derived = deriveStatus(descriptor.id, env, mode, webhookConfigured);
+    const derived = deriveStatus(
+      descriptor.id,
+      env,
+      mode,
+      webhookConfigured,
+      options.oauthMailboxes
+    );
     const record = verifications[descriptor.id] ?? null;
     let status = applyVerification(derived.status, derived.configured, record);
     let message = derived.message;

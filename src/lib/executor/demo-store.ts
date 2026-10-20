@@ -11,17 +11,22 @@
  * the identical core against the database.
  *
  * Demo stop-rule signals: replies are detected from the demo inbox
- * (inbound messages from the lead at/after enrollment). There is no
- * demo suppression list — suppression-driven stops are a live-mode
- * behaviour (the suppression table + Resend webhook), and the demo
- * adapter never suppresses, so `suppressionReason` is always null
- * here. That asymmetry is deliberate and documented, not hidden.
+ * (inbound messages from the lead at/after enrollment). Suppressions
+ * are read from the demo suppression store via GET
+ * /api/email/suppressions (P5 Stage C): the public unsubscribe
+ * endpoint and the suppression UI write to that same store, so an
+ * unsubscribe or a manual block in Demo Mode stops the enrollment
+ * here exactly like the live stop rules do. The read is browser-only
+ * and fail-soft (an unreachable API yields no suppression signal) —
+ * acceptable in demo, where the adapter only ever simulates; the
+ * LIVE send path (Supabase store + adapter) remains fail-closed.
  */
 
 import type { CampaignStep, Lead } from "@/types";
 import type { CampaignsRepository } from "@/lib/data/campaigns";
 import type { LeadsRepository } from "@/lib/data/leads";
 import type { InboxRepository } from "@/lib/data/inbox";
+import { createAccountsRepository } from "@/lib/data/accounts";
 import { loadDemoCollection, saveDemoCollection } from "@/lib/data/demo-store";
 import { DEMO_WORKSPACE_ID } from "@/lib/data/workspace";
 import { DEMO_WORKSPACE_PLAN } from "@/lib/data/usage";
@@ -32,6 +37,7 @@ import type {
   ExecutorEnrollment,
   ExecutorStore,
   LeadSignals,
+  SenderIdentity,
   StepExecutionRecord,
 } from "./types";
 
@@ -46,9 +52,44 @@ export interface DemoExecutorStoreDeps {
 export class DemoExecutorStore implements ExecutorStore {
   readonly simulated = true;
   private readonly deps: DemoExecutorStoreDeps;
+  /** email → reason, fetched once per store instance (one scan run). */
+  private suppressionCache: Promise<Map<string, string>> | null = null;
 
   constructor(deps: DemoExecutorStoreDeps) {
     this.deps = deps;
+  }
+
+  /**
+   * The demo suppression list, from the same API the suppression UI
+   * and the public unsubscribe endpoint use. Browser-only: anywhere
+   * else (unit tests, SSR) there is no demo API to ask, so the map is
+   * empty — demo sends there remain simple simulations.
+   */
+  private loadDemoSuppressions(): Promise<Map<string, string>> {
+    if (!this.suppressionCache) {
+      this.suppressionCache = (async () => {
+        const map = new Map<string, string>();
+        if (typeof window === "undefined" || typeof fetch !== "function") {
+          return map;
+        }
+        try {
+          const res = await fetch("/api/email/suppressions");
+          if (!res.ok) return map;
+          const body = (await res.json()) as {
+            entries?: Array<{ email?: string; reason?: string }>;
+          };
+          for (const entry of body.entries ?? []) {
+            if (entry.email) {
+              map.set(entry.email.trim().toLowerCase(), entry.reason ?? "suppressed");
+            }
+          }
+        } catch {
+          // Fail soft in demo only (see header): no signal.
+        }
+        return map;
+      })();
+    }
+    return this.suppressionCache;
   }
 
   private loadExecutions(): StepExecutionRecord[] {
@@ -105,6 +146,38 @@ export class DemoExecutorStore implements ExecutorStore {
     return this.deps.campaigns.getCampaignSteps(campaignId);
   }
 
+  /**
+   * Sender identity for the {my_*} variables: the campaign's
+   * connected account (demo store) for the requested channel.
+   */
+  async getSenderIdentity(
+    workspaceId: string,
+    campaignId: string,
+    channel: "linkedin" | "email"
+  ): Promise<SenderIdentity | null> {
+    const campaign = await this.deps.campaigns.getCampaign(
+      workspaceId,
+      campaignId
+    );
+    if (!campaign) return null;
+    const accountId =
+      channel === "linkedin"
+        ? campaign.sender_account_id
+        : campaign.email_account_id;
+    if (!accountId) return null;
+    const account = await createAccountsRepository("demo").getAccount(
+      workspaceId,
+      accountId
+    );
+    if (!account) return null;
+    return {
+      firstName: account.sender_first_name || undefined,
+      lastName: account.sender_last_name || undefined,
+      jobTitle: account.sender_job_title || undefined,
+      companyName: account.sender_company || undefined,
+    };
+  }
+
   async getLead(workspaceId: string, leadId: string): Promise<Lead | null> {
     const leads = await this.deps.leads.listLeads(workspaceId);
     return leads.find((l) => l.id === leadId) ?? null;
@@ -134,7 +207,11 @@ export class DemoExecutorStore implements ExecutorStore {
         }
       }
     }
-    return { repliedAt, suppressionReason: null };
+    const suppressions = await this.loadDemoSuppressions();
+    const suppressionReason = lead.email
+      ? (suppressions.get(lead.email.trim().toLowerCase()) ?? null)
+      : null;
+    return { repliedAt, suppressionReason };
   }
 
   async getWorkspacePlan(): Promise<import("@/types").PlanType> {

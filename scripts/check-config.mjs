@@ -23,6 +23,7 @@ const CATALOG = [
   // [name, group, requiredForLive]
   ["NEXT_PUBLIC_APP_URL", "core", true],
   ["NODE_ENV", "core", false],
+  ["NEXT_PUBLIC_DEMO_MODE", "core", false],
   ["NEXT_PUBLIC_SUPABASE_URL", "core", true],
   ["NEXT_PUBLIC_SUPABASE_ANON_KEY", "core", true],
   ["SUPABASE_SERVICE_ROLE_KEY", "core", true],
@@ -30,6 +31,14 @@ const CATALOG = [
   ["RESEND_API_KEY", "email", false],
   ["EMAIL_FROM", "email", false],
   ["RESEND_WEBHOOK_SECRET", "email", false],
+  ["EMAIL_REPLY_TO", "email", false],
+  ["UNSUBSCRIBE_SECRET", "email", false],
+  ["INSTANTLY_API_KEY", "email", false],
+  ["GOOGLE_CLIENT_ID", "oauth", false],
+  ["GOOGLE_CLIENT_SECRET", "oauth", false],
+  ["MICROSOFT_CLIENT_ID", "oauth", false],
+  ["MICROSOFT_CLIENT_SECRET", "oauth", false],
+  ["TOKEN_ENCRYPTION_KEY", "oauth", false],
   ["STRIPE_SECRET_KEY", "billing", false],
   ["STRIPE_WEBHOOK_SECRET", "billing", false],
   ["NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "billing", false],
@@ -50,11 +59,14 @@ const CATALOG = [
   ["LINKEDIN_CLIENT_ID", "integrations", false],
   ["LINKEDIN_CLIENT_SECRET", "integrations", false],
   ["LINKEDIN_REDIRECT_URI", "integrations", false],
+  ["LINKEDIN_PROVIDER", "integrations", false],
+  ["LINKEDIN_PROVIDER_API_KEY", "integrations", false],
 ];
 
 const GROUP_LABELS = {
   core: "Core (app + Supabase + bootstrap)",
   email: "Email (Resend)",
+  oauth: "Mailbox OAuth (Gmail / Outlook)",
   billing: "Billing (Stripe)",
   ai: "AI providers",
   pixel: "Meta Pixel",

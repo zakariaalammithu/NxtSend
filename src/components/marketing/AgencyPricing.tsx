@@ -4,6 +4,15 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Briefcase, Check } from "lucide-react";
+import {
+  AGENCY_EXTRA_SEAT_PRICES,
+  AGENCY_PRICES,
+  formatAnnualTotal,
+  formatPrice,
+  priceFor,
+  type BillingCycle,
+} from "@/lib/marketing-prices";
+import { BillingToggle } from "./BillingToggle";
 
 /**
  * Agency pricing card (mirror: aimfox.com/agency, card id "agency-card").
@@ -14,12 +23,13 @@ import { ArrowRight, Briefcase, Check } from "lucide-react";
  * pricing cards). Left: plan, "From:" price block and the frosted
  * "Schedule a call" pill; right: the small Monthly/Yearly toggle and
  * the feature list. Copy rewritten originally for NxtSend in Phase-2
- * Stage 2; prices and structure are unchanged.
+ * Stage 2; structure is unchanged. The mirror's Calendly link is not
+ * carried over — the CTA points at /demo, as elsewhere in this rebuild.
  *
- * The toggle is state-only: the mirror download carries no rendered
- * yearly price for this card, so nothing is invented. The mirror's
- * Calendly link is not carried over — the CTA points at /demo, as
- * elsewhere in this rebuild.
+ * Prices come from the shared model in src/lib/marketing-prices.ts:
+ * monthly renders the long-standing figures; yearly shows the exact
+ * monthly-equivalents at the advertised -25% plus a "billed annually"
+ * caption covering the plan total and the extra-seat rate.
  */
 
 const FEATURES = [
@@ -30,7 +40,8 @@ const FEATURES = [
 ] as const;
 
 export function AgencyPricing() {
-  const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
+  const [billing, setBilling] = useState<BillingCycle>("monthly");
+  const yearly = billing === "yearly";
 
   return (
     <div className="mx-auto flex w-full max-w-[61.25rem] flex-col items-center gap-y-8">
@@ -65,17 +76,26 @@ export function AgencyPricing() {
               <span className="text-15 font-medium text-white/70">From:</span>
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span className="text-48 font-medium leading-none text-white xl:text-54">
-                  $499
+                  {formatPrice(priceFor(AGENCY_PRICES, billing))}
                 </span>
                 <span className="flex flex-col items-start gap-1.5">
                   <span className="text-20 font-medium text-white">
                     /20 seats
                   </span>
                   <span className="rounded-full bg-black-900 px-2.5 py-1 text-12 font-semibold text-white">
-                    +$20 per new seat
+                    +{formatPrice(priceFor(AGENCY_EXTRA_SEAT_PRICES, billing))}{" "}
+                    per new seat
                   </span>
                 </span>
               </div>
+              {yearly && (
+                <p className="mt-3 text-13 text-white/60">
+                  {formatAnnualTotal(AGENCY_PRICES.yearlyTotal)} billed
+                  annually · extra seats{" "}
+                  {formatPrice(AGENCY_EXTRA_SEAT_PRICES.yearlyMonthlyEq)}/mo
+                  billed annually
+                </p>
+              )}
             </div>
             <Link
               href="/demo"
@@ -88,32 +108,12 @@ export function AgencyPricing() {
           {/* Right: toggle + features */}
           <div className="mt-10 flex flex-col md:mt-0 md:flex-1">
             <div className="flex md:justify-end">
-              <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-black-900/40 p-1 backdrop-blur-md">
-                <button
-                  type="button"
-                  onClick={() => setBilling("monthly")}
-                  aria-pressed={billing === "monthly"}
-                  className={`cursor-pointer rounded-full px-3 py-1 text-11 ${
-                    billing === "monthly"
-                      ? "bg-black-900 font-bold text-white ring-1 ring-white/20"
-                      : "font-semibold text-white/70"
-                  }`}
-                >
-                  Monthly
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBilling("yearly")}
-                  aria-pressed={billing === "yearly"}
-                  className={`cursor-pointer rounded-full px-3 py-1 text-11 ${
-                    billing === "yearly"
-                      ? "bg-black-900 font-bold text-white ring-1 ring-white/20"
-                      : "font-semibold text-white/70"
-                  }`}
-                >
-                  Yearly
-                </button>
-              </span>
+              <BillingToggle
+                size="sm"
+                badge={false}
+                billing={billing}
+                onChange={setBilling}
+              />
             </div>
 
             <div className="mt-6 text-18 font-bold text-white">

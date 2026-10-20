@@ -24,6 +24,7 @@ import {
   type InboxMessage,
 } from "@/lib/data/inbox";
 import type { ProviderState } from "@/lib/env";
+import EmailContentHints from "@/components/dashboard/EmailContentHints";
 
 const PAGE_SIZE = 25;
 
@@ -164,12 +165,16 @@ export default function InboxPage() {
     }
   }, []);
 
-  // Auto-open the most recent conversation on first load (desktop flow).
+  // Auto-open on first load: a ?conversation= deep link (reply
+  // notifications, Stage D) wins; otherwise the most recent thread
+  // (desktop flow).
   React.useEffect(() => {
-    if (!autoSelected.current && summaries.length > 0 && !selectedId) {
-      autoSelected.current = true;
-      openConversation(summaries[0].id);
-    }
+    if (autoSelected.current || summaries.length === 0 || selectedId) return;
+    autoSelected.current = true;
+    const linked = new URLSearchParams(window.location.search).get(
+      "conversation"
+    );
+    openConversation(linked || summaries[0].id);
   }, [summaries, selectedId, openConversation]);
 
   React.useEffect(() => {
@@ -681,6 +686,11 @@ export default function InboxPage() {
                         <span>{sending ? "Sending…" : "Send"}</span>
                       </button>
                     </div>
+                    <EmailContentHints
+                      subject={subject}
+                      body={replyText}
+                      context="reply"
+                    />
                     {sendError && (
                       <p className="flex items-center gap-1.5 text-12 text-rose-300">
                         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />

@@ -199,4 +199,54 @@ describe("demoDraft / renderTemplate", () => {
       })
     ).toBe("Hi Jo at Acme");
   });
+
+  it("renders last_name and the company_name alias", () => {
+    expect(
+      renderTemplate("Hi {{first_name}} {{last_name}} of {{company_name}}", {
+        firstName: "Jo",
+        lastName: "Reyes",
+        company: "Acme",
+      })
+    ).toBe("Hi Jo Reyes of Acme");
+  });
+
+  it("supports the {var:Fallback} syntax in both brace styles", () => {
+    expect(renderTemplate("Hi {{first_name:Friend}}", {})).toBe("Hi Friend");
+    expect(renderTemplate("Hi {first_name:Friend}", {})).toBe("Hi Friend");
+    expect(
+      renderTemplate("Hi {{first_name:Friend}}", { firstName: "Jo" })
+    ).toBe("Hi Jo");
+    expect(
+      renderTemplate("Role: {{job_title:your role}}", { jobTitle: "" })
+    ).toBe("Role: your role");
+  });
+
+  it("accepts Closely-style single-brace variables", () => {
+    expect(
+      renderTemplate("Hi {first_name} from {company}", {
+        firstName: "Jo",
+        company: "Acme",
+      })
+    ).toBe("Hi Jo from Acme");
+  });
+
+  it("resolves sender (my_*) variables and custom fields", () => {
+    expect(
+      renderTemplate("From {{my_first_name}} {{my_last_name}}, {{my_job_title}}", {
+        myFirstName: "Alex",
+        myLastName: "Vance",
+        myJobTitle: "Founder",
+      })
+    ).toBe("From Alex Vance, Founder");
+    expect(
+      renderTemplate("Team of {{team_size}} people", {
+        customFields: { team_size: "40" },
+      })
+    ).toBe("Team of 40 people");
+    expect(renderTemplate("Hi {{first_name}}", {})).toBe("Hi there");
+  });
+
+  it("leaves unknown variables untouched so typos stay visible", () => {
+    expect(renderTemplate("Hi {{frist_name}}", {})).toBe("Hi {{frist_name}}");
+  });
 });

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createMemoryStorage, setDemoStorage } from "@/lib/data/demo-store";
 import { createInboxRepository, type InboxRepository } from "@/lib/data/inbox";
 import { DEMO_WORKSPACE_ID } from "@/lib/data/workspace";
@@ -89,6 +89,43 @@ describe("sendInboxReply", () => {
         (m) => m.idempotency_key === "k-sent" && m.status === "sent"
       )
     ).toBe(true);
+  });
+
+  describe("reply routing (P5 Stage C)", () => {
+    afterEach(() => {
+      delete process.env.EMAIL_REPLY_TO;
+    });
+
+    it("passes EMAIL_REPLY_TO as replyTo when set; unset leaves it undefined", async () => {
+      const repo = createInboxRepository("demo");
+      const conv = await emailConversation(repo);
+
+      process.env.EMAIL_REPLY_TO = "replies@reply.example.com";
+      const withReplyTo = new FakeAdapter([SENT]);
+      await sendInboxReply(
+        { repo, adapter: withReplyTo },
+        {
+          workspaceId: DEMO_WORKSPACE_ID,
+          conversationId: conv.id,
+          content: "with routing",
+          idempotencyKey: "k-replyto-1",
+        }
+      );
+      expect(withReplyTo.calls[0].replyTo).toBe("replies@reply.example.com");
+
+      delete process.env.EMAIL_REPLY_TO;
+      const without = new FakeAdapter([SENT]);
+      await sendInboxReply(
+        { repo, adapter: without },
+        {
+          workspaceId: DEMO_WORKSPACE_ID,
+          conversationId: conv.id,
+          content: "without routing",
+          idempotencyKey: "k-replyto-2",
+        }
+      );
+      expect(without.calls[0].replyTo).toBeUndefined();
+    });
   });
 
   it("marks demo sends as simulated, never delivered", async () => {

@@ -19,6 +19,12 @@ export interface UserPreferences {
   notify_connections: boolean;
   daily_digest: boolean;
   bounce_alerts: boolean;
+  /**
+   * Preferred voice language (BCP-47, P6 Stage C) — OPTIONAL so the
+   * settings page's four-toggle payload stays valid. Repositories
+   * preserve the stored value when an update omits it.
+   */
+  voice_language?: string;
 }
 
 export const DEFAULT_USER_PREFERENCES: UserPreferences = {
@@ -56,6 +62,9 @@ export function normalizeStoredPrefs(raw: unknown): StoredUserPrefs {
     if (typeof r[key] === "boolean") out[key] = r[key] as boolean;
   }
   if (typeof r.bio === "string") out.bio = r.bio.slice(0, 280);
+  if (typeof r.voice_language === "string" && r.voice_language) {
+    out.voice_language = r.voice_language.slice(0, 35);
+  }
   return out;
 }
 

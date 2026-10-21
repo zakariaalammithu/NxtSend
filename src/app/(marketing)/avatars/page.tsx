@@ -100,7 +100,7 @@ export default function AvatarsPage() {
             width={3362}
             height={1442}
             priority
-            className="pointer-events-none absolute bottom-0 left-1/2 w-[140%] max-w-none -translate-x-1/2 sm:w-full"
+            className="pointer-events-none absolute bottom-0 left-1/2 w-[118%] max-w-none -translate-x-1/2 sm:w-full"
           />
           <h1 className="relative z-10 mb-5 max-w-4xl bg-gradient-purple-horizontal bg-clip-text text-center text-48 font-semibold text-transparent md:text-54 2xl:text-64">
             Additional LinkedIn profiles, tailored and ready to send

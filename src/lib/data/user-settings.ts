@@ -123,7 +123,13 @@ class DemoUserSettingsRepository implements UserSettingsRepository {
 
   async updatePreferences(prefs: UserPreferences): Promise<UserSettingsData> {
     const record = loadDemoRecord();
-    const normalized = normalizeStoredPrefs({ ...prefs, bio: record.bio });
+    const normalized = normalizeStoredPrefs({
+      ...prefs,
+      bio: record.bio,
+      // Preserve the stored voice language when this update (e.g. the
+      // settings page's four toggles) doesn't carry one.
+      voice_language: prefs.voice_language ?? record.voice_language,
+    });
     Object.assign(record, normalized);
     saveDemoRecord(record);
     return demoData(record);
@@ -216,7 +222,13 @@ class SupabaseUserSettingsRepository implements UserSettingsRepository {
   async updatePreferences(prefs: UserPreferences): Promise<UserSettingsData> {
     const identity = await this.identity();
     const current = await this.loadPrefs(identity.id);
-    const normalized = normalizeStoredPrefs({ ...prefs, bio: current.bio });
+    const normalized = normalizeStoredPrefs({
+      ...prefs,
+      bio: current.bio,
+      // Preserve the stored voice language when this update doesn't
+      // carry one (see the demo repository for the same rule).
+      voice_language: prefs.voice_language ?? current.voice_language,
+    });
     await this.savePrefs(identity.id, normalized);
     return this.getSettings();
   }

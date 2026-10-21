@@ -36,6 +36,11 @@ export interface ResendSender {
     text?: string;
     replyTo?: string;
     headers?: Record<string, string>;
+    attachments?: Array<{
+      filename: string;
+      content: string;
+      contentType: string;
+    }>;
   }): Promise<{ id: string | null; error: string | null }>;
 }
 
@@ -55,6 +60,15 @@ function sdkSender(apiKey: string): ResendSender {
       if (payload.replyTo) options.replyTo = payload.replyTo;
       if (payload.headers && Object.keys(payload.headers).length > 0) {
         options.headers = payload.headers;
+      }
+      if (payload.attachments && payload.attachments.length > 0) {
+        // Resend's documented attachment shape: base64 content +
+        // filename (+ optional content type).
+        options.attachments = payload.attachments.map((a) => ({
+          filename: a.filename,
+          content: a.content,
+          content_type: a.contentType,
+        }));
       }
       const { data, error } = await client.emails.send(
         options as unknown as Parameters<typeof client.emails.send>[0]
@@ -220,6 +234,14 @@ export class ResendEmailAdapter implements EmailProviderAdapter {
       text: bodies.text,
       replyTo: input.replyTo,
       headers: Object.keys(headers).length > 0 ? headers : undefined,
+      attachments:
+        input.attachments && input.attachments.length > 0
+          ? input.attachments.map((a) => ({
+              filename: a.filename,
+              content: a.contentBase64,
+              contentType: a.contentType,
+            }))
+          : undefined,
     });
 
     if (result.error || !result.id) {

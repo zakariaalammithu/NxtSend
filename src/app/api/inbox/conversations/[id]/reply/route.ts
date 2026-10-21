@@ -6,7 +6,19 @@ import {
   createConversationRoutingAdapter,
   type EmailProviderAdapter,
 } from "@/lib/email";
-import { sendInboxReply, type ReplyFailureCode } from "@/lib/inbox/reply";
+import {
+  sendInboxReply,
+  type ReplyFailureCode,
+  type ReplyVoiceNote,
+} from "@/lib/inbox/reply";
+import {
+  audioDataUrl,
+  buildVoiceAttachment,
+} from "@/lib/voice/attachments";
+import {
+  downloadVoiceNoteAsAttachment,
+  isWorkspaceVoicePath,
+} from "@/lib/voice/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -43,11 +55,69 @@ export async function POST(
     return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   }
 
-  let body: { content?: unknown; subject?: unknown; idempotencyKey?: unknown } = {};
+  let body: {
+    content?: unknown;
+    subject?: unknown;
+    idempotencyKey?: unknown;
+    voiceNote?: unknown;
+  } = {};
   try {
     body = (await req.json()) as typeof body;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  // Voice note (P6 Stage C): the client sends either inline audio
+  // (Demo Mode — stored as a data: URL, nothing leaves the browser
+  // beyond this simulated send) or a storage path it obtained from
+  // /api/voice/upload (live mode — the server downloads the bytes
+  // here so the attachment is real). A path outside the caller's
+  // workspace is refused outright.
+  let voiceNote: ReplyVoiceNote | undefined;
+  if (body.voiceNote && typeof body.voiceNote === "object") {
+    const vn = body.voiceNote as Record<string, unknown>;
+    const durationSec =
+      typeof vn.durationSec === "number" ? Math.max(0, Math.round(vn.durationSec)) : null;
+    const language = typeof vn.language === "string" ? vn.language : null;
+    const transcript = typeof vn.transcript === "string" ? vn.transcript : null;
+    if (typeof vn.path === "string" && vn.path) {
+      if (!isWorkspaceVoicePath(ctx.workspaceId, vn.path)) {
+        return NextResponse.json(
+          { error: "That voice note does not belong to your workspace." },
+          { status: 403 }
+        );
+      }
+      const admin = createAdminClient();
+      const attachment = admin
+        ? await downloadVoiceNoteAsAttachment(admin, vn.path)
+        : null;
+      if (!attachment) {
+        return NextResponse.json(
+          { error: "The voice note could not be loaded from storage, so the reply was not sent." },
+          { status: 502 }
+        );
+      }
+      voiceNote = { path: vn.path, durationSec, language, transcript, attachment };
+    } else if (
+      typeof vn.dataBase64 === "string" &&
+      typeof vn.contentType === "string"
+    ) {
+      const built = buildVoiceAttachment({
+        contentType: vn.contentType,
+        contentBase64: vn.dataBase64,
+        filename: typeof vn.filename === "string" ? vn.filename : undefined,
+      });
+      if (!built.ok) {
+        return NextResponse.json({ error: built.error }, { status: 400 });
+      }
+      voiceNote = {
+        path: audioDataUrl(vn.contentType, vn.dataBase64),
+        durationSec,
+        language,
+        transcript,
+        attachment: built.attachment,
+      };
+    }
   }
 
   // The inbox owns its message rows (idempotency), so the adapter must
@@ -77,6 +147,7 @@ export async function POST(
       subject: typeof body.subject === "string" ? body.subject : undefined,
       idempotencyKey:
         typeof body.idempotencyKey === "string" ? body.idempotencyKey : "",
+      voiceNote,
     }
   );
 

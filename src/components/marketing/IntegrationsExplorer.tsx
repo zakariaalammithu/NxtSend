@@ -3,21 +3,39 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowUpRight, Search } from "lucide-react";
+import { ArrowUpRight, Search, Sparkles } from "lucide-react";
 
 /**
  * Integrations explorer (layout/structure from the mirror:
  * aimfox.com/integrations, downloaded as ZIP 2).
  *
  * Phase-2 branding (2026-10-19): all copy below was rewritten in
- * NxtSend's own words — integration names, category names and badges
- * are factual labels and are retained, and each description states
- * what that tool does alongside NxtSend's campaigns, leads and inbox.
- * The mirror's own "Aimfox" entry was removed entirely (D8): it
- * described a session-sync/Chrome-extension product NxtSend does not
- * have, so the directory now lists 18 integrations. The category
- * selector scrolls to a section and highlights the one in view
- * (scroll-spy), and the search box filters the cards.
+ * NxtSend's own words. The mirror's own product entry was removed
+ * entirely (D8): it described a session-sync/Chrome-extension product
+ * NxtSend does not have. The category selector scrolls to a section
+ * and highlights the one in view (scroll-spy), and the search box
+ * filters the cards.
+ *
+ * P6 honesty reconciliation (2026-10-20): the Phase-2 copy still
+ * claimed live connections the product does not have ("activity
+ * synced both ways", "2-way sync" badges, "pass leads straight into
+ * HubSpot"…). Every description and badge below now matches the
+ * Integration Center registry (src/lib/integrations-center/registry.ts),
+ * the same source the in-app Integration Center and the home section
+ * use:
+ * - n8n / Zapier / Make / Pabbly / Slack events ride the registry's
+ *   "webhooks" descriptor: signed OUTBOUND events only — one-way,
+ *   no native apps, nothing syncs back.
+ * - Instantly is the registry's read-only warm-up status adapter —
+ *   NxtSend reads its data and never sends through it.
+ * - HubSpot is the registry's CRM entry: NOT implemented. The other
+ *   CRMs and tools without a registry adapter say "Not implemented"
+ *   too, with the real workaround where one exists (CSV export).
+ * - Muse.ai leads the directory with its registry state: the Muse
+ *   Connector Platform path — no public API drives a user's Muse
+ *   agent, so nothing is "connected" from NxtSend's side.
+ * No card here may claim a connection or sync the registry does not
+ * support.
  *
  * Link mapping (no external URLs are carried over):
  * - Cards map to the app route /signup?integration=<slug>.
@@ -29,153 +47,174 @@ interface IntegrationItem {
   name: string;
   description: string;
   badge?: string;
-  logo: string;
+  /** Real brand logo file under public/images/integrations/logos
+      (every entry has one since the P6 logo pass — Muse.ai uses the
+      genuine Muse squiggle served by muse.ai itself). */
+  logo?: string;
+  icon?: typeof Sparkles;
 }
 
 const LOGOS = "/images/integrations/logos";
 
-/* ── Integrations (mirror order within each category) ────────────────────── */
+/* ── Integrations (P6: Muse.ai first; copy reconciled with the registry) ── */
 const INTEGRATIONS: Record<string, IntegrationItem> = {
+  "muse-ai": {
+    slug: "muse-ai",
+    name: "Muse.ai",
+    description:
+      "Meta's Muse agent reaches NxtSend through the Muse Connector Platform — NxtSend exposes an API, Muse calls it. No public API exists for driving a user's Muse agent, so nothing connects from this side yet; the connector submission is prepared in the Integration Center",
+    badge: "Connector Platform",
+    logo: `${LOGOS}/muse.svg`,
+  },
   instantly: {
     slug: "instantly",
     name: "Instantly",
     description:
-      "Pair Instantly with NxtSend to run email alongside LinkedIn outreach, with activity synced both ways",
-    badge: "2-way sync",
+      "Instantly runs mailbox warm-up on its own network. NxtSend only reads the warm-up status its API reports — per-mailbox state, provider-set limits and activity totals — and never sends mail through Instantly",
+    badge: "Warm-up status · read-only",
     logo: `${LOGOS}/instantly.svg`,
   },
   clay: {
     slug: "clay",
     name: "Clay",
     description:
-      "Use Clay-enriched prospect data to target and personalize NxtSend campaigns",
+      "Enrich and build prospect lists in Clay, then bring them into NxtSend by importing the exported CSV on the Leads page. There is no direct Clay connection yet",
+    badge: "Via CSV import",
     logo: `${LOGOS}/clay.webp`,
   },
   n8n: {
     slug: "n8n",
     name: "n8n",
     description:
-      "Connect NxtSend to n8n and build workflow automations around your outreach activity",
-    badge: "2-way sync",
+      "NxtSend sends signed outbound events — lead.created, campaign.created, campaign.status_changed — to an n8n Webhook node, so your workflows react when outreach data changes",
+    badge: "Via outbound webhooks",
     logo: `${LOGOS}/n8n.svg`,
   },
   slack: {
     slug: "slack",
     name: "Slack",
     description:
-      "Send NxtSend alerts to Slack when a prospect replies or engages",
+      "There is no native Slack app yet. NxtSend's signed outbound webhook events can be posted to any HTTPS endpoint, including a relay that forwards them into a Slack channel",
+    badge: "Via outbound webhooks",
     logo: `${LOGOS}/slack.svg`,
   },
   smartlead: {
     slug: "smartlead",
     name: "Smartlead",
     description:
-      "Link your Smartlead workspace to NxtSend and coordinate email with LinkedIn in multichannel campaigns",
-    badge: "2-way sync",
+      "Smartlead is a separate email-sequencing tool, and no adapter connects it to NxtSend yet. Email campaigns here run through NxtSend's own sending providers — Resend, Gmail or Outlook",
+    badge: "Not implemented",
     logo: `${LOGOS}/smartlead.svg`,
   },
   zapier: {
     slug: "zapier",
     name: "Zapier",
     description:
-      "Use Zapier to connect NxtSend with thousands of other apps and automate routine outreach tasks",
-    badge: "2-way sync",
+      "Send signed NxtSend events into your Zaps through a Zapier Catch Hook — lead and campaign changes only. This is a webhook connection, not a native Zapier app",
+    badge: "Via outbound webhooks",
     logo: `${LOGOS}/zapier.svg`,
   },
   make: {
     slug: "make",
     name: "Make",
     description:
-      "Build custom, no-code automations by connecting NxtSend with your tools in Make",
-    badge: "2-way sync",
+      "Make scenarios can start from NxtSend's signed outbound webhook events — point a Make Custom Webhook at the lead and campaign events you choose in the Integration Center",
+    badge: "Via outbound webhooks",
     logo: `${LOGOS}/make.svg`,
   },
   pabbly: {
     slug: "pabbly",
     name: "Pabbly",
     description:
-      "Use Pabbly Connect to pass NxtSend data to your other apps and keep workflows moving",
-    badge: "2-way sync",
+      "Pabbly Connect workflows can receive NxtSend's signed outbound events — lead.created, campaign.created, campaign.status_changed — through its webhook trigger",
+    badge: "Via outbound webhooks",
     logo: `${LOGOS}/pabbly.svg`,
   },
   "outbound-sync": {
     slug: "outbound-sync",
     name: "Outbound Sync",
-    description: "Keep outbound activity aligned across HubSpot and Salesforce",
+    description:
+      "Outbound Sync aligns data between HubSpot and Salesforce on its own side. NxtSend has no connection to it and no CRM sync yet — leads leave NxtSend as CSV exports today",
+    badge: "Not implemented",
     logo: `${LOGOS}/outbound-sync.png`,
   },
   hubspot: {
     slug: "hubspot",
     name: "HubSpot",
     description:
-      "Pass new NxtSend leads straight into HubSpot and keep every opportunity in view",
-    badge: "2-way sync",
+      "No HubSpot sync is built yet. NxtSend's Leads section is the built-in CRM today, with real CSV import and export — a HubSpot adapter is planned, not shipped",
+    badge: "Not implemented",
     logo: `${LOGOS}/hubspot.svg`,
   },
   pipedrive: {
     slug: "pipedrive",
     name: "Pipedrive",
     description:
-      "Sync NxtSend outreach with Pipedrive so your pipeline reflects the latest prospect activity",
-    badge: "2-way sync",
+      "No Pipedrive adapter exists yet. Until a sync is built, export leads from NxtSend as CSV and import them into Pipedrive manually",
+    badge: "Not implemented",
     logo: `${LOGOS}/pipedrive.svg`,
   },
   close: {
     slug: "close",
     name: "Close",
     description:
-      "Move engaged NxtSend prospects into Close as contacts ready to work",
-    badge: "2-way sync",
+      "No Close adapter exists yet. Engaged prospects can be exported from NxtSend as CSV and imported into Close today",
+    badge: "Not implemented",
     logo: `${LOGOS}/close.svg`,
   },
   salesforce: {
     slug: "salesforce",
     name: "Salesforce",
     description:
-      "Send qualified NxtSend leads into Salesforce and keep follow-up organized",
-    badge: "2-way sync",
+      "No Salesforce adapter exists yet. Qualified leads leave NxtSend as CSV exports, which Salesforce imports directly",
+    badge: "Not implemented",
     logo: `${LOGOS}/salesforce.svg`,
   },
   masterinbox: {
     slug: "masterinbox",
     name: "Masterinbox",
     description:
-      "Bring email and LinkedIn replies together in one inbox view through Masterinbox",
-    badge: "2-way sync",
+      "NxtSend already has its own unified inbox for email and LinkedIn replies, so replies are handled inside NxtSend — no Masterinbox connection exists",
+    badge: "Not implemented",
     logo: `${LOGOS}/masterinbox.svg`,
   },
   emailbison: {
     slug: "emailbison",
     name: "EmailBison",
-    description: "Pair EmailBison's email sequencing with NxtSend's LinkedIn campaigns",
-    badge: "2-way sync",
+    description:
+      "EmailBison runs its own email sequencing outside NxtSend, and no adapter connects the two today — NxtSend sends through Resend, Gmail or Outlook mailboxes instead",
+    badge: "Not implemented",
     logo: `${LOGOS}/emailbison.jpg`,
   },
   weezly: {
     slug: "weezly",
     name: "Weezly",
-    description: "Send personalized videos with Weezly",
-    badge: "Coming soon",
+    description:
+      "Personalized video steps with Weezly are not built yet. Campaign steps today are text — with voice notes recorded in the app and delivered as email attachments",
+    badge: "Not implemented",
     logo: `${LOGOS}/weezly.svg`,
   },
   trigify: {
     slug: "trigify",
     name: "Trigify",
-    description: "Use Trigify signals to time outreach when leads are active",
-    badge: "Coming soon",
+    description:
+      "Trigify's buying signals are not connected to NxtSend yet — no signal feed reaches campaigns or leads today",
+    badge: "Not implemented",
     logo: `${LOGOS}/trigify.svg`,
   },
   rb2b: {
     slug: "rb2b",
     name: "RB2b",
-    description: "Identify website visitors with RB2B and follow up through LinkedIn",
+    description:
+      "RB2B identifies visitors on your own website; NxtSend cannot receive those identifications yet — no connection exists between the two",
+    badge: "Not implemented",
     logo: `${LOGOS}/rb2b.svg`,
   },
 };
 
 /* ── Categories (mirror order; Automations is one shorter after D8) ────── */
 const CATEGORIES: { title: string; slugs: string[] }[] = [
-  { title: "Top Choice", slugs: ["instantly", "clay", "n8n", "slack", "smartlead"] },
+  { title: "Top Choice", slugs: ["muse-ai", "instantly", "clay", "n8n", "slack", "smartlead"] },
   {
     title: "Automations",
     slugs: ["n8n", "zapier", "make", "pabbly", "slack", "clay", "outbound-sync"],
@@ -229,13 +268,19 @@ function IntegrationCard({ item }: { item: IntegrationItem }) {
       className="group relative flex flex-col gap-y-8 rounded-3xl border border-black-700 p-4 text-white transition-colors duration-200 hover:bg-white/[0.04]"
     >
       <div className="flex items-center gap-x-2">
-        <Image
-          src={item.logo}
-          alt=""
-          width={40}
-          height={40}
-          className="h-10 w-10 shrink-0"
-        />
+        {item.logo ? (
+          <Image
+            src={item.logo}
+            alt=""
+            width={40}
+            height={40}
+            className="h-10 w-10 shrink-0 object-contain"
+          />
+        ) : item.icon ? (
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/15 text-purple-300">
+            <item.icon className="h-5 w-5" />
+          </span>
+        ) : null}
         <div className="ml-2 flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-24 font-bold">{item.name}</span>
           {item.badge && (

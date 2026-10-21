@@ -49,6 +49,71 @@ import {
 import { cn } from "@/lib/utils";
 import { StepTypeIcon } from "./SequenceCanvas";
 import EmailContentHints from "@/components/dashboard/EmailContentHints";
+import {
+  VoiceComposer,
+  useVoiceLanguage,
+  type ComposerVoiceNote,
+} from "@/components/dashboard/voice/VoiceComposer";
+import { getDataMode } from "@/lib/data/mode";
+import {
+  audioDataUrl,
+  parseDataUrl,
+  parseStepVoiceNote,
+  type StepVoiceNote,
+} from "@/lib/voice/attachments";
+
+/** step.config.voice_note → composer note (existing note when reopening). */
+function composerNoteFromStep(note: StepVoiceNote | null): ComposerVoiceNote | null {
+  if (!note) return null;
+  if (note.source === "data" && note.dataUrl) {
+    const parsed = parseDataUrl(note.dataUrl);
+    return {
+      filename: note.filename,
+      contentType: note.contentType,
+      durationSec: note.durationSec,
+      language: note.language,
+      transcript: note.transcript ?? null,
+      dataBase64: parsed?.contentBase64,
+      objectUrl: note.dataUrl,
+    };
+  }
+  return {
+    filename: note.filename,
+    contentType: note.contentType,
+    durationSec: note.durationSec,
+    language: note.language,
+    transcript: note.transcript ?? null,
+    path: note.path,
+  };
+}
+
+/** Composer note → step.config.voice_note (what the executor reads). */
+function stepNoteFromComposer(note: ComposerVoiceNote | null): StepVoiceNote | null {
+  if (!note) return null;
+  if (note.path) {
+    return {
+      source: "storage",
+      path: note.path,
+      filename: note.filename,
+      contentType: note.contentType,
+      durationSec: note.durationSec,
+      language: note.language,
+      transcript: note.transcript,
+    };
+  }
+  if (note.dataBase64) {
+    return {
+      source: "data",
+      dataUrl: audioDataUrl(note.contentType, note.dataBase64),
+      filename: note.filename,
+      contentType: note.contentType,
+      durationSec: note.durationSec,
+      language: note.language,
+      transcript: note.transcript,
+    };
+  }
+  return null;
+}
 
 export interface StepEditorDrawerProps {
   step: SequenceStepDraft | null;
@@ -90,6 +155,10 @@ export function StepEditorDrawer({
   const [showTemplates, setShowTemplates] = React.useState(false);
   const [aiBusy, setAiBusy] = React.useState(false);
   const [aiNotice, setAiNotice] = React.useState<string | null>(null);
+  const [voiceLanguage, setVoiceLanguage] = useVoiceLanguage();
+  const [stepVoiceNote, setStepVoiceNote] =
+    React.useState<ComposerVoiceNote | null>(null);
+  const dataMode = React.useMemo(() => getDataMode(), []);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   // Reset the local draft whenever a different step is opened.
@@ -106,6 +175,9 @@ export function StepEditorDrawer({
     setPreviewIdx(0);
     setShowTemplates(false);
     setAiNotice(null);
+    setStepVoiceNote(
+      composerNoteFromStep(parseStepVoiceNote(step.config?.voice_note))
+    );
   }, [step]);
 
   if (!step) return null;
@@ -186,6 +258,13 @@ export function StepEditorDrawer({
       config.withdraw_after_days = withdrawOn
         ? Math.max(1, Number(withdrawDays) || 14)
         : null;
+    }
+    if (step.step_type === "email") {
+      // The per-step voice note rides with the step config; the
+      // executor attaches it to the outgoing email (see
+      // src/lib/voice/attachments.ts). Removing the note in the
+      // editor clears it here too.
+      config.voice_note = stepNoteFromComposer(stepVoiceNote);
     }
     onSave({
       ...step,
@@ -540,6 +619,34 @@ export function StepEditorDrawer({
                     in this campaign, the preview cycles through them instead.
                   </p>
                 )}
+              </div>
+
+              {/* Voice — dictation, read-aloud, translation, and (email
+                  steps) a per-step voice note the executor attaches. */}
+              <div>
+                <label className="mb-1.5 block text-12 font-medium text-black-300">
+                  Voice
+                </label>
+                <VoiceComposer
+                  text={content}
+                  onTextChange={setContent}
+                  ttsText={renderTemplate(content, previewVars)}
+                  language={voiceLanguage}
+                  onLanguageChange={setVoiceLanguage}
+                  mode={dataMode}
+                  allowAttach={step.step_type === "email"}
+                  note={step.step_type === "email" ? stepVoiceNote : null}
+                  onNoteChange={
+                    step.step_type === "email" ? setStepVoiceNote : undefined
+                  }
+                  deliveryNote={
+                    step.step_type === "email"
+                      ? dataMode === "demo"
+                        ? "The attached voice note is stored with this step and sent as an email attachment to every recipient. In Demo Mode the audio stays in your browser and sends are simulated."
+                        : "The attached voice note is stored with this step and sent as an email attachment to every recipient of this step."
+                      : "Voice notes can't be delivered on LinkedIn — no approved LinkedIn provider exists, so nothing can attach or send audio there. Dictation, translation and read-aloud still work on the message text."
+                  }
+                />
               </div>
 
               {/* Withdraw toggle — connection requests only */}

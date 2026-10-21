@@ -69,7 +69,7 @@ const comparisonGroups: CompareGroup[] = [
       { name: "Endorsing skills", cells: ["check", "check", "check"] },
       {
         name: "Voice messages",
-        note: "Send them within campaigns or from the unified inbox",
+        note: "Recorded in the app and delivered as email attachments — in campaigns or from the unified inbox",
         cells: ["check", "check", "check"],
       },
       {

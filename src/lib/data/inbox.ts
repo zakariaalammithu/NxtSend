@@ -51,6 +51,18 @@ export interface InboxMessage {
   provider_message_id?: string | null;
   idempotency_key?: string | null;
   error?: string | null;
+  /**
+   * Voice note carried by this message (P6 Stage C, migration 015).
+   * `voice_note_path` is either a private-bucket storage path
+   * (`<workspace_id>/<note_id>/<file>`, live mode — played through
+   * the signed-URL route) or a `data:` URL (Demo Mode — the audio
+   * never left the browser). Null when the message has no voice note.
+   */
+  voice_note_path?: string | null;
+  voice_note_duration_sec?: number | null;
+  voice_note_language?: string | null;
+  /** Transcript of the voice note when one was produced. */
+  transcript?: string | null;
 }
 
 export interface InboxConversation {
@@ -102,6 +114,11 @@ export interface InsertMessageInput {
   error?: string | null;
   sent_at?: string;
   read_at?: string | null;
+  /** Voice-note fields (P6 Stage C) — see InboxMessage. */
+  voice_note_path?: string | null;
+  voice_note_duration_sec?: number | null;
+  voice_note_language?: string | null;
+  transcript?: string | null;
 }
 
 export interface InboxRepository {
@@ -502,6 +519,13 @@ function rowToMessage(row: MessageRow): InboxMessage {
     provider_message_id: (row.provider_message_id as string | null) ?? null,
     idempotency_key: (row.idempotency_key as string | null) ?? null,
     error: (row.error as string | null) ?? null,
+    voice_note_path: (row.voice_note_path as string | null) ?? null,
+    voice_note_duration_sec:
+      typeof row.voice_note_duration_sec === "number"
+        ? row.voice_note_duration_sec
+        : null,
+    voice_note_language: (row.voice_note_language as string | null) ?? null,
+    transcript: (row.transcript as string | null) ?? null,
   };
 }
 
@@ -764,6 +788,17 @@ class SupabaseInboxRepository implements InboxRepository {
         error: input.error ?? null,
         ...(input.sent_at ? { sent_at: input.sent_at } : {}),
         ...(input.read_at ? { read_at: input.read_at } : {}),
+        // Voice columns (migration 015) are only written when a
+        // voice note is present, so plain text sends keep working
+        // against a database that has not applied 015 yet.
+        ...(input.voice_note_path
+          ? {
+              voice_note_path: input.voice_note_path,
+              voice_note_duration_sec: input.voice_note_duration_sec ?? null,
+              voice_note_language: input.voice_note_language ?? null,
+              transcript: input.transcript ?? null,
+            }
+          : {}),
       })
       .select("*")
       .single();
@@ -783,6 +818,10 @@ class SupabaseInboxRepository implements InboxRepository {
       "provider_message_id",
       "read_at",
       "sent_at",
+      "voice_note_path",
+      "voice_note_duration_sec",
+      "voice_note_language",
+      "transcript",
     ] as const) {
       if (patch[key] !== undefined) allowed[key] = patch[key] as unknown;
     }

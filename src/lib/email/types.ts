@@ -10,12 +10,26 @@ import type { ProviderState } from "@/lib/env";
 
 export type { ProviderState };
 
+/**
+ * A file carried with an outbound email (P6 Stage C — voice notes
+ * are the first producer). `contentBase64` is the raw file bytes in
+ * base64; every adapter renders it in its provider's native shape
+ * (Resend `attachments`, Gmail MIME part, Graph `fileAttachment`).
+ */
+export interface EmailAttachment {
+  filename: string;
+  contentType: string;
+  contentBase64: string;
+}
+
 export interface SendEmailInput {
   workspaceId: string;
   to: string;
   subject: string;
   html?: string;
   text?: string;
+  /** Optional file attachments (e.g. a recorded voice note). */
+  attachments?: EmailAttachment[];
   /** Defaults to EMAIL_FROM. */
   from?: string;
   replyTo?: string;

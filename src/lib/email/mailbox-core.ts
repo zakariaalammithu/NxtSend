@@ -30,7 +30,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/server";
 import type { ProviderState } from "@/lib/env";
 import { getDataMode } from "@/lib/data/mode";
-import type { SendEmailInput, SendEmailResult } from "./types";
+import type {
+  EmailAttachment,
+  SendEmailInput,
+  SendEmailResult,
+} from "./types";
 import { checkSuppression } from "./suppression";
 import {
   appendUnsubscribeFooter,
@@ -55,6 +59,8 @@ export interface PreparedMailboxMessage {
   html?: string;
   replyTo?: string;
   headers: Record<string, string>;
+  /** File attachments carried through from SendEmailInput (voice notes). */
+  attachments?: EmailAttachment[];
 }
 
 /** Provider-specific delivery: returns the provider message ID. */
@@ -251,6 +257,10 @@ export async function sendMailboxEmail(
       html: bodies.html,
       replyTo: input.replyTo,
       headers,
+      attachments:
+        input.attachments && input.attachments.length > 0
+          ? input.attachments
+          : undefined,
     });
     providerMessageId = delivered.providerMessageId;
   } catch (err) {

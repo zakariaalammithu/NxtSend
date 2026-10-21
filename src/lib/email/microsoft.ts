@@ -68,6 +68,15 @@ export function buildGraphMessage(message: PreparedMailboxMessage): Record<
       ([name, value]) => ({ name, value })
     );
   }
+  if (message.attachments && message.attachments.length > 0) {
+    // Graph fileAttachment shape: base64 bytes in contentBytes.
+    graphMessage.attachments = message.attachments.map((a) => ({
+      "@odata.type": "#microsoft.graph.fileAttachment",
+      name: a.filename,
+      contentType: a.contentType,
+      contentBytes: a.contentBase64,
+    }));
+  }
   return graphMessage;
 }
 

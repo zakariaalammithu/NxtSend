@@ -5,7 +5,7 @@ import {
   ArrowUpRight,
   Check,
   ShieldCheck,
-  Headphones,
+  MessageCircle,
 } from "lucide-react";
 import { AcademySeries } from "@/components/marketing/AcademySeries";
 
@@ -132,10 +132,13 @@ export default function AcademyPage() {
                 <ShieldCheck className="h-3.5 w-3.5 text-green-400" /> Safe
                 &amp; secure
               </span>
-              <span className="flex items-center gap-1.5">
-                <Headphones className="h-3.5 w-3.5 text-green-400" /> 24/7
-                Support
-              </span>
+              <Link
+                href="/contact"
+                className="flex items-center gap-1.5 transition-colors hover:text-white"
+              >
+                <MessageCircle className="h-3.5 w-3.5 text-green-400" />{" "}
+                Questions? Contact us
+              </Link>
             </div>
           </div>
         </div>

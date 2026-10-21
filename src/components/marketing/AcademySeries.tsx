@@ -27,6 +27,9 @@ interface AcademyModule {
   description: string;
   /** Still for the card's right panel; null when not in the download. */
   image: string | null;
+  /** Backdrop shown behind the still (rendered object-contain so no
+      in-image text is ever cropped — P6 clip fix). */
+  artBackdrop?: string;
   /** Mirror card glow (box-shadow / radial-gradient tint), verbatim rgba. */
   glow: string;
   tint: string;
@@ -67,6 +70,8 @@ const modules: AcademyModule[] = [
     description:
       "Define who you want to reach, write messages in your own voice, and build a sequence that is ready to launch.",
     image: "/images/academy/module-2.webp",
+    artBackdrop:
+      "bg-[linear-gradient(180deg,#05050f_0%,#1d1fc0_48%,#9db9ff_100%)]",
     glow: "rgba(255,110,26,0.35)",
     tint: "rgba(255,110,26,0.16)",
     lessons: [
@@ -101,6 +106,7 @@ const modules: AcademyModule[] = [
     description:
       "Manage new replies, read your results clearly, and diagnose campaigns that have stalled.",
     image: "/images/academy/module-3.webp",
+    artBackdrop: "bg-[#e9ebff]",
     glow: "rgba(0,170,255,0.35)",
     tint: "rgba(0,170,255,0.16)",
     lessons: [
@@ -138,10 +144,10 @@ export function AcademySeries() {
             <Image
               src="/images/academy/module-2.webp"
               alt="NxtSend Academy course artwork"
-              width={1280}
-              height={720}
+              width={2916}
+              height={2663}
               priority
-              className="absolute inset-0 size-full object-cover"
+              className="absolute inset-0 size-full object-cover object-[50%_78%]"
             />
             <div className="absolute inset-0 bg-gradient-to-r from-black-900/85 via-black-900/40 to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-t from-black-900/95 via-black-900/45 to-transparent" />
@@ -223,15 +229,17 @@ export function AcademySeries() {
                     ))}
                   </div>
                 </div>
-                <div className="relative h-56 shrink-0 md:h-auto md:w-2/5">
-                  <div className="relative size-full overflow-hidden">
+                <div className="relative h-64 shrink-0 md:h-auto md:w-2/5">
+                  <div
+                    className={`relative size-full overflow-hidden ${mod.artBackdrop ?? ""}`}
+                  >
                     {mod.image ? (
                       <Image
                         src={mod.image}
                         alt=""
                         fill
                         sizes="(min-width: 768px) 40vw, 100vw"
-                        className="object-cover"
+                        className="object-contain"
                       />
                     ) : null}
                   </div>

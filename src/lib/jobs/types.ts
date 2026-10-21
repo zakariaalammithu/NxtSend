@@ -98,5 +98,9 @@ export interface JobsContext {
   getSequenceExecutor?: () => {
     store: import("@/lib/executor/types").ExecutorStore;
     adapter: import("@/lib/email/types").EmailProviderAdapter;
+    /** Voice-note storage resolver for step attachments (P6 Stage C). */
+    resolveVoiceAttachment?: (
+      path: string
+    ) => Promise<import("@/lib/email/types").EmailAttachment | null>;
   } | null;
 }

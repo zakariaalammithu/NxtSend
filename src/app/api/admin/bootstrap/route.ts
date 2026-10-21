@@ -48,15 +48,22 @@ function recordAttempt(ip: string): void {
 /**
  * Admin Bootstrap Endpoint
  *
- * Promotes nxtsendai@gmail.com to super_admin role.
- * Protected by ADMIN_BOOTSTRAP_SECRET env var.
+ * Promotes an EXISTING signed-up account to the super_admin role.
+ * Protected by ADMIN_BOOTSTRAP_SECRET env var — the secret is the
+ * capability; the email in the request only SELECTS which existing
+ * account to promote and grants nothing by itself (there is no
+ * email-based shortcut anywhere in this route).
  * Should be called ONCE after initial deployment, then the secret should
  * be removed from environment variables.
+ *
+ * The owner's own admin account is mithusquare@gmail.com (the default
+ * below, used when the body omits `email`) — the owner signs up with
+ * that address first, then runs this once (SETUP.md §5).
  *
  * Usage:
  *   curl -X POST https://your-domain.com/api/admin/bootstrap \
  *     -H "Content-Type: application/json" \
- *     -d '{"secret": "your-bootstrap-secret", "email": "nxtsendai@gmail.com"}'
+ *     -d '{"secret": "your-bootstrap-secret", "email": "mithusquare@gmail.com"}'
  */
 export async function POST(request: NextRequest) {
   try {
@@ -89,8 +96,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2. Validate email
-    const targetEmail = email || "nxtsendai@gmail.com";
+    // 2. Validate email. The default is the owner's signup address
+    // (mithusquare@gmail.com); an explicit `email` in the body selects a
+    // different EXISTING account. Either way the email only selects the
+    // account — promotion requires the bootstrap secret above.
+    const targetEmail = email || "mithusquare@gmail.com";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(targetEmail)) {
       return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
     }

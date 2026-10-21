@@ -94,7 +94,11 @@ const followUpDue: JobHandler = async (job, ctx: JobsContext) => {
     };
   }
   const summary = await executeDueSteps(
-    { store: executor.store, adapter: executor.adapter },
+    {
+      store: executor.store,
+      adapter: executor.adapter,
+      resolveVoiceAttachment: executor.resolveVoiceAttachment,
+    },
     { workspaceId: job.workspace_id ?? null }
   );
   return {

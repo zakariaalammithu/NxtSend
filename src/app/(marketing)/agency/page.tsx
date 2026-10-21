@@ -6,6 +6,17 @@ import {
   Check,
   ShieldCheck,
   Headphones,
+  Briefcase,
+  ChevronLeft,
+  CreditCard,
+  KeyRound,
+  Lock,
+  Palette,
+  Receipt,
+  Settings2,
+  UserRound,
+  Users,
+  Webhook,
 } from "lucide-react";
 import { AgencyPricing } from "@/components/marketing/AgencyPricing";
 
@@ -72,25 +83,194 @@ const processSteps = [
   },
 ];
 
+/* ── Hero artwork: the Agency Plan settings panel, rebuilt as native
+      JSX (P6 clip fix). The previous raster capture
+      (agency-plan.webp) was cropped inside the file itself — its right
+      column and bottom row are cut off in the source pixels, and its
+      overlay rendering clipped the panel's top as well — and it showed
+      the old aimfox.com app. A live panel cannot be clipped at any
+      viewport and carries NxtSend's own domain and branding. ──────── */
+const panelNav = [
+  { label: "Profile settings", icon: UserRound },
+  { label: "General", icon: Settings2 },
+  { label: "Billing", icon: CreditCard },
+  { label: "Invoices", icon: Receipt },
+  { label: "Members", icon: Users },
+  { label: "Clients", icon: Briefcase },
+  { label: "API keys", icon: KeyRound },
+  { label: "Webhooks", icon: Webhook },
+  { label: "Agency Plan", icon: Briefcase, active: true },
+  { label: "White label", icon: Palette },
+];
+
+const panelRows = [
+  { name: "Nexora", meta: "2 accounts", bg: "bg-gradient-to-br from-slate-200 to-slate-400", hide: "" },
+  { name: "Utopia", meta: "8 accounts", bg: "bg-gradient-to-br from-indigo-500 to-purple-700", hide: "" },
+  { name: "Miracle", meta: "4 accounts · 5 avatars", bg: "bg-gradient-to-br from-neutral-700 to-black", hide: "hidden min-[500px]:flex" },
+  { name: "Northbeam", meta: "6 accounts · 3 avatars", bg: "bg-gradient-to-br from-orange-400 to-rose-500", hide: "hidden lg:flex" },
+];
+
+function AgencyPlanPanel() {
+  return (
+    <div
+      aria-hidden="true"
+      className="absolute right-3 top-1/2 w-[76%] -translate-y-1/2 sm:right-5 sm:w-[68%] lg:right-6"
+    >
+      <div className="overflow-hidden rounded-xl bg-white text-left shadow-2xl ring-1 ring-black-900/10">
+        {/* Browser chrome */}
+        <div className="flex items-center gap-1.5 border-b border-black-900/[0.06] px-3 py-2">
+          <span className="h-2 w-2 rounded-full bg-[#FF5F57]" />
+          <span className="h-2 w-2 rounded-full bg-[#FEBC2E]" />
+          <span className="h-2 w-2 rounded-full bg-[#28C840]" />
+          <span className="ml-2 flex items-center gap-1 rounded-md bg-black-50 px-2 py-0.5 text-[9px] font-medium text-black-400">
+            <Lock className="h-2.5 w-2.5" />
+            app.nxtsend.com
+          </span>
+        </div>
+        <div className="flex">
+          {/* Settings sidebar */}
+          <div className="hidden w-[7.5rem] shrink-0 flex-col border-r border-black-900/[0.06] px-2 py-3 sm:flex lg:w-[8.5rem]">
+            <p className="flex items-center gap-0.5 px-1 text-11 font-semibold text-black-900">
+              <ChevronLeft className="h-3 w-3" />
+              Settings
+            </p>
+            <div className="mt-2 flex items-center gap-1.5 px-1 py-1">
+              <span className="h-4 w-4 shrink-0 rounded bg-gradient-brand" />
+              <span className="truncate text-10 font-semibold text-black-900">
+                Northbeam
+              </span>
+            </div>
+            <ul className="mt-1 space-y-0.5">
+              {panelNav.map((item) => (
+                <li
+                  key={item.label}
+                  className={`flex items-center gap-1.5 rounded-md px-1.5 py-1 text-10 ${
+                    item.active
+                      ? "bg-purple-600/10 font-semibold text-purple-700"
+                      : "text-black-500"
+                  }`}
+                >
+                  <item.icon className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{item.label}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          {/* Plan content */}
+          <div className="min-w-0 flex-1 px-3 py-3 sm:px-4">
+            <p className="text-13 font-bold text-black-900">Agency Plan</p>
+            <div className="mt-2 rounded-lg border border-black-900/[0.08] p-2.5">
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white">
+                  <Briefcase className="h-3.5 w-3.5" />
+                </span>
+                <span className="text-12 font-bold text-black-900">
+                  Agency Plan
+                </span>
+                <span className="rounded-full bg-emerald-50 px-1.5 py-px text-[9px] font-semibold text-emerald-600 ring-1 ring-emerald-200">
+                  Active
+                </span>
+              </div>
+              <p className="mt-1.5 text-10 text-black-400">
+                Grow your LinkedIn network with fully automated campaigns
+              </p>
+              <div className="mt-2 flex items-center gap-1.5 border-t border-dashed border-black-900/10 pt-2 text-[9px] text-black-500 sm:text-10">
+                <span>Next billing on Jun 25th, 2025</span>
+                <span className="text-black-300">|</span>
+                <span>**** 4444</span>
+                <span className="font-semibold text-purple-600">Edit</span>
+              </div>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="rounded-lg border border-black-900/[0.08] p-2.5">
+                <p className="text-[9px] text-black-400 sm:text-10">Total seats</p>
+                <p className="mt-0.5 text-16 font-bold text-black-900">70</p>
+              </div>
+              <div className="rounded-lg border border-black-900/[0.08] p-2.5">
+                <p className="text-[9px] text-black-400 sm:text-10">
+                  Assigned seats
+                </p>
+                <p className="mt-0.5 text-16 font-bold text-purple-600">49</p>
+              </div>
+            </div>
+            {/* Workspace table — hidden on the smallest frames so the
+                panel always fits its stage without clipping. */}
+            <div className="hidden min-[500px]:block">
+            <p className="mt-2.5 flex items-center gap-1.5 px-0.5 text-[9px] font-medium text-black-400 sm:text-10">
+              Name
+              <span className="rounded bg-purple-600/10 px-1 font-semibold text-purple-600">
+                7
+              </span>
+            </p>
+            <ul className="mt-0.5 divide-y divide-black-900/[0.06]">
+              {panelRows.map((row) => (
+                <li key={row.name} className={`flex items-center gap-2 py-1.5 ${row.hide}`}>
+                  <span className={`h-6 w-6 shrink-0 rounded-md ${row.bg}`} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-11 font-semibold text-black-900">
+                      {row.name}
+                    </span>
+                    <span className="block truncate text-[9px] text-black-400">
+                      {row.meta}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AgencyPage() {
   return (
     <div className="relative min-h-screen bg-black-900">
       {/* ──────────────────────────────────────────────────────────────────── */}
       {/* HERO */}
       {/* ──────────────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden bg-gradient-hero pt-12 pb-20 lg:pt-20 lg:pb-28">
-        <div className="pointer-events-none absolute -top-40 left-1/2 h-[500px] w-[800px] -translate-x-1/2 rounded-full bg-purple-600/20 blur-[130px]" />
-        <div className="pointer-events-none absolute top-1/3 -right-40 h-[350px] w-[350px] rounded-full bg-orange-600/15 blur-[120px]" />
+      {/* Hero shell restyled to the bizreviewradar.com treatment
+          (P6 addendum): near-black #05070f base, a white 1px grid at
+          64px cells / 5% opacity masked by a radial fade, and an
+          emerald radial glow at the top — the reference's agency
+          section treatment, with NxtSend's own copy kept. */}
+      <section className="relative isolate overflow-hidden bg-[#05070f] pt-12 pb-20 lg:pt-20 lg:pb-28">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[40rem]"
+          style={{
+            background:
+              "radial-gradient(110% 60% at 50% 0%, rgba(16,185,129,0.28) 0%, rgba(12,17,80,0.35) 45%, rgba(5,7,15,0) 75%)",
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-[0.05]"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)",
+            backgroundSize: "64px 64px",
+            maskImage:
+              "radial-gradient(70% 50% at 50% 20%, #000, transparent)",
+            WebkitMaskImage:
+              "radial-gradient(70% 50% at 50% 20%, #000, transparent)",
+          }}
+        />
 
         <div className="section-container relative z-10">
           <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
             <div className="text-center lg:text-left">
-              <h1 className="text-44 sm:text-54 lg:text-64 font-extrabold tracking-tight text-white leading-[1.08]">
+              <p className="text-12 font-semibold uppercase tracking-widest text-emerald-400">
+                For agencies &amp; consultants
+              </p>
+              <h1 className="mt-4 text-44 sm:text-54 lg:text-64 font-semibold tracking-tight text-white leading-[1.08]">
                 Agency outreach that{" "}
                 <span className="text-gradient-brand">grows with your clients</span>
               </h1>
 
-              <p className="mx-auto mt-6 max-w-xl text-17 sm:text-20 leading-relaxed text-black-300 lg:mx-0">
+              <p className="mx-auto mt-6 max-w-xl text-17 sm:text-20 leading-relaxed text-white/60 lg:mx-0">
                 White-label LinkedIn campaign management for teams handling
                 many client accounts.
               </p>
@@ -106,22 +286,22 @@ export default function AgencyPage() {
               </div>
             </div>
 
-            <div className="relative overflow-hidden rounded-3xl border border-black-700/80 shadow-2xl">
+            {/* Artwork frame: aspect-matched stage for the backdrop +
+                the JSX Agency Plan panel (clip fix — the old raster
+                overlay was cropped inside its own file and again by
+                this frame). The backdrop is abstract art (safe to
+                cover-crop); the panel is live markup, so no text in it
+                can be cut at any viewport. */}
+            <div className="relative aspect-[4/3] overflow-hidden rounded-3xl border border-black-700/80 shadow-2xl min-[500px]:aspect-[16/10] lg:aspect-[6/5]">
               <Image
                 src="/images/agency/hero.webp"
-                alt="Agency plan artwork"
-                width={4096}
-                height={1497}
-                className="h-full w-full object-cover"
+                alt=""
+                fill
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                className="object-cover"
                 priority
               />
-              <Image
-                src="/images/agency/agency-plan.webp"
-                alt="Agency plan details"
-                width={1200}
-                height={1128}
-                className="absolute bottom-0 right-0 w-1/2 object-cover"
-              />
+              <AgencyPlanPanel />
             </div>
           </div>
         </div>
@@ -150,27 +330,35 @@ export default function AgencyPage() {
               3D-visual panel + orange CTA panel) are the mirror's, while
               the section keeps this site's dark theme. */}
           <div className="mx-auto mt-14 grid w-full max-w-[73.75rem] gap-6 sm:gap-8">
-            {/* Fully whitelabel — title bottom-right, as in the mirror */}
-            <div className="relative h-[26rem] overflow-hidden rounded-7xl xl:h-[41.5rem]">
-              <Image
-                src="/images/agency/whitelabel-bg.webp"
-                alt="Fully white-label. Entirely your brand."
-                fill
-                sizes="(max-width: 1200px) 100vw, 1180px"
-                className="object-cover"
-              />
-              <div className="absolute inset-0 flex justify-center p-8 md:p-16 xl:items-end xl:justify-end xl:p-14">
-                <h3 className="text-center text-30 font-bold text-white sm:text-36 xl:text-right xl:text-30">
-                  Fully white-label.
-                  <br />
-                  Entirely your brand.
-                </h3>
+            {/* Fully whitelabel — title bottom-right at xl, as in the
+                mirror. Below xl the title sits above the card: the
+                artwork's bright UI panel fills the frame and leaves no
+                legible spot for white text over it (P6 clip fix). */}
+            <div>
+              <h3 className="mb-4 text-24 font-bold text-white sm:text-30 xl:hidden">
+                Fully white-label. Entirely your brand.
+              </h3>
+              <div className="relative aspect-[2384/1328] overflow-hidden rounded-7xl">
+                <Image
+                  src="/images/agency/whitelabel-bg.webp"
+                  alt="Fully white-label. Entirely your brand."
+                  fill
+                  sizes="(max-width: 1200px) 100vw, 1180px"
+                  className="object-cover"
+                />
+                <div className="absolute inset-0 hidden items-end justify-end p-14 xl:flex">
+                  <h3 className="text-right text-30 font-bold text-white">
+                    Fully white-label.
+                    <br />
+                    Entirely your brand.
+                  </h3>
+                </div>
               </div>
             </div>
 
             <div className="flex flex-col gap-6 sm:gap-8 xl:flex-row">
               {/* Workspaces — title at the top, as in the mirror */}
-              <div className="relative h-[26rem] grow overflow-hidden rounded-7xl xl:h-[41.5rem]">
+              <div className="relative aspect-[1480/1328] grow overflow-hidden rounded-7xl xl:aspect-auto xl:h-[41.5rem]">
                 <Image
                   src="/images/agency/workspaces-bg.webp"
                   alt="Workspaces"
@@ -178,9 +366,9 @@ export default function AgencyPage() {
                   sizes="(max-width: 1280px) 100vw, 720px"
                   className="object-cover object-center"
                 />
-                <div className="relative z-10 px-4 pt-14 text-center">
-                  <h3 className="text-30 font-bold text-white">Workspaces</h3>
-                  <p className="mx-auto mt-3 max-w-[18.25rem] text-15 text-white">
+                <div className="relative z-10 px-4 pt-6 text-center sm:pt-14">
+                  <h3 className="text-24 font-bold text-white sm:text-30">Workspaces</h3>
+                  <p className="mx-auto mt-2 max-w-[18.25rem] text-13 text-white sm:mt-3 sm:text-15">
                     Each client stays in their own space, while your team
                     keeps oversight of every account.
                   </p>
@@ -188,7 +376,7 @@ export default function AgencyPage() {
               </div>
 
               {/* Account manager — dark text on the light artwork (mirror) */}
-              <div className="relative h-[26rem] overflow-hidden rounded-7xl xl:h-[41.5rem] xl:w-[26.25rem] xl:shrink-0">
+              <div className="relative aspect-[1568/1440] overflow-hidden rounded-7xl xl:aspect-auto xl:h-[41.5rem] xl:w-[26.25rem] xl:shrink-0">
                 <Image
                   src="/images/agency/account-manager-bg.webp"
                   alt="Account manager"
@@ -196,9 +384,9 @@ export default function AgencyPage() {
                   sizes="(max-width: 1280px) 100vw, 420px"
                   className="object-cover object-center"
                 />
-                <div className="relative z-10 px-4 pt-14 text-center text-black-900">
-                  <h3 className="text-30 font-bold">Account manager</h3>
-                  <p className="mx-auto mt-3 max-w-[18.25rem] text-15">
+                <div className="relative z-10 px-4 pt-6 text-center text-black-900 sm:pt-14">
+                  <h3 className="text-24 font-bold sm:text-30">Account manager</h3>
+                  <p className="mx-auto mt-2 max-w-[18.25rem] text-13 sm:mt-3 sm:text-15">
                     Work with a named account manager, reach the team in
                     Slack, and get help moving profiles over.
                   </p>
@@ -390,7 +578,7 @@ export default function AgencyPage() {
                 alt="Agency seats"
                 width={1096}
                 height={1067}
-                className="h-64 w-full object-cover"
+                className="h-auto w-full"
               />
               <div className="p-8">
                 <h3 className="text-22 font-bold text-white">Agency seats</h3>
@@ -414,7 +602,7 @@ export default function AgencyPage() {
                 alt="Outreach Avatars"
                 width={1124}
                 height={1061}
-                className="h-64 w-full object-cover"
+                className="h-auto w-full"
               />
               <div className="p-8">
                 <h3 className="flex items-center gap-2 text-22 font-bold text-white">

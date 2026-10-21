@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { Linkedin, Facebook } from "lucide-react";
 interface FooterLink {
   label: string;
   href: string;
@@ -12,7 +13,7 @@ interface FooterColumn {
   links: FooterLink[];
 }
 
-/* Aimfox-style footer columns — every link points at a route that exists. */
+/* Footer columns (mirror layout) — every link points at a route that exists. */
 const FOOTER_COLUMNS: FooterColumn[] = [
   {
     title: "Product",
@@ -36,16 +37,29 @@ const FOOTER_COLUMNS: FooterColumn[] = [
   },
 ];
 
-/* Social icons removed (Fix Batch 3): the X and GitHub profiles linked here
-   (x.com/nxtsend, github.com/nxtsend) return 404 — no verified NxtSend social
-   profiles exist yet. Re-add icons here once real profile URLs exist. */
+/* Social profiles (P6): the owner supplied real company profiles, so the
+   LinkedIn + Facebook icons are back — the same URLs the contact page
+   uses. The old X/GitHub placeholders (x.com/nxtsend, github.com/nxtsend)
+   returned 404 and stay removed. */
+const SOCIAL_LINKS = [
+  {
+    label: "NxtSend on LinkedIn",
+    href: "https://www.linkedin.com/company/NxtSend",
+    Icon: Linkedin,
+  },
+  {
+    label: "NxtSend on Facebook",
+    href: "https://web.facebook.com/NxtSend",
+    Icon: Facebook,
+  },
+];
 
 export function Footer() {
   const [logoError, setLogoError] = useState<boolean>(false);
 
   return (
     <footer className="relative w-full bg-black-900 px-3 pb-3 pt-2 text-white sm:px-4 sm:pb-4">
-      {/* Large dark navy rounded container (Aimfox-style) */}
+      {/* Large dark navy rounded container (mirror layout) */}
       <div className="relative mx-auto max-w-[1400px] overflow-hidden rounded-[2.5rem] border border-white/5 bg-black-800 px-6 py-14 sm:px-10 lg:px-14">
         {/* Subtle ambient glow */}
         <div
@@ -82,6 +96,21 @@ export function Footer() {
             <p className="mt-5 max-w-xs text-15 leading-relaxed text-black-400">
               Scale your outreach. Automate your growth.
             </p>
+
+            <div className="mt-6 flex items-center gap-3">
+              {SOCIAL_LINKS.map(({ label, href, Icon }) => (
+                <a
+                  key={href}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-black-300 transition-colors hover:border-purple-500/50 hover:text-white"
+                >
+                  <Icon className="h-[18px] w-[18px]" />
+                </a>
+              ))}
+            </div>
           </div>
 
           {/* Link columns */}

@@ -84,7 +84,16 @@ In the Supabase SQL Editor, run the migrations **in numeric order**:
 → `007_admin_settings` → `008_referrals` → `009_user_preferences`
 → `010_sequence_executor` → `011_campaign_config_step_types`
 → `012_notifications` → `013_connected_account_provider_health`
-→ `014_oauth_connections`
+→ `014_oauth_connections` → `015_voice_notes`
+
+Migration 015 in full: voice-note columns on `messages`
+(`voice_note_path`, `voice_note_duration_sec`, `voice_note_language`,
+`transcript`) and the **private** `voice-notes` Storage bucket
+(10 MB cap, audio MIME types only) whose RLS policies scope objects to
+the owning workspace. The app accesses it only through server routes
+(service role after session + workspace checks, short-lived signed URLs
+for playback) — confirm the bucket exists and stays private after
+applying.
 
 Migration 011 in full: `campaigns.config` JSONB (wizard metadata),
 `step_type` enum values `like_post` / `view_profile` / `endorse_skills`,

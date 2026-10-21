@@ -47,6 +47,7 @@ Open **SQL Editor** in the Supabase dashboard and run each file from
 | 12 | `012_notifications.sql` | `notifications` table (in-app notifications with read state; workspace RLS — members read/mark-read, creation is service-role only). Powers the dashboard bell and reply-arrival notifications created by inbound ingestion (P5 Stage D) |
 | 13 | `013_connected_account_provider_health.sql` | `connected_accounts` gains provider identity + auth health: `provider_account_id`, `auth_status` (`ok` / `needs_reconnect` / `expired` / `error` / `not_connected`, backfilled `ok` for rows already marked `connected`), `last_sync_at`, `last_error`. Powers the account health + reconnect surfaces; written only by a provider integration (P5 Stage F) |
 | 14 | `014_oauth_connections.sql` | `oauth_connections` table (P5 Stage G): the encrypted OAuth token vault for connected Gmail / Outlook mailboxes — workspace + `connected_accounts` FKs (CASCADE), provider CHECK (`google` / `microsoft`), mailbox address, scopes, `access_token_enc` / `refresh_token_enc` (AES-256-GCM ciphertext only), token expiry, grant status. **RLS enabled with NO client policies — service-role only by construction**; the UI reads metadata through guarded API routes that never return token fields |
+| 15 | `015_voice_notes.sql` | Voice notes (P6 Stage C): `messages` gains `voice_note_path` / `voice_note_duration_sec` / `voice_note_language` / `transcript`, plus the **private** Supabase Storage bucket `voice-notes` (public = false, 10 MB cap, audio MIME allowlist) with storage RLS policies scoping objects to workspaces the caller belongs to (first path segment = workspace id). Audio bytes live in the bucket, never in the table; playback goes through a server route using short-lived signed URLs. A voice note is delivered as an **email attachment only** — there is no LinkedIn voice-note delivery |
 
 Do not skip or reorder — later migrations depend on earlier helpers
 (`is_workspace_member`, `is_workspace_admin`).
@@ -90,7 +91,7 @@ and treated as *not configured*.
 | `STRIPE_PRICE_ID_GROWTH` / `_ANNUAL` | For checkout | " |
 | `STRIPE_PRICE_ID_AGENCY` / `_ANNUAL` | For checkout | " |
 | `NEXT_PUBLIC_META_PIXEL_ID` | Optional | Meta Pixel ID (public identifier, not a secret) — §8 |
-| `OPENAI_API_KEY` | Optional | AI drafting via OpenAI (server-only) |
+| `OPENAI_API_KEY` | Optional | AI drafting via OpenAI (server-only); also enables **Whisper transcription** of recorded voice notes (`/api/voice/transcribe`) — without it, voice dictation falls back to the browser's built-in speech recognition where available |
 | `OPENAI_MODEL` | Optional | Override (default `gpt-4o-mini`) |
 | `ANTHROPIC_API_KEY` | Optional | AI drafting via Claude (server-only) |
 | `ANTHROPIC_MODEL` | Optional | Override (default `claude-sonnet-4-5`) |
@@ -104,22 +105,52 @@ and treated as *not configured*.
 
 ## 5. Create the first Super Admin (bootstrap)
 
-1. Set `ADMIN_BOOTSTRAP_SECRET` to a long random value in the
-   environment (local `.env.local` or Vercel), and restart/redeploy.
-2. Sign up in the app with the email that should become super admin.
-3. Promote it:
+The owner's initial admin account is **mithusquare@gmail.com**. Admin
+privilege is **never** granted by the email address alone: the email
+only selects an *existing* account, and the one-time
+`ADMIN_BOOTSTRAP_SECRET` is the actual capability. Run these steps in
+order, exactly once, at go-live:
+
+1. **Create the Supabase project and apply ALL migrations 001–015 in
+   order** (§1–§2 above), and finish the auth URL configuration (§3).
+   The bootstrap writes to `profiles` and `audit_logs`, which only
+   exist after the migrations.
+2. **Sign up in the app** (the normal `/signup` page) with
+   **mithusquare@gmail.com** and complete any email confirmation, so
+   the account and its `profiles` row exist. Bootstrap cannot create
+   the account — it only promotes an existing one.
+3. **Set `ADMIN_BOOTSTRAP_SECRET`** in **Vercel → Project → Settings →
+   Environment Variables** to a long random value (e.g.
+   `openssl rand -hex 32`) and redeploy. Do not commit it anywhere and
+   do not reuse any other secret for it.
+4. **Promote the account** (from your own machine, replacing the
+   domain, secret and — only if different — email):
    ```bash
    curl -X POST https://<your-domain>/api/admin/bootstrap \
      -H "Content-Type: application/json" \
-     -d '{"secret": "<ADMIN_BOOTSTRAP_SECRET>", "email": "<the-signup-email>"}'
+     -d '{"secret": "<ADMIN_BOOTSTRAP_SECRET>", "email": "mithusquare@gmail.com"}'
    ```
-   The route is rate-limited (5 attempts / 10 min / IP), compares the
-   secret in constant time, and writes an audit-log entry.
-4. **Remove `ADMIN_BOOTSTRAP_SECRET` from the environment** and
-   redeploy. The endpoint stays armed while the variable exists.
-5. Verify: sign in and open `/admin` — it should load (in Demo Mode
-   `/admin` redirects away by design; a super admin only exists in live
-   mode).
+   Expected response: `{"success": true, ...}`. The route is
+   rate-limited (5 attempts / 10 min / IP), compares the secret in
+   constant time, and refuses to run in Demo Mode. Common failures:
+   `403` = secret not set (or still the placeholder); `401` = wrong
+   secret; `404` = no account has signed up with that email yet
+   (repeat step 2); `503` = Supabase env vars not configured.
+5. **Remove `ADMIN_BOOTSTRAP_SECRET` from the Vercel environment** and
+   redeploy. The endpoint stays armed for as long as the variable
+   exists — removing it is part of the procedure, not an optional
+   tidy-up.
+6. **Verify**: sign in as mithusquare@gmail.com and open `/admin` — it
+   should load the admin console (in Demo Mode `/admin` redirects away
+   by design; a super admin only exists in live mode). Then open the
+   admin **Audit Logs** page and confirm an `ADMIN_BOOTSTRAP` entry
+   exists for the promotion.
+
+**Adding more admins later:** repeat this same procedure for each new
+admin — they sign up first, you set a *fresh* `ADMIN_BOOTSTRAP_SECRET`,
+POST with their email, then remove the secret again. (The role-change
+dialog on the admin Users page is currently local-state only and does
+**not** persist role changes, so do not rely on it for granting admin.)
 
 Never grant admin by editing `user_metadata` — roles come only from the
 `profiles` table and can only be changed via the service role.

@@ -9,6 +9,10 @@ import {
 } from "lucide-react";
 import { HomeFaq } from "@/components/marketing/HomeFaq";
 import { HomePricing } from "@/components/marketing/HomePricing";
+import { TrustedBy } from "@/components/marketing/TrustedBy";
+import { BentoFeatures } from "@/components/marketing/BentoFeatures";
+import { LiveView } from "@/components/marketing/LiveView";
+import { HomeIntegrations } from "@/components/marketing/HomeIntegrations";
 
 export const metadata: Metadata = {
   title: { absolute: "NxtSend — Reach more of the right people on LinkedIn" },
@@ -40,50 +44,6 @@ const mapPins = [
   { name: "Olivia W.", photo: "/images/agents/olivia-w.webp", left: "57%", top: "33%" },
   { name: "Chris H.", photo: "/images/agents/chris-h.webp", left: "79.3%", top: "58.7%" },
 ];
-
-/* ── Made to convert (mirror section 2) — artwork cards from the mirror ──── */
-const convertCards = [
-  {
-    title: "Messages that read like a person wrote them",
-    chips: ["AI personalisation", "Custom variables", "Attachments"],
-    art: "/images/bento/1.webp",
-    alt: "Messages that read like a person wrote them — personalised pitch artwork",
-    layout: "wide",
-    overlay: "bottom-left",
-  },
-  {
-    title: "Get noticed in a busy inbox",
-    chips: ["Voice notes"],
-    art: "/images/bento/2.webp",
-    alt: "Get noticed in a busy inbox — voice message artwork",
-    layout: "narrow",
-    overlay: "top-center",
-  },
-  {
-    title: "Their language, their timezone",
-    chips: ["Automatic translation", "Timezone-aware sending"],
-    art: "/images/bento/3.webp",
-    alt: "Their language, their timezone — translation artwork",
-    layout: "medium",
-    overlay: "top-center-dark",
-  },
-  {
-    title: "A campaign shape for every goal",
-    chips: ["Connection requests", "Message sequences", "Reactions"],
-    art: "/images/bento/4.webp",
-    alt: "A campaign shape for every goal — campaign types artwork",
-    layout: "medium",
-    overlay: "top-center",
-  },
-  {
-    title: "Test variations, keep what works",
-    chips: ["A/B testing"],
-    art: "/images/bento/5.webp",
-    alt: "Test variations, keep what works — A/B testing artwork",
-    layout: "narrow",
-    overlay: "top-center",
-  },
-] as const;
 
 /* ── How it works (original section — replaces the removed testimonial wall) ── */
 const howItWorksSteps = [
@@ -233,6 +193,11 @@ export default function MarketingHomePage() {
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
+      {/* TRUSTED BY — owner-supplied logos (P6) */}
+      {/* ──────────────────────────────────────────────────────────────────── */}
+      <TrustedBy />
+
+      {/* ──────────────────────────────────────────────────────────────────── */}
       {/* 1. OUTREACH WITH RENTED ACCOUNTS */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative py-24 lg:py-32">
@@ -348,201 +313,18 @@ export default function MarketingHomePage() {
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* 2. BUILT TO START CONVERSATIONS — artwork bento (mirror) */}
+      {/* 2. BUILT TO START CONVERSATIONS — JSX bento (P6 rework) */}
       {/* ──────────────────────────────────────────────────────────────────── */}
-      <section className="relative border-t border-black-700/80 bg-black-800/30 py-24 lg:py-32">
-        <div className="pointer-events-none absolute top-1/2 left-0 h-[400px] w-[400px] -translate-y-1/2 rounded-full bg-purple-600/10 blur-[130px]" />
-        <div className="section-container relative z-10">
-          <div className="text-center">
-            <h2 className="text-36 sm:text-48 font-bold text-white tracking-tight">
-              Built to start conversations, not just send requests
-            </h2>
-          </div>
+      <BentoFeatures />
 
-          <div className="mx-auto mt-16 grid max-w-6xl grid-cols-1 gap-6 lg:grid-cols-12">
-            {convertCards.map((card) => {
-              const span =
-                card.layout === "wide"
-                  ? "lg:col-span-12 h-[440px] sm:h-[520px] lg:h-[600px]"
-                  : card.layout === "narrow"
-                    ? "lg:col-span-5 h-[440px] lg:h-[560px]"
-                    : "lg:col-span-7 h-[440px] lg:h-[560px]";
-              const dark = card.overlay !== "top-center-dark";
-              return (
-                <div
-                  key={card.title}
-                  className={`group relative overflow-hidden rounded-[2rem] shadow-2xl ring-1 ring-white/10 ${span}`}
-                >
-                  <Image
-                    src={card.art}
-                    alt={card.alt}
-                    fill
-                    sizes="(max-width: 1024px) 100vw, 1150px"
-                    className={`object-cover transition-transform duration-500 group-hover:scale-[1.02] ${
-                      card.overlay === "bottom-left"
-                        ? "object-left sm:object-center"
-                        : ""
-                    }`}
-                  />
-                  {card.overlay === "bottom-left" ? (
-                    <div className="absolute bottom-0 left-0 p-7 sm:p-9">
-                      <h3 className="max-w-[300px] text-24 sm:text-28 font-bold leading-snug text-white">
-                        {card.title}
-                      </h3>
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {card.chips.map((chip) => (
-                          <span
-                            key={chip}
-                            className="rounded-full border border-white/25 bg-black-900/35 px-3 py-1 text-12 font-semibold text-white backdrop-blur-md"
-                          >
-                            {chip}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="absolute inset-x-0 top-0 flex flex-col items-center p-7 text-center sm:p-9">
-                      <h3
-                        className={`max-w-[340px] text-24 sm:text-28 font-bold leading-snug ${dark ? "text-white" : "text-black-900"}`}
-                      >
-                        {card.title}
-                      </h3>
-                      <div className="mt-4 flex flex-wrap justify-center gap-2">
-                        {card.chips.map((chip) => (
-                          <span
-                            key={chip}
-                            className={
-                              dark
-                                ? "rounded-full border border-white/25 bg-black-900/35 px-3 py-1 text-12 font-semibold text-white backdrop-blur-md"
-                                : "rounded-full border border-black/10 bg-white/60 px-3 py-1 text-12 font-semibold text-black-700 backdrop-blur-md"
-                            }
-                          >
-                            {chip}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
+      {/* 3. ONE LIVE VIEW OF EVERY CAMPAIGN — interactive preview (P6) */}
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* 3. ONE LIVE VIEW OF EVERY CAMPAIGN */}
+      <LiveView />
+
+      {/* 4. INTEGRATES WITH YOUR FAVORITE TOOLS — registry cards (P6) */}
       {/* ──────────────────────────────────────────────────────────────────── */}
-      <section id="analytics" className="relative border-t border-black-700/80 py-24 lg:py-32">
-        <div className="section-container">
-          <div className="text-center">
-            <h2 className="text-36 sm:text-48 font-bold text-white tracking-tight">
-              One live view of every campaign
-            </h2>
-          </div>
+      <HomeIntegrations />
 
-          <div className="mx-auto mt-14 grid max-w-6xl grid-cols-1 items-center gap-10 lg:grid-cols-12">
-            {/* Left: tabs, heading, copy */}
-            <div className="lg:col-span-5">
-              <div className="inline-flex items-center gap-1 rounded-full border border-black-600 bg-black-800 p-1">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-12 font-bold uppercase tracking-wide text-black-900">
-                  Unified inbox
-                  <Image src="/images/icons/unibox.png" alt="" width={18} height={18} className="h-4 w-4 object-contain" />
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-12 font-bold uppercase tracking-wide text-black-300">
-                  Leads
-                  <Image src="/images/icons/leads.png" alt="" width={18} height={18} className="h-4 w-4 object-contain" />
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-12 font-bold uppercase tracking-wide text-black-300">
-                  Analytics
-                  <Image src="/images/icons/analytics.png" alt="" width={18} height={18} className="h-4 w-4 object-contain" />
-                </span>
-              </div>
-
-              <h3 className="mt-8 text-36 sm:text-44 font-bold leading-[1.12] text-white tracking-tight">
-                Every reply lands in a single inbox
-              </h3>
-              <p className="mt-4 max-w-md text-16 leading-relaxed text-black-400">
-                Answer messages from every connected and rented profile in one
-                thread view, without switching accounts or losing track of who
-                said what.
-              </p>
-
-              <ul className="mt-8 space-y-3">
-                <li className="flex items-start gap-2.5 text-15 text-black-200">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-purple-400" />
-                  <span>Filter conversations by account or by campaign</span>
-                </li>
-                <li className="flex items-start gap-2.5 text-15 text-black-200">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-purple-400" />
-                  <span>Assign a thread to a teammate inside the same workspace</span>
-                </li>
-                <li className="flex items-start gap-2.5 text-15 text-black-200">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-purple-400" />
-                  <span>Search past messages before you write the follow-up</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Right: big unified-inbox UI panel */}
-            <div className="lg:col-span-7">
-              <div className="rounded-[2rem] border border-black-700/80 bg-black-800/40 p-2 shadow-2xl sm:p-3">
-                <div className="overflow-hidden rounded-[1.6rem] border border-black-700/60">
-                  <Image
-                    src="/images/unibox.webp"
-                    alt="NxtSend dashboard — unified inbox with conversations from every profile in one place"
-                    width={1600}
-                    height={1175}
-                    className="h-auto w-full"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* 4. INTEGRATES WITH YOUR FAVORITE TOOLS */}
-      {/* ──────────────────────────────────────────────────────────────────── */}
-      <section className="relative border-t border-black-700/80 bg-black-800/30 py-24 lg:py-32">
-        <div className="section-container">
-          <div className="text-center">
-            <h2 className="text-36 sm:text-48 font-bold text-white tracking-tight">
-              Works alongside the tools you already use
-            </h2>
-          </div>
-
-          <div className="mx-auto mt-12 max-w-5xl">
-            <Image
-              src="/images/home-integrations/integrations-desktop.webp"
-              alt="NxtSend Integration Center — connect your CRM, email and automation tools"
-              width={2000}
-              height={838}
-              className="hidden h-auto w-full sm:block"
-            />
-            <Image
-              src="/images/home-integrations/integrations.webp"
-              alt="NxtSend Integration Center — connect your CRM, email and automation tools"
-              width={1200}
-              height={1089}
-              className="h-auto w-full sm:hidden"
-            />
-          </div>
-
-          <div className="mt-10 text-center">
-            <Link
-              href="/integrations"
-              className="group inline-flex items-center gap-2 rounded-full border border-black-600 bg-black-800 px-7 py-3 text-15 font-semibold text-white transition-all hover:border-purple-500/50 hover:text-purple-300"
-            >
-              <span>Explore integrations</span>
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ──────────────────────────────────────────────────────────────────── */}
       {/* 5. HOW IT WORKS — original section (replaces the removed testimonial wall) */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section id="how-it-works" className="relative border-t border-black-700/80 bg-black-900 py-24 lg:py-32">

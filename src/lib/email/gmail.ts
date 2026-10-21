@@ -43,29 +43,9 @@ function encodeBody(text: string): string {
     .trimEnd();
 }
 
-/**
- * Builds the RFC 822 message for the Gmail API. Both bodies are
- * carried when both exist (multipart/alternative); the prepared
- * unsubscribe headers are emitted verbatim as MIME headers.
- * Exported for payload tests.
- */
-export function buildMimeMessage(message: PreparedMailboxMessage): string {
-  const boundary = `nxtsend_${Buffer.from(
-    `${message.to}|${message.subject}|${Date.now()}`
-  )
-    .toString("base64url")
-    .slice(0, 24)}`;
-  const lines: string[] = [
-    `From: ${message.from}`,
-    `To: ${message.to}`,
-    `Subject: ${encodeHeaderValue(message.subject)}`,
-  ];
-  if (message.replyTo) lines.push(`Reply-To: ${message.replyTo}`);
-  for (const [name, value] of Object.entries(message.headers)) {
-    lines.push(`${name}: ${value}`);
-  }
-  lines.push("MIME-Version: 1.0");
-
+/** The body section (single-part or multipart/alternative), no headers. */
+function buildBodySection(message: PreparedMailboxMessage, boundary: string): string[] {
+  const lines: string[] = [];
   const hasText = message.text !== undefined;
   const hasHtml = message.html !== undefined;
   if (hasText && hasHtml) {
@@ -100,7 +80,63 @@ export function buildMimeMessage(message: PreparedMailboxMessage): string {
       encodeBody(message.text ?? "")
     );
   }
+  return lines;
+}
+
+/**
+ * Builds the RFC 822 message for the Gmail API. Both bodies are
+ * carried when both exist (multipart/alternative); the prepared
+ * unsubscribe headers are emitted verbatim as MIME headers. When the
+ * message carries attachments (voice notes), the whole body section
+ * is wrapped in multipart/mixed with one base64 part per file.
+ * Exported for payload tests.
+ */
+export function buildMimeMessage(message: PreparedMailboxMessage): string {
+  const seed = Buffer.from(`${message.to}|${message.subject}|${Date.now()}`)
+    .toString("base64url")
+    .slice(0, 24);
+  const boundary = `nxtsend_${seed}`;
+  const headers: string[] = [
+    `From: ${message.from}`,
+    `To: ${message.to}`,
+    `Subject: ${encodeHeaderValue(message.subject)}`,
+  ];
+  if (message.replyTo) headers.push(`Reply-To: ${message.replyTo}`);
+  for (const [name, value] of Object.entries(message.headers)) {
+    headers.push(`${name}: ${value}`);
+  }
+  headers.push("MIME-Version: 1.0");
+
+  const attachments = message.attachments ?? [];
+  if (attachments.length === 0) {
+    return [...headers, ...buildBodySection(message, boundary)].join("\r\n");
+  }
+
+  const mixedBoundary = `nxtsend_mixed_${seed}`;
+  const lines: string[] = [
+    ...headers,
+    `Content-Type: multipart/mixed; boundary="${mixedBoundary}"`,
+    "",
+    `--${mixedBoundary}`,
+    ...buildBodySection(message, boundary),
+  ];
+  for (const attachment of attachments) {
+    lines.push(
+      `--${mixedBoundary}`,
+      `Content-Type: ${attachment.contentType}; name="${attachment.filename}"`,
+      "Content-Transfer-Encoding: base64",
+      `Content-Disposition: attachment; filename="${attachment.filename}"`,
+      "",
+      wrapBase64(attachment.contentBase64)
+    );
+  }
+  lines.push(`--${mixedBoundary}--`, "");
   return lines.join("\r\n");
+}
+
+/** Folds a base64 string to 76-char MIME lines. */
+function wrapBase64(base64: string): string {
+  return base64.replace(/.{1,76}/g, "$&\r\n").trimEnd();
 }
 
 export async function deliverViaGmail(

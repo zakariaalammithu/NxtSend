@@ -25,6 +25,13 @@ import {
 } from "@/lib/data/inbox";
 import type { ProviderState } from "@/lib/env";
 import EmailContentHints from "@/components/dashboard/EmailContentHints";
+import {
+  VoiceComposer,
+  useVoiceLanguage,
+  type ComposerVoiceNote,
+} from "@/components/dashboard/voice/VoiceComposer";
+import { VoiceNotePlayer } from "@/components/dashboard/voice/VoiceNotePlayer";
+import { isDataUrl, parseDataUrl } from "@/lib/voice/attachments";
 
 const PAGE_SIZE = 25;
 
@@ -84,6 +91,8 @@ export default function InboxPage() {
   const [threadError, setThreadError] = React.useState<string | null>(null);
 
   const [replyText, setReplyText] = React.useState("");
+  const [voiceLanguage, setVoiceLanguage] = useVoiceLanguage();
+  const [voiceNote, setVoiceNote] = React.useState<ComposerVoiceNote | null>(null);
   const [subject, setSubject] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const [retryingId, setRetryingId] = React.useState<string | null>(null);
@@ -149,6 +158,7 @@ export default function InboxPage() {
       setThread(data);
       setSubject(deriveReplySubject(data.conversation));
       setReplyText("");
+      setVoiceNote(null);
       // Opening marks the thread read server-side; mirror that locally.
       setSummaries((prev) =>
         prev.map((s) =>
@@ -207,7 +217,12 @@ export default function InboxPage() {
   }, []);
 
   const postReply = React.useCallback(
-    async (args: { content: string; subject?: string; idempotencyKey: string }) => {
+    async (args: {
+      content: string;
+      subject?: string;
+      idempotencyKey: string;
+      voiceNote?: Record<string, unknown>;
+    }) => {
       const conversationId = selectedId;
       if (!conversationId) return null;
       const res = await fetch(`/api/inbox/conversations/${conversationId}/reply`, {
@@ -227,7 +242,7 @@ export default function InboxPage() {
 
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!replyText.trim() || !selectedId || sending) return;
+    if ((!replyText.trim() && !voiceNote) || !selectedId || sending) return;
     setSending(true);
     setSendError(null);
     const key =
@@ -238,11 +253,28 @@ export default function InboxPage() {
         content: replyText,
         subject,
         idempotencyKey: key,
+        voiceNote: voiceNote
+          ? {
+              // Demo Mode carries the audio inline (stored as a data:
+              // URL); live mode references the uploaded bucket path.
+              ...(voiceNote.path
+                ? { path: voiceNote.path }
+                : {
+                    dataBase64: voiceNote.dataBase64,
+                    contentType: voiceNote.contentType,
+                    filename: voiceNote.filename,
+                  }),
+              durationSec: voiceNote.durationSec,
+              language: voiceNote.language,
+              transcript: voiceNote.transcript,
+            }
+          : undefined,
       });
       if (result?.data.message) upsertMessage(result.data.message);
       if (result?.res.ok) {
         delete draftKeys.current[selectedId];
         setReplyText("");
+        setVoiceNote(null);
       } else {
         setSendError(result?.data.error ?? "The reply could not be sent.");
       }
@@ -258,10 +290,36 @@ export default function InboxPage() {
     setRetryingId(message.id);
     setSendError(null);
     try {
+      // A retried voice reply re-attaches its note from the stored
+      // pointer (data: URL in demo, bucket path live — the reply
+      // route resolves either server-side).
+      let retryVoiceNote: Record<string, unknown> | undefined;
+      if (message.voice_note_path) {
+        if (isDataUrl(message.voice_note_path)) {
+          const parsed = parseDataUrl(message.voice_note_path);
+          if (parsed) {
+            retryVoiceNote = {
+              dataBase64: parsed.contentBase64,
+              contentType: parsed.contentType,
+              durationSec: message.voice_note_duration_sec ?? undefined,
+              language: message.voice_note_language ?? undefined,
+              transcript: message.transcript ?? undefined,
+            };
+          }
+        } else {
+          retryVoiceNote = {
+            path: message.voice_note_path,
+            durationSec: message.voice_note_duration_sec ?? undefined,
+            language: message.voice_note_language ?? undefined,
+            transcript: message.transcript ?? undefined,
+          };
+        }
+      }
       const result = await postReply({
         content: message.content,
         subject: message.subject ?? undefined,
         idempotencyKey: message.idempotency_key,
+        voiceNote: retryVoiceNote,
       });
       if (result?.data.message) upsertMessage(result.data.message);
       if (!result?.res.ok) {
@@ -610,7 +668,17 @@ export default function InboxPage() {
                             {msg.subject}
                           </div>
                         )}
-                        <p>{msg.content}</p>
+                        {msg.content && <p>{msg.content}</p>}
+                        {msg.voice_note_path && (
+                          <VoiceNotePlayer
+                            path={msg.voice_note_path}
+                            mode={thread.mode}
+                            durationSec={msg.voice_note_duration_sec}
+                            language={msg.voice_note_language}
+                            transcript={msg.transcript}
+                            onAccent={isOutbound}
+                          />
+                        )}
                       </div>
 
                       <div className="flex items-center gap-2 mt-1 text-10 text-black-500">
@@ -651,7 +719,9 @@ export default function InboxPage() {
                     <p>
                       Replies via LinkedIn require an authorized LinkedIn
                       integration. None is connected, so sending is disabled —
-                      nothing here can message this contact.
+                      nothing here can message this contact. Voice notes
+                      can&apos;t be delivered on LinkedIn either; they are
+                      delivered as email attachments.
                     </p>
                   </div>
                 ) : (
@@ -675,7 +745,7 @@ export default function InboxPage() {
                       />
                       <button
                         type="submit"
-                        disabled={!replyText.trim() || sending}
+                        disabled={(!replyText.trim() && !voiceNote) || sending}
                         className="inline-flex items-center gap-1.5 self-end rounded-xl bg-purple-600 hover:bg-purple-500 px-5 py-2.5 text-13 font-semibold text-white shadow-glow-purple transition-all disabled:opacity-40"
                       >
                         {sending ? (
@@ -686,6 +756,20 @@ export default function InboxPage() {
                         <span>{sending ? "Sending…" : "Send"}</span>
                       </button>
                     </div>
+                    <VoiceComposer
+                      text={replyText}
+                      onTextChange={setReplyText}
+                      language={voiceLanguage}
+                      onLanguageChange={setVoiceLanguage}
+                      mode={thread.mode}
+                      note={voiceNote}
+                      onNoteChange={setVoiceNote}
+                      deliveryNote={
+                        thread.mode === "demo"
+                          ? "Voice notes are delivered as email attachments. In Demo Mode the recording stays in your browser and the send is simulated — nothing is emailed."
+                          : "Voice notes are delivered as an email attachment with this reply."
+                      }
+                    />
                     <EmailContentHints
                       subject={subject}
                       body={replyText}

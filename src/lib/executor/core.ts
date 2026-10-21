@@ -30,6 +30,10 @@ import { renderTemplate } from "@/lib/ai/prompt";
 import type { EmailProviderAdapter } from "@/lib/email/types";
 import { getEmailReplyTo } from "@/lib/email/state";
 import {
+  parseStepVoiceNote,
+  resolveStepVoiceAttachment,
+} from "@/lib/voice/attachments";
+import {
   stepExecutionKey,
   emptyRunSummary,
   type ExecutorEnrollment,
@@ -125,6 +129,15 @@ export interface ExecuteDueStepsDeps {
   now?: Date;
   /** Max enrollments inspected per scan (worker-friendly bound). */
   limit?: number;
+  /**
+   * Resolves a `voice-notes` bucket path to an email attachment
+   * (P6 Stage C). Server runs inject the storage download; without
+   * it, storage-sourced step voice notes cannot be attached and the
+   * run logs that plainly (the email still sends — text-only).
+   */
+  resolveVoiceAttachment?: (
+    path: string
+  ) => Promise<import("@/lib/email/types").EmailAttachment | null>;
 }
 
 export async function executeDueSteps(
@@ -418,6 +431,22 @@ export async function executeDueSteps(
     const subject = renderTemplate(step.subject ?? "", vars);
     const content = renderTemplate(step.content ?? "", vars);
 
+    // Voice note (P6 Stage C): an email step may carry a recorded
+    // note in step.config.voice_note. It rides as a real email
+    // attachment; if it cannot be resolved, the email still sends
+    // and the failure is logged — never silently presented as sent.
+    const stepVoiceNote = parseStepVoiceNote(step.config?.voice_note);
+    let voiceAttachment: import("@/lib/email/types").EmailAttachment | undefined;
+    let voiceAttachError: string | null = null;
+    if (stepVoiceNote) {
+      const resolved = await resolveStepVoiceAttachment(
+        stepVoiceNote,
+        deps.resolveVoiceAttachment
+      );
+      if (resolved.ok) voiceAttachment = resolved.attachment;
+      else voiceAttachError = resolved.error;
+    }
+
     const result = await adapter.sendEmail({
       workspaceId,
       to: recipient,
@@ -429,6 +458,7 @@ export async function executeDueSteps(
       replyTo: getEmailReplyTo(),
       leadId: lead.id,
       campaignId: campaign.id,
+      attachments: voiceAttachment ? [voiceAttachment] : undefined,
     });
 
     if (result.status === "sent" || result.status === "simulated") {
@@ -455,6 +485,19 @@ export async function executeDueSteps(
         provider_message_id: result.providerMessageId,
         idempotency_key: stepExecutionKey(enrollment.id, step.step_order),
         sent_at: nowIso,
+        // The stored path points at where the note lives (data URL in
+        // demo / bucket path live) only when it was actually attached.
+        ...(stepVoiceNote && voiceAttachment
+          ? {
+              voice_note_path:
+                stepVoiceNote.source === "data"
+                  ? (stepVoiceNote.dataUrl as string)
+                  : (stepVoiceNote.path as string),
+              voice_note_duration_sec: stepVoiceNote.durationSec,
+              voice_note_language: stepVoiceNote.language,
+              transcript: stepVoiceNote.transcript ?? null,
+            }
+          : {}),
       });
       await store.completeStepExecution(claim.id, {
         status: result.status === "sent" ? "sent" : "simulated",
@@ -470,10 +513,20 @@ export async function executeDueSteps(
         campaign_id: campaign.id,
         action: result.status === "sent" ? "step_sent" : "step_simulated",
         details:
-          result.status === "sent"
+          (result.status === "sent"
             ? `Step ${step.step_order} email sent to ${recipient} (provider message ID ${result.providerMessageId}).`
-            : `Step ${step.step_order} email to ${recipient} simulated in Demo Mode — not actually sent.`,
+            : `Step ${step.step_order} email to ${recipient} simulated in Demo Mode — not actually sent.`) +
+          (stepVoiceNote && voiceAttachment
+            ? ` Voice note attached (${stepVoiceNote.filename}, ${stepVoiceNote.durationSec}s).`
+            : ""),
       });
+      if (stepVoiceNote && voiceAttachError) {
+        await store.appendActivity(workspaceId, {
+          campaign_id: campaign.id,
+          action: "voice_note_not_attached",
+          details: `Step ${step.step_order} email to ${recipient} was sent WITHOUT its voice note: ${voiceAttachError}`,
+        });
+      }
       await advance(store, enrollment, steps.length, nowIso, summary);
       continue;
     }

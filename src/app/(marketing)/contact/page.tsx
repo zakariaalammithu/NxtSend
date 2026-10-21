@@ -1,10 +1,29 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Mail, MapPin, Clock, CheckCircle2, Send, MessageSquare } from "lucide-react";
+import {
+  Mail,
+  MapPin,
+  CheckCircle2,
+  Send,
+  MessageSquare,
+  Linkedin,
+  Facebook,
+  CalendarDays,
+  LifeBuoy,
+  Handshake,
+  ArrowRight,
+} from "lucide-react";
+
+/* Owner-supplied profiles (P6). These are the only social URLs the
+   page and footer may link — earlier placeholders pointed at bare
+   platform homepages and were removed in Fix Batch 3. */
+const LINKEDIN_URL = "https://www.linkedin.com/company/NxtSend";
+const FACEBOOK_URL = "https://web.facebook.com/NxtSend";
 
 const contactSchema = z.object({
   firstName: z.string().min(2, "First name must be at least 2 characters"),
@@ -111,7 +130,7 @@ export default function ContactPage() {
                     >
                       hello@nxtsend.com
                     </a>
-                    <p className="text-12 text-black-500 mt-0.5">Average reply time &lt; 2 hours</p>
+                    <p className="text-12 text-black-500 mt-0.5">For sales, support and partnership enquiries</p>
                   </div>
                 </div>
 
@@ -121,51 +140,60 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <h3 className="text-13 font-semibold uppercase tracking-wider text-black-400">
-                      Headquarters
+                      Office
                     </h3>
                     <p className="mt-1 text-15 font-medium text-white leading-relaxed">
                       Austin, TX 73301, USA
                     </p>
-                    <p className="text-12 text-black-500 mt-0.5">Global cloud infrastructure</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-4">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-black-700 text-green-400 border border-black-600">
-                    <Clock className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-13 font-semibold uppercase tracking-wider text-black-400">
-                      Support Hours
-                    </h3>
-                    <p className="mt-1 text-15 font-medium text-white">
-                      Monday – Friday: 24/5
-                    </p>
-                    <p className="text-12 text-black-500 mt-0.5">24/7 for Enterprise & Agency tiers</p>
                   </div>
                 </div>
               </div>
 
-              {/* Social links removed (Fix Batch 3): the icons linked to bare
-                  platform homepages (linkedin.com, twitter.com, …) and no
-                  verified NxtSend profiles exist yet. Re-add once real
-                  profile URLs exist. */}
+              {/* Social profiles — owner-supplied URLs (P6). Fix Batch 3
+                  removed the old icons because they pointed at bare
+                  platform homepages; these link to the real company
+                  profiles, matching the footer. */}
+              <div className="mt-8 border-t border-black-700/60 pt-6">
+                <h3 className="text-13 font-semibold uppercase tracking-wider text-black-400">
+                  Follow Us
+                </h3>
+                <div className="mt-3.5 flex flex-wrap gap-3">
+                  <a
+                    href={LINKEDIN_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-xl border border-black-600 bg-black-800 px-4 py-2.5 text-13 font-semibold text-white transition-colors hover:border-purple-500/50 hover:text-purple-300"
+                  >
+                    <Linkedin className="h-4 w-4" />
+                    LinkedIn
+                  </a>
+                  <a
+                    href={FACEBOOK_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-xl border border-black-600 bg-black-800 px-4 py-2.5 text-13 font-semibold text-white transition-colors hover:border-purple-500/50 hover:text-purple-300"
+                  >
+                    <Facebook className="h-4 w-4" />
+                    Facebook
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* ─── Contact Form Right ──────────────────────────────────── */}
           <div className="lg:col-span-7">
-            <div className="glass-card p-8 sm:p-9 relative">
+            <div id="contact-form" className="glass-card p-8 sm:p-9 relative scroll-mt-28">
               {submitted ? (
                 <div className="py-12 text-center">
                   <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-500/20 text-green-400 border border-green-500/30 mb-6">
                     <CheckCircle2 className="h-8 w-8" />
                   </div>
                   <h3 className="text-26 font-bold text-white">
-                    Thanks! We&apos;ll be in touch within 24 hours.
+                    Thanks — your message is on its way.
                   </h3>
                   <p className="mt-3 text-14 text-black-300 max-w-md mx-auto">
-                    Your message has been assigned to our customer support team. Expect a response shortly.
+                    We&apos;ve received your message and will reply to the email address you gave us.
                   </p>
                   <button
                     type="button"
@@ -182,7 +210,7 @@ export default function ContactPage() {
                       Send Us a Message
                     </h3>
                     <p className="text-13 text-black-400 mt-1">
-                      Our product and support teams will get back to you promptly.
+                      Fill in the form and we&apos;ll reply by email.
                     </p>
                   </div>
 
@@ -288,6 +316,68 @@ export default function ContactPage() {
                   </div>
                 </form>
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* ─── What to contact us about ────────────────────────────────
+            Routing hints only — each card restates an existing page or
+            flow (the demo request page, this form / email, this form).
+            No phone numbers, hours or response-time promises. */}
+        <div className="max-w-5xl mx-auto mt-16">
+          <h2 className="text-center text-26 sm:text-30 font-bold text-white">
+            What to contact us about
+          </h2>
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="glass-card p-6 flex flex-col">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-600/20 text-purple-400 border border-purple-500/30">
+                <CalendarDays className="h-5 w-5" />
+              </div>
+              <h3 className="mt-4 text-16 font-bold text-white">Sales &amp; demos</h3>
+              <p className="mt-2 flex-1 text-14 leading-relaxed text-black-300">
+                Comparing plans or planning a rollout across several accounts? Request a walkthrough and we&apos;ll arrange it by email.
+              </p>
+              <Link
+                href="/demo"
+                className="mt-5 inline-flex items-center gap-1.5 text-14 font-semibold text-purple-300 hover:text-purple-200"
+              >
+                Book a demo
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+
+            <div className="glass-card p-6 flex flex-col">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-black-700 text-green-400 border border-black-600">
+                <LifeBuoy className="h-5 w-5" />
+              </div>
+              <h3 className="mt-4 text-16 font-bold text-white">Product support</h3>
+              <p className="mt-2 flex-1 text-14 leading-relaxed text-black-300">
+                Something not behaving as expected, or a question about your workspace? Email us or use the form on this page.
+              </p>
+              <a
+                href="mailto:hello@nxtsend.com"
+                className="mt-5 inline-flex items-center gap-1.5 text-14 font-semibold text-purple-300 hover:text-purple-200"
+              >
+                Email support
+                <ArrowRight className="h-4 w-4" />
+              </a>
+            </div>
+
+            <div className="glass-card p-6 flex flex-col">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-600/20 text-orange-400 border border-orange-500/30">
+                <Handshake className="h-5 w-5" />
+              </div>
+              <h3 className="mt-4 text-16 font-bold text-white">Partnerships</h3>
+              <p className="mt-2 flex-1 text-14 leading-relaxed text-black-300">
+                Integration ideas, agency arrangements or something else entirely — tell us what you have in mind in the form above.
+              </p>
+              <a
+                href="#contact-form"
+                className="mt-5 inline-flex items-center gap-1.5 text-14 font-semibold text-purple-300 hover:text-purple-200"
+              >
+                Send a message
+                <ArrowRight className="h-4 w-4" />
+              </a>
             </div>
           </div>
         </div>

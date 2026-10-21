@@ -5,14 +5,14 @@ import {
   ArrowRight,
   Check,
   ShieldCheck,
-  Headphones,
+  MessageCircle,
 } from "lucide-react";
 import { IntegrationsExplorer } from "@/components/marketing/IntegrationsExplorer";
 
 export const metadata: Metadata = {
   title: { absolute: "NxtSend Integrations – Connect Your Tech Stack for LinkedIn Outreach" },
   description:
-    "Connect NxtSend with the CRM, automation and messaging tools you already use — HubSpot, Salesforce, Slack, Zapier, Make and more — and keep lead data moving across your stack.",
+    "Browse the tools that sit alongside NxtSend — what connects today through signed outbound webhooks and CSV import, and what is still planned. Every card states the integration's real status.",
 };
 
 export default function IntegrationsPage() {
@@ -82,10 +82,13 @@ export default function IntegrationsPage() {
                 <ShieldCheck className="h-3.5 w-3.5 text-green-400" /> Safe
                 &amp; secure
               </span>
-              <span className="flex items-center gap-1.5">
-                <Headphones className="h-3.5 w-3.5 text-green-400" /> 24/7
-                Support
-              </span>
+              <Link
+                href="/contact"
+                className="flex items-center gap-1.5 transition-colors hover:text-white"
+              >
+                <MessageCircle className="h-3.5 w-3.5 text-green-400" />{" "}
+                Questions? Contact us
+              </Link>
             </div>
           </div>
         </div>

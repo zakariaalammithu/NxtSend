@@ -24,7 +24,11 @@
  * injected) so the whole flow is unit-testable with fakes.
  */
 
-import type { EmailProviderAdapter, SendEmailResult } from "@/lib/email/types";
+import type {
+  EmailAttachment,
+  EmailProviderAdapter,
+  SendEmailResult,
+} from "@/lib/email/types";
 import { getEmailReplyTo } from "@/lib/email/state";
 import {
   deriveReplySubject,
@@ -59,12 +63,29 @@ export type ReplyOutcome =
       providerResult: SendEmailResult | null;
     };
 
+/**
+ * A voice note attached to a reply (P6 Stage C). `path` is what gets
+ * STORED on the message row: a private-bucket storage path in live
+ * mode, or a `data:` URL in Demo Mode. `attachment` is the byte
+ * payload handed to the email adapter for THIS send — the storage
+ * path alone is never emailed; the route resolves live paths to
+ * bytes server-side before calling the service.
+ */
+export interface ReplyVoiceNote {
+  path: string;
+  durationSec?: number | null;
+  language?: string | null;
+  transcript?: string | null;
+  attachment?: EmailAttachment;
+}
+
 export interface SendReplyArgs {
   workspaceId: string;
   conversationId: string;
   content: string;
   subject?: string;
   idempotencyKey: string;
+  voiceNote?: ReplyVoiceNote;
 }
 
 const TERMINAL_OK = new Set(["sent", "simulated"]);
@@ -85,7 +106,10 @@ export async function sendInboxReply(
       providerResult: null,
     };
   }
-  if (!content) {
+  // A reply may be voice-only: empty text is acceptable when a voice
+  // note is attached (its transcript, when present, is the stored
+  // body so the thread still reads sensibly).
+  if (!content && !args.voiceNote) {
     return {
       ok: false,
       code: "empty_content",
@@ -94,6 +118,7 @@ export async function sendInboxReply(
       providerResult: null,
     };
   }
+  const storedContent = content || (args.voiceNote?.transcript ?? "").trim();
 
   const thread = await repo.getThread(args.workspaceId, args.conversationId);
   if (!thread) {
@@ -148,6 +173,14 @@ export async function sendInboxReply(
   if (attempt && TERMINAL_OK.has(attempt.status)) {
     return { ok: true, duplicate: true, message: attempt, providerResult: null };
   }
+  const voiceFields = args.voiceNote
+    ? {
+        voice_note_path: args.voiceNote.path,
+        voice_note_duration_sec: args.voiceNote.durationSec ?? null,
+        voice_note_language: args.voiceNote.language ?? null,
+        transcript: args.voiceNote.transcript ?? null,
+      }
+    : {};
   if (!attempt) {
     attempt = await repo.insertMessage({
       workspace_id: args.workspaceId,
@@ -156,18 +189,20 @@ export async function sendInboxReply(
       channel: "email",
       direction: "outbound",
       subject,
-      content,
+      content: storedContent,
       status: "queued",
       is_demo: isDemo,
       idempotency_key: args.idempotencyKey,
+      ...voiceFields,
     });
   } else {
     // Retry of a failed/suppressed/queued attempt: same row, fresh try.
     attempt = await repo.updateMessage(args.workspaceId, attempt.id, {
       status: "queued",
       error: null,
-      content,
+      content: storedContent,
       subject,
+      ...voiceFields,
     });
   }
 
@@ -175,11 +210,20 @@ export async function sendInboxReply(
     workspaceId: args.workspaceId,
     to: recipient,
     subject,
-    text: content,
+    // A voice-only reply still needs a text body for the email itself;
+    // the note explains the attachment in plain words.
+    text:
+      content ||
+      (args.voiceNote
+        ? "This reply is a voice note — please listen to the attached audio file."
+        : storedContent),
     // Reply routing (P5 Stage C): EMAIL_REPLY_TO when set, so a reply
     // to this reply also lands on the receiving domain / Inbox.
     replyTo: getEmailReplyTo(),
     leadId: conversation.lead_id,
+    attachments: args.voiceNote?.attachment
+      ? [args.voiceNote.attachment]
+      : undefined,
   });
 
   const now = new Date().toISOString();

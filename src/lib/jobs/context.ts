@@ -17,6 +17,7 @@ import {
 import { runDeliveryAttempt } from "@/lib/webhooks/dispatch";
 import { SupabaseExecutorStore } from "@/lib/executor/supabase-store";
 import { createCampaignRoutingAdapter } from "@/lib/email";
+import { downloadVoiceNoteAsAttachment } from "@/lib/voice/storage";
 
 export function createSupabaseJobsContext(admin: SupabaseClient): JobsContext {
   const webhookStore = createSupabaseWebhookStore(admin);
@@ -118,6 +119,10 @@ export function createSupabaseJobsContext(admin: SupabaseClient): JobsContext {
       return {
         store: new SupabaseExecutorStore(admin),
         adapter: createCampaignRoutingAdapter(admin),
+        // Step voice notes stored in the private bucket resolve to
+        // real attachments at send time (P6 Stage C).
+        resolveVoiceAttachment: (path: string) =>
+          downloadVoiceNoteAsAttachment(admin, path),
       };
     },
   };

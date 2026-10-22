@@ -3,6 +3,7 @@ import {
   ArrowRight,
   Heart,
   MessageCircle,
+  Paperclip,
   Play,
   UserPlus,
 } from "lucide-react";
@@ -233,6 +234,83 @@ function AbTestVisual() {
   );
 }
 
+/* ── Card 1 fill (xl stage): resolved custom variables ────────────────── */
+/* The two card-1 voids exist only in the wide (xl) geometry: below xl the
+ * thread panel spans the full card width and, with the title block, fully
+ * composes the card (probe-verified, zero overflow). The fills are
+ * therefore xl-only — at narrower widths the card keeps its Stage B
+ * composition untouched rather than overlapping the thread panel. */
+const VARIABLE_ROWS = [
+  { token: "{first_name}", value: "Michael" },
+  { token: "{company}", value: "Northwind" },
+  { token: "{role}", value: "Head of Sales" },
+  { token: "{recent_activity}", value: "Hiring two account executives" },
+] as const;
+
+function VariablesPanel() {
+  return (
+    <div className="absolute left-9 top-9 z-10 hidden w-[400px] rounded-3xl bg-white/10 p-5 shadow-2xl ring-1 ring-white/15 backdrop-blur-md xl:block">
+      <div className="flex items-center gap-3">
+        <Image
+          src="/images/people/michael-kokernak.jpg"
+          alt="Michael Kokernak"
+          width={80}
+          height={80}
+          className="h-10 w-10 shrink-0 rounded-full object-cover object-top ring-2 ring-white/30"
+        />
+        <div className="min-w-0 leading-tight">
+          <div className="truncate text-13 font-bold text-white">Michael K.</div>
+          <div className="truncate text-11 text-white/55">Head of Sales · Northwind</div>
+        </div>
+        <span className="ml-auto shrink-0 rounded-full bg-white/15 px-2.5 py-1 text-11 font-semibold text-white">
+          Custom variables
+        </span>
+      </div>
+      <ul className="mt-3 divide-y divide-white/10 border-t border-white/10">
+        {VARIABLE_ROWS.map((row) => (
+          <li key={row.token} className="flex items-center gap-2 py-2">
+            <span className="shrink-0 rounded-md bg-white/15 px-1.5 py-0.5 font-mono text-11 font-semibold text-purple-100">
+              {row.token}
+            </span>
+            <ArrowRight className="h-3.5 w-3.5 shrink-0 text-white/40" />
+            <span className="truncate text-12 text-white/85">{row.value}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/* ── Card 1 fill (xl stage): follow-up step under the thread ──────────── */
+function FollowUpStrip() {
+  return (
+    <div className="ml-auto mt-4 hidden w-full max-w-[640px] rounded-3xl bg-white/10 p-5 shadow-2xl ring-1 ring-white/15 backdrop-blur-md xl:block">
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="text-13 font-bold text-white">
+          Follow-up
+          <span className="ml-1.5 text-11 font-semibold text-white/55">
+            Sequence · Step 3 of 5
+          </span>
+        </div>
+        <span className="shrink-0 text-11 text-white/55">
+          Sends in 2 days if no reply
+        </span>
+      </div>
+      <p className="mt-2.5 text-12 leading-relaxed text-white/85">
+        Floating this back to the top of your inbox — I put together a short
+        note on how teams like yours plan their outreach. It is attached
+        below in case it is useful.
+      </p>
+      <div className="mt-3">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-11 font-semibold text-white">
+          <Paperclip className="h-3.5 w-3.5" />
+          intro-notes.pdf
+        </span>
+      </div>
+    </div>
+  );
+}
+
 /* ── Card 1 visual: personalised message thread ───────────────────────── */
 function MessageThreadVisual() {
   return (
@@ -263,6 +341,7 @@ function MessageThreadVisual() {
           conversations from the profiles they already have.
         </div>
       </div>
+      <FollowUpStrip />
     </div>
   );
 }
@@ -290,6 +369,7 @@ export function BentoFeatures() {
               }}
             />
             <MessageThreadVisual />
+            <VariablesPanel />
             <div className="absolute bottom-0 left-0 z-10 p-7 sm:p-9">
               <h3 className="max-w-[300px] text-24 font-bold leading-snug text-white sm:text-28">
                 Messages that read like a person wrote them

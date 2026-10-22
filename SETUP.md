@@ -48,6 +48,7 @@ Open **SQL Editor** in the Supabase dashboard and run each file from
 | 13 | `013_connected_account_provider_health.sql` | `connected_accounts` gains provider identity + auth health: `provider_account_id`, `auth_status` (`ok` / `needs_reconnect` / `expired` / `error` / `not_connected`, backfilled `ok` for rows already marked `connected`), `last_sync_at`, `last_error`. Powers the account health + reconnect surfaces; written only by a provider integration (P5 Stage F) |
 | 14 | `014_oauth_connections.sql` | `oauth_connections` table (P5 Stage G): the encrypted OAuth token vault for connected Gmail / Outlook mailboxes — workspace + `connected_accounts` FKs (CASCADE), provider CHECK (`google` / `microsoft`), mailbox address, scopes, `access_token_enc` / `refresh_token_enc` (AES-256-GCM ciphertext only), token expiry, grant status. **RLS enabled with NO client policies — service-role only by construction**; the UI reads metadata through guarded API routes that never return token fields |
 | 15 | `015_voice_notes.sql` | Voice notes (P6 Stage C): `messages` gains `voice_note_path` / `voice_note_duration_sec` / `voice_note_language` / `transcript`, plus the **private** Supabase Storage bucket `voice-notes` (public = false, 10 MB cap, audio MIME allowlist) with storage RLS policies scoping objects to workspaces the caller belongs to (first path segment = workspace id). Audio bytes live in the bucket, never in the table; playback goes through a server route using short-lived signed URLs. A voice note is delivered as an **email attachment only** — there is no LinkedIn voice-note delivery |
+| 16 | `016_integration_hub.sql` | Integration Hub (P7): `hub_integrations`, `hub_credentials`, `hub_test_accounts`, `hub_checklist_items`, `hub_checklist_state`, `hub_documents`. Credential values exist ONLY as AES-256-GCM ciphertext (`value_enc`, keyed by `INTEGRATION_HUB_ENCRYPTION_KEY`) — no plaintext column exists. **RLS enabled with NO client policies on all six tables — service-role only**, behind the admin gate. Seeds the six BRR records (Muse connector `in_review`, the other five `configuring`), their checklists/documents and 8 Hub-global templates — all idempotent (`ON CONFLICT DO NOTHING`), and **no credentials and no test accounts**. See §16 |
 
 Do not skip or reorder — later migrations depend on earlier helpers
 (`is_workspace_member`, `is_workspace_admin`).
@@ -102,6 +103,7 @@ and treated as *not configured*.
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | For Gmail mailboxes | Google Cloud OAuth 2.0 Web client (server-only secret) — §15. Callback: `<NEXT_PUBLIC_APP_URL>/api/oauth/google/callback` |
 | `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | For Outlook mailboxes | Azure app registration (server-only secret value) — §15. Callback: `<NEXT_PUBLIC_APP_URL>/api/oauth/microsoft/callback` |
 | `TOKEN_ENCRYPTION_KEY` | For mailbox OAuth | ⚠️ Server-only. AES-256-GCM key for the OAuth token vault (migration 014) — exactly 32 bytes, base64. Generate: `openssl rand -base64 32`. Also derives the OAuth state + fallback unsubscribe signing keys. **Rotating it invalidates every stored grant — mailboxes must reconnect** |
+| `INTEGRATION_HUB_ENCRYPTION_KEY` | For the Integration Hub vault | ⚠️ Server-only. AES-256-GCM key for the Integration Hub credential vault (migration 016) — exactly 32 bytes, base64, DEDICATED to the Hub (not shared with the mailbox vault). Generate: `openssl rand -base64 32`. **Losing or rotating it makes every stored Hub credential undecryptable — they must all be re-entered** — §16 |
 
 ## 5. Create the first Super Admin (bootstrap)
 
@@ -111,7 +113,7 @@ only selects an *existing* account, and the one-time
 `ADMIN_BOOTSTRAP_SECRET` is the actual capability. Run these steps in
 order, exactly once, at go-live:
 
-1. **Create the Supabase project and apply ALL migrations 001–015 in
+1. **Create the Supabase project and apply ALL migrations 001–016 in
    order** (§1–§2 above), and finish the auth URL configuration (§3).
    The bootstrap writes to `profiles` and `audit_logs`, which only
    exist after the migrations.
@@ -747,6 +749,107 @@ on success you land back on Connected Accounts with a confirmation
 notice, and the mailbox is selectable as a campaign's email
 account. Use **Test Connection** any time to re-validate the stored
 grant against the provider.
+
+## 16. Integration Hub (BRR) — credential vault
+
+The Integration Hub (admin → Integrations → **Integration Hub**,
+`/admin/integration-hub`) is the operator's
+record for an external integration: its workflow status, documentation,
+submission/compliance checklists, reviewer test accounts, and the
+credentials needed to configure it. Its data lives in the six `hub_*`
+tables (migration **016**, applied in order after 015 — see the §2
+table). All six tables are service-role-only (RLS on, zero client
+policies); every Hub API route sits behind the admin gate.
+
+### 16.1 The vault key
+
+Credential values are stored ONLY as AES-256-GCM ciphertext
+(`hub_credentials.value_enc`), encrypted with a key that is dedicated
+to the Hub — it is NOT the mailbox OAuth key:
+
+```bash
+openssl rand -base64 32
+```
+
+Set the output as `INTEGRATION_HUB_ENCRYPTION_KEY` (server-only; never
+`NEXT_PUBLIC_`). Rules that follow from the design:
+
+- **Losing or rotating this key means re-entering every Hub
+  credential.** Stored values become undecryptable; there is no
+  recovery and no dual-key decrypt. Back the key up wherever you keep
+  the other production secrets.
+- While the key is unset or malformed, credential create / reveal /
+  copy refuse with **503 (fail closed)**. Integration records,
+  checklists, documents and test accounts keep working.
+- Values are never returned by list/get endpoints (metadata + last 4
+  characters only), never written to the audit log, and never included
+  in a Copy Integration Package unless an admin explicitly lists that
+  credential for export.
+- Reveal and copy are **strict-audited**: the `HUB_CREDENTIAL_REVEAL` /
+  `HUB_CREDENTIAL_COPY` audit row is written BEFORE the value is
+  decrypted; if the audit write fails, the request fails and no value
+  is returned. Test-account passwords are vault credentials too (kind
+  `test_account_password`) — a test-account record only references
+  one, it never holds a password.
+- An integration's status can be set to `approved` / `live` only via
+  an explicit confirmed status change — never as a side effect of
+  saving configuration or credentials.
+
+### 16.2 Demo Mode behaviour
+
+In Demo Mode the Hub is explorable with labelled fixtures, but the
+vault is inert by design:
+
+- Credential rows are **metadata-only shells** (no value, no last-4).
+- Credential **create / update / delete are disabled** (503), and
+  reveal / copy return nothing ("demo mode — nothing stored"). There
+  is no write path for a demo secret, so a value typed in Demo Mode
+  can never come back later as if it had been saved.
+- Demo copy packages carry a `DEMO — NOT REAL CREDENTIALS` banner and
+  never include values.
+- `INTEGRATION_HUB_ENCRYPTION_KEY` is not required in Demo Mode.
+
+### 16.3 What you must enter manually
+
+The Hub ships with documentation, checklists and **empty credential
+shells only** — no real values are seeded, and none can be generated
+for you. After go-live (Supabase connected + migration 016 applied +
+`INTEGRATION_HUB_ENCRYPTION_KEY` set), enter these yourself in
+**admin → Integration Hub → the record → Credentials**:
+
+1. **Muse OAuth Client ID + Client Secret** (record: *BRR Muse
+   Connector*, environment `production`) — from the BRR OAuth app
+   "BizReviewRadar Muse Connector". The secret was issued once by
+   BRR; if it is lost, rotate it in BRR — it cannot be recovered from
+   the Hub.
+2. **BRR test API key** (`brr_test_…`, record: *BRR REST API*,
+   environment `test`). Note: `brr_live_` keys are currently REFUSED
+   by BRR's API auth layer (demo phase) — a stored live key will not
+   authenticate until BRR enables live keys.
+3. **Zapier API key** (record: *BRR Zapier*, environment `test`) —
+   the BRR Zapier app is private/invite-only and uses the BRR test
+   key for auth.
+4. **BRR webhook signing secret** (record: *BRR Webhooks*,
+   environment `production`) — from the BRR webhook endpoint
+   configuration.
+5. **Confirm the redirect URI on the Meta side**: the Hub records
+   `https://agent.meta.ai/api/hatch/oauth/callback` as
+   *recorded, unverified* (it appears nowhere in the BRR repo). Verify
+   it against the current Meta Credentials Integration setup and
+   update the record's verification status only from what Meta's
+   interface actually shows.
+6. **Reviewer/test account**: create the dedicated BRR reviewer
+   account yourself and confirm it carries the `api_demo`
+   entitlement — without that entitlement the reviewer cannot use the
+   API/Muse surfaces. Then record the account under the Muse
+   record's Test accounts (its password, if stored, goes in the vault
+   as a `test_account_password` credential — never in the account
+   record itself).
+
+Nothing on the BRR side is changed by the Hub: BRR's production flags
+(`muse_mcp_enabled`, `oauth_authcode_enabled`, plus the
+`MUSE_CONNECTOR_PUBLIC_ORIGIN` env) stay exactly as they are until
+you change them in BRR under separate authorisation.
 
 ## Appendix — Muse.ai research note (2026-10-18)
 

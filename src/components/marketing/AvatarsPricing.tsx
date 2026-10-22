@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { Check, Gem } from "lucide-react";
+import { AuroraBg } from "./AuroraBg";
 import {
   AVATAR_PRICES,
   formatAnnualTotal,
@@ -14,14 +14,13 @@ import {
 import { BillingToggle } from "./BillingToggle";
 
 /**
- * Avatars pricing card (layout provenance: aimfox.com/avatars mirror,
- * card id "rental-card").
+ * Avatars pricing card.
  *
- * The card follows the mirror's construction — a WIDE aurora artwork
- * card (card-bg-2 on small screens, the dark card-bg-3 aurora from md
- * up, the same artwork family as the homepage pricing cards), price
- * block on the left, features and the small Monthly/Yearly toggle on
- * the right. Phase-2 branding: card copy rewritten originally for
+ * Construction — a WIDE aurora card (the "agency" CSS aurora on
+ * small screens, the dark "avatar" aurora from md up; see AuroraBg —
+ * the same family as the homepage pricing cards), price block on
+ * the left, features and the small Monthly/Yearly toggle on the
+ * right. Phase-2 branding: card copy rewritten originally for
  * NxtSend.
  *
  * Prices come from the shared model in src/lib/marketing-prices.ts:
@@ -43,21 +42,10 @@ export function AvatarsPricing() {
   return (
     <div className="mx-auto flex w-full max-w-[61.25rem] flex-col gap-y-8">
       <div className="relative overflow-hidden rounded-6xl border border-white/10 shadow-[0_1px_10px_0_rgba(255,255,255,0.50)_inset]">
-        {/* Artwork: card-bg-2 (mobile) / card-bg-3 dark aurora (md+) */}
-        <Image
-          src="/images/pricing/card-bg-2.webp"
-          alt=""
-          fill
-          sizes="(max-width: 768px) 100vw, 980px"
-          className="object-cover md:hidden"
-        />
-        <Image
-          src="/images/pricing/card-bg-3.webp"
-          alt=""
-          fill
-          sizes="(max-width: 768px) 100vw, 980px"
-          className="hidden object-cover md:block"
-        />
+        {/* Aurora background: agency gradient (mobile) / avatar
+            gradient (md+) */}
+        <AuroraBg variant="agency" className="md:hidden" />
+        <AuroraBg variant="avatar" className="hidden md:block" />
 
         <div className="relative flex flex-col p-6 pb-10 md:flex-row md:gap-x-4 md:p-8 md:py-9 xl:gap-x-7">
           {/* Left: plan, price, CTA */}

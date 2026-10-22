@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Check, Linkedin, Zap, Briefcase, Gem } from "lucide-react";
+import { AuroraBg } from "./AuroraBg";
 import {
   AGENCY_EXTRA_SEAT_PRICES,
   AGENCY_PRICES,
@@ -17,9 +17,9 @@ import {
 import { BillingToggle } from "./BillingToggle";
 
 /**
- * Homepage pricing section (section 6 of the homepage; artwork cards
- * from the mirror). Extracted from the homepage server component so
- * the Monthly / Yearly toggle can hold real state.
+ * Homepage pricing section (section 6 of the homepage). Extracted
+ * from the homepage server component so the Monthly / Yearly toggle
+ * can hold real state.
  *
  * Prices come from the shared model in src/lib/marketing-prices.ts:
  * monthly figures render exactly the long-standing strings; yearly
@@ -46,13 +46,7 @@ export function HomePricing() {
         <div className="mx-auto mt-14 grid max-w-5xl grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Outreach seat */}
           <div className="relative overflow-hidden rounded-[2rem] shadow-2xl ring-1 ring-white/10">
-            <Image
-              src="/images/pricing/card-bg-1.webp"
-              alt=""
-              fill
-              sizes="(max-width: 1024px) 100vw, 500px"
-              className="object-cover"
-            />
+            <AuroraBg variant="seat" />
             <div className="relative flex h-full flex-col p-8">
               <div className="flex items-center gap-2 text-white">
                 <Zap className="h-5 w-5 fill-white" />
@@ -124,13 +118,7 @@ export function HomePricing() {
 
           {/* Agency */}
           <div className="relative overflow-hidden rounded-[2rem] shadow-2xl ring-1 ring-white/10">
-            <Image
-              src="/images/pricing/card-bg-2.webp"
-              alt=""
-              fill
-              sizes="(max-width: 1024px) 100vw, 500px"
-              className="object-cover"
-            />
+            <AuroraBg variant="agency" />
             <div className="relative flex h-full flex-col p-8">
               <div className="flex items-center gap-2 text-white">
                 <Briefcase className="h-5 w-5" />
@@ -195,13 +183,7 @@ export function HomePricing() {
 
           {/* Outreach avatar — wide card */}
           <div className="relative overflow-hidden rounded-[2rem] shadow-2xl ring-1 ring-white/10 lg:col-span-2">
-            <Image
-              src="/images/pricing/card-bg-3.webp"
-              alt=""
-              fill
-              sizes="(max-width: 1024px) 100vw, 1024px"
-              className="object-cover"
-            />
+            <AuroraBg variant="avatar" />
             <div className="relative grid gap-8 p-8 md:grid-cols-2">
               <div>
                 <div className="flex items-center gap-2 text-white">

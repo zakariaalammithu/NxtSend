@@ -2,18 +2,17 @@ import Link from "next/link";
 import Image from "next/image";
 
 /**
- * Academy hero + course series (mirror: aimfox.com/academy).
+ * Academy hero + course series.
  *
- * The mirror page built this series around recorded lessons for the
- * mirror product. Those recordings are not carried over. What remains
- * is the same shape — three modules, ten topics in order — rewritten
- * as a NxtSend syllabus: the hero is a static visual, lessons are
+ * Three modules, ten topics in order, presented as a NxtSend
+ * syllabus: the hero is a static native composition, lessons are
  * listed as curriculum items with no players, and a note on the page
  * states plainly that NxtSend Academy video lessons are in production.
  *
- * The right-hand panel of each module card shows the module's own
- * still image where the download contains one (modules 2 and 3) and
- * the card's glow gradient alone for module 1.
+ * The right-hand panel of each module card carries a native visual
+ * built from the module's own content — a curriculum stack for
+ * module 2, a dark inbox mock for module 3 — and the card's glow
+ * gradient alone for module 1.
  */
 
 interface AcademyLesson {
@@ -25,12 +24,9 @@ interface AcademyLesson {
 interface AcademyModule {
   title: string;
   description: string;
-  /** Still for the card's right panel; null when not in the download. */
-  image: string | null;
-  /** Backdrop shown behind the still (rendered object-contain so no
-      in-image text is ever cropped — P6 clip fix). */
-  artBackdrop?: string;
-  /** Mirror card glow (box-shadow / radial-gradient tint), verbatim rgba. */
+  /** Native visual for the card's right panel; null = glow only. */
+  visual: "curriculum" | "inbox" | null;
+  /** Card glow (box-shadow / radial-gradient tint), as rgba. */
   glow: string;
   tint: string;
   lessons: AcademyLesson[];
@@ -41,7 +37,7 @@ const modules: AcademyModule[] = [
     title: "Foundations and account setup",
     description:
       "Connect your LinkedIn profile, find your way around the workspace, and choose daily limits that keep your activity steady and safe.",
-    image: null,
+    visual: null,
     glow: "rgba(0,170,255,0.35)",
     tint: "rgba(0,170,255,0.16)",
     lessons: [
@@ -69,9 +65,7 @@ const modules: AcademyModule[] = [
     title: "Planning and launching a campaign",
     description:
       "Define who you want to reach, write messages in your own voice, and build a sequence that is ready to launch.",
-    image: "/images/academy/module-2.webp",
-    artBackdrop:
-      "bg-[linear-gradient(180deg,#05050f_0%,#1d1fc0_48%,#9db9ff_100%)]",
+    visual: "curriculum",
     glow: "rgba(255,110,26,0.35)",
     tint: "rgba(255,110,26,0.16)",
     lessons: [
@@ -105,8 +99,7 @@ const modules: AcademyModule[] = [
     title: "Handling replies and improving results",
     description:
       "Manage new replies, read your results clearly, and diagnose campaigns that have stalled.",
-    image: "/images/academy/module-3.webp",
-    artBackdrop: "bg-[#e9ebff]",
+    visual: "inbox",
     glow: "rgba(0,170,255,0.35)",
     tint: "rgba(0,170,255,0.16)",
     lessons: [
@@ -132,6 +125,91 @@ const modules: AcademyModule[] = [
   },
 ];
 
+/* ── Native panel visuals (built from each module's own content) ─────── */
+
+function CurriculumVisual({ lessons }: { lessons: AcademyLesson[] }) {
+  return (
+    <div
+      aria-hidden="true"
+      className="absolute inset-0 bg-[linear-gradient(180deg,#05050f_0%,#1d1fc0_48%,#9db9ff_100%)]"
+    >
+      <div className="flex h-full flex-col items-center justify-center gap-2.5 p-6">
+        {lessons.map((lesson) => (
+          <div
+            key={lesson.number}
+            className="flex w-full max-w-80 items-center gap-3 rounded-2xl border border-white/25 bg-white/10 px-3.5 py-2.5 backdrop-blur-sm"
+          >
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-white/20 text-12 font-semibold text-white">
+              {lesson.number}
+            </span>
+            <span className="text-13 leading-snug font-medium text-white">
+              {lesson.title}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const inboxRows = [
+  { name: "Emily Johnson", photo: "/images/agents/emily-johnson.webp", unread: true },
+  { name: "James Miller", photo: "/images/agents/james-miller.webp", unread: true },
+  { name: "Olivia W.", photo: "/images/agents/olivia-w.webp", unread: false },
+];
+
+function InboxVisual() {
+  return (
+    <div
+      aria-hidden="true"
+      className="absolute inset-0 bg-[linear-gradient(160deg,#0b0b16_0%,#131328_55%,#1d1b4b_100%)]"
+    >
+      <div className="flex h-full items-center justify-center p-6">
+        <div className="w-full max-w-80 overflow-hidden rounded-2xl border border-white/10 bg-black-900/80 shadow-2xl">
+          <div className="flex items-center gap-1.5 border-b border-white/10 px-3.5 py-2.5">
+            <span className="h-2 w-2 rounded-full bg-white/15" />
+            <span className="h-2 w-2 rounded-full bg-white/15" />
+            <span className="h-2 w-2 rounded-full bg-white/15" />
+            <span className="ml-2 text-11 font-semibold text-white/70">
+              Unified inbox
+            </span>
+          </div>
+          <div className="divide-y divide-white/5">
+            {inboxRows.map((row) => (
+              <div key={row.name} className="flex items-center gap-3 px-3.5 py-3">
+                <Image
+                  src={row.photo}
+                  alt=""
+                  width={64}
+                  height={64}
+                  className="h-8 w-8 shrink-0 rounded-full object-cover object-top"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-12 font-semibold text-white">
+                      {row.name}
+                    </span>
+                    {row.unread ? (
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-purple-400" />
+                    ) : null}
+                  </div>
+                  <div className="mt-1.5 h-1.5 w-4/5 rounded bg-white/15" />
+                  <div className="mt-1 h-1.5 w-3/5 rounded bg-white/10" />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-white/10 px-3.5 py-2.5">
+            <div className="flex h-7 items-center rounded-full bg-white/5 px-3 text-11 text-white/35">
+              Write a reply…
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AcademySeries() {
   return (
     <>
@@ -141,14 +219,37 @@ export function AcademySeries() {
       <section className="px-2.5 pt-24 sm:pt-28">
         <div className="relative h-[548px] overflow-hidden rounded-5xl bg-black-900 p-2.5 md:h-[648px] md:p-4 xl:h-[700px] xl:rounded-8xl">
           <div className="relative flex size-full items-end overflow-hidden rounded-4xl">
-            <Image
-              src="/images/academy/module-2.webp"
-              alt="NxtSend Academy course artwork"
-              width={2916}
-              height={2663}
-              priority
-              className="absolute inset-0 size-full object-cover object-[50%_78%]"
+            <div
+              aria-hidden="true"
+              className="absolute inset-0"
+              style={{
+                background:
+                  "linear-gradient(155deg, #05050f 0%, #101040 42%, #1d1fc0 78%, #9db9ff 125%)",
+              }}
             />
+            {/* Module cards composition — the syllabus itself, fanned
+                over the banner's gradient. */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 right-6 hidden w-[21rem] -translate-y-1/2 flex-col gap-3.5 md:flex lg:right-14 lg:w-[24rem]"
+            >
+              {modules.map((mod, i) => (
+                <div
+                  key={mod.title}
+                  className="rounded-3xl border border-white/20 bg-white/10 p-4 shadow-2xl backdrop-blur-md"
+                  style={{
+                    transform: `rotate(${[-2.5, 1.5, -1][i]}deg) translateX(${[0, 18, 6][i]}px)`,
+                  }}
+                >
+                  <span className="text-11 font-semibold tracking-wide text-white/60 uppercase">
+                    Module {i + 1} · {mod.lessons.length} lessons
+                  </span>
+                  <p className="mt-1 text-16 font-semibold text-white">
+                    {mod.title}
+                  </p>
+                </div>
+              ))}
+            </div>
             <div className="absolute inset-0 bg-gradient-to-r from-black-900/85 via-black-900/40 to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-t from-black-900/95 via-black-900/45 to-transparent" />
             <div className="relative flex max-w-160 flex-col items-start p-8 md:p-14 xl:p-16">
@@ -230,17 +331,11 @@ export function AcademySeries() {
                   </div>
                 </div>
                 <div className="relative h-64 shrink-0 md:h-auto md:w-2/5">
-                  <div
-                    className={`relative size-full overflow-hidden ${mod.artBackdrop ?? ""}`}
-                  >
-                    {mod.image ? (
-                      <Image
-                        src={mod.image}
-                        alt=""
-                        fill
-                        sizes="(min-width: 768px) 40vw, 100vw"
-                        className="object-contain"
-                      />
+                  <div className="relative size-full overflow-hidden">
+                    {mod.visual === "curriculum" ? (
+                      <CurriculumVisual lessons={mod.lessons} />
+                    ) : mod.visual === "inbox" ? (
+                      <InboxVisual />
                     ) : null}
                   </div>
                 </div>

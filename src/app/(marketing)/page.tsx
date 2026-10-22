@@ -6,6 +6,8 @@ import {
   Check,
   ShieldCheck,
   Headphones,
+  UserRound,
+  Users,
 } from "lucide-react";
 import { HomeFaq } from "@/components/marketing/HomeFaq";
 import { HomePricing } from "@/components/marketing/HomePricing";
@@ -79,7 +81,7 @@ const howItWorksSteps = [
   },
 ];
 
-/* ── FAQ (mirror section 7) ──────────────────────────────────────────────── */
+/* ── FAQ (section 7) ─────────────────────────────────────────────────────── */
 const faqs = [
   {
     question: "Can I rent LinkedIn outreach profiles directly through NxtSend?",
@@ -220,7 +222,7 @@ export default function MarketingHomePage() {
             </span>
           </div>
 
-          {/* Account pills — white cards, mirror layout (3 / 3 / 2 centred).
+          {/* Account pills — white cards, laid out 3 / 3 / 2 centred.
               Sample profiles shown are illustrative personas. */}
           <div className="mx-auto mt-12 flex max-w-5xl flex-wrap items-stretch justify-center gap-4">
             {rentedAgents.map((agent, i) => (
@@ -241,14 +243,12 @@ export default function MarketingHomePage() {
                   </div>
                   <div className="truncate text-12 text-black-400">{agent.role}</div>
                 </div>
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black-50">
-                  <Image
-                    src={i < 3 ? "/images/icons/multi-accounts.png" : "/images/icons/sdr.png"}
-                    alt=""
-                    width={20}
-                    height={20}
-                    className="h-4.5 w-4.5 object-contain"
-                  />
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black-50 text-black-600">
+                  {i < 3 ? (
+                    <Users className="h-4.5 w-4.5" />
+                  ) : (
+                    <UserRound className="h-4.5 w-4.5" />
+                  )}
                 </span>
               </div>
             ))}
@@ -359,7 +359,7 @@ export default function MarketingHomePage() {
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* 6. PRICING THAT SCALES WITH YOUR GROWTH — artwork cards (mirror). */}
+      {/* 6. PRICING THAT SCALES WITH YOUR GROWTH — artwork cards. */}
       {/* Rendered by the HomePricing client component so the billing      */}
       {/* toggle holds real state (model: src/lib/marketing-prices.ts).     */}
       {/* ──────────────────────────────────────────────────────────────────── */}

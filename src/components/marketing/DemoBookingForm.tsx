@@ -8,11 +8,11 @@ import { z } from "zod";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 
 /**
- * Demo booking block (mirror: aimfox.com/demo).
+ * Demo booking block.
  *
- * On the mirror, booking a demo happens through an external calendar
- * service. That service is NOT embedded or linked here. Instead this
- * is the app's own booking-request form, headed by a generic team
+ * Booking is not handed off to an external calendar service — none
+ * is embedded or linked here. This is the app's own booking-request
+ * form, headed by a generic team
  * block — no named hosts and no individual photos — with a plain
  * request label on the submit button.
  *

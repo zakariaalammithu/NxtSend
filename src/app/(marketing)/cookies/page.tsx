@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, Cookie, Mail } from "lucide-react";
+import { Cookie, Mail } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Cookie Policy",
@@ -9,60 +9,38 @@ export const metadata: Metadata = {
 };
 
 export default function CookiesPage() {
-  const lastUpdated = "October 2026";
+  const lastUpdated = "22 October 2026";
 
   const cookieCategories = [
     {
       name: "Essential & Authentication Cookies",
       required: true,
       description:
-        "Strictly necessary for the operation of the website and SaaS application. They enable user logins, secure workspace session states, CSRF defense, and billing gateways.",
-      examples: ["nxtsend_session", "sb-auth-token", "__stripe_mid"],
+        "Strictly necessary for the application to work. Our authentication provider (Supabase) sets session cookies that keep you signed in and protect your workspace session; without them, signing in is not possible.",
+      examples: ["sb-<project-ref>-auth-token"],
     },
     {
-      name: "Functional & Preference Cookies",
+      name: "Functional & Preference Storage",
       required: false,
       description:
-        "Allow the platform to remember your personal choices and configurations, such as selected dark theme modes, active workspace tabs, and collapsed sidebar preferences.",
-      examples: ["nxt_sidebar_state", "nxt_locale", "nxt_theme"],
+        "Browser local storage that remembers choices you make on this device — most importantly your cookie-consent decision — so the site does not have to ask on every visit.",
+      examples: ["nxtsend_cookie_consent (local storage)"],
     },
     {
-      name: "Performance & Analytics Cookies",
+      name: "Marketing (Meta Pixel) — only when configured",
       required: false,
       description:
-        "Help us understand how visitors navigate our marketing pages, which features are most heavily utilized, and detect interface errors or API latency bottlenecks.",
-      examples: ["_ga", "_ga_container", "ph_app_metrics"],
-    },
-    {
-      name: "Targeting & Marketing Cookies",
-      required: false,
-      description:
-        "Used to measure the efficacy of our advertising campaigns and deliver relevant content. We do not sell this information to third-party data brokers.",
-      examples: ["_fbp", "_li_fat_id"],
+        "If a Meta (Facebook) Pixel ID is configured for this website, Meta's pixel may load after consent is recorded and set its own cookie to measure advertising performance. When no Pixel ID is configured, no pixel loads and this category sets nothing. We do not sell cookie data to data brokers.",
+      examples: ["_fbp (set by Meta, only when a Pixel is configured)"],
     },
   ];
 
   return (
-    <div className="relative min-h-screen bg-black-900 pt-12 pb-24 text-white">
+    <div className="relative min-h-screen overflow-x-clip bg-black-900 pt-12 pb-24 text-white">
       {/* Background glow */}
       <div className="pointer-events-none absolute top-0 left-1/2 h-[400px] w-[750px] -translate-x-1/2 rounded-full bg-purple-600/10 blur-[140px]" />
 
       <div className="section-container relative z-10 max-w-4xl">
-        {/* Prominent Legal Disclaimer Banner */}
-        <div className="mb-10 rounded-2xl border border-yellow-500/40 bg-yellow-500/10 p-5 sm:p-6 backdrop-blur-md">
-          <div className="flex items-start gap-3.5">
-            <AlertTriangle className="h-6 w-6 shrink-0 text-yellow-400 mt-0.5" />
-            <div>
-              <h2 className="text-15 font-bold text-yellow-300">
-                ⚠️ Legal Notice & Draft Template
-              </h2>
-              <p className="mt-1 text-13 leading-relaxed text-yellow-200/90">
-                This is a draft template provided for demonstrative and structural purposes. Have a qualified legal professional review and adapt this document to your operational cookie taxonomy and applicable privacy laws before publication.
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* Header */}
         <div className="border-b border-black-700/80 pb-8 mb-10">
           <div className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-900/30 px-3.5 py-1 text-12 font-semibold text-purple-300 mb-4">
@@ -96,7 +74,7 @@ export default function CookiesPage() {
               2. Categories of Cookies We Use
             </h2>
             <p>
-              We categorize the cookies deployed on our platform into four standard tiers:
+              We categorize the cookies and browser storage used on our platform as follows:
             </p>
 
             <div className="space-y-4">
@@ -139,9 +117,9 @@ export default function CookiesPage() {
               Some cookies and tags are placed by reputable third-party partners to support our cloud infrastructure:
             </p>
             <ul className="list-disc list-inside space-y-2 text-14 text-black-300">
-              <li><strong>Stripe:</strong> Fraud prevention and secure payment tokenization.</li>
-              <li><strong>Supabase:</strong> Encrypted user authentication and session validation.</li>
-              <li><strong>Cloudflare:</strong> DDoS mitigation, bot defense, and CDN caching.</li>
+              <li><strong>Supabase:</strong> User authentication and session validation.</li>
+              <li><strong>Stripe:</strong> Fraud prevention and secure payment processing on Stripe&apos;s own checkout pages.</li>
+              <li><strong>Meta:</strong> Advertising measurement, only when a Meta Pixel is configured for this website and consent has been recorded (see Section 2).</li>
             </ul>
           </section>
 
@@ -180,10 +158,10 @@ export default function CookiesPage() {
             </p>
             <div className="rounded-2xl border border-black-700 bg-black-800/60 p-6 flex items-center justify-between flex-wrap gap-4">
               <div>
-                <p className="text-14 font-semibold text-white">NxtSend Privacy Operations</p>
-                <p className="text-13 text-black-400">Austin, TX 73301, USA</p>
-                <a href="mailto:privacy@nxtsend.com" className="text-14 text-purple-400 hover:underline">
-                  privacy@nxtsend.com
+                <p className="text-14 font-semibold text-white">NxtSend</p>
+                <p className="text-13 text-black-400">Office: Austin, TX 73301, USA</p>
+                <a href="mailto:hello@nxtsend.com" className="text-14 text-purple-400 hover:underline">
+                  hello@nxtsend.com
                 </a>
               </div>
               <Link

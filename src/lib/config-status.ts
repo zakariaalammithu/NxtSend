@@ -104,6 +104,7 @@ export const CONFIG_CATALOG: ConfigVarSpec[] = [
   { name: "CRON_SECRET", group: "jobs", visibility: "server", requiredForLive: true, purpose: "Authenticates POST/GET /api/jobs/run (Vercel Cron sends it as a Bearer token). The worker refuses to run while unset." },
 
   // ── Integrations ──────────────────────────────────────────────────
+  { name: "INTEGRATION_HUB_ENCRYPTION_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Integration Hub credential-vault key (AES-256-GCM, migration 016; dedicated key, separate from TOKEN_ENCRYPTION_KEY). Encrypts hub_credentials at rest. Losing or rotating it makes stored Hub credentials undecryptable — they must be re-entered." },
   { name: "LINKEDIN_PROVIDER", group: "integrations", visibility: "server", requiredForLive: false, purpose: "RESERVED for the LinkedIn provider integration (src/lib/linkedin): the name/key of the LinkedIn-approved outreach provider the owner procured. Setting it connects nothing — no vendor adapter is implemented yet." },
   { name: "LINKEDIN_PROVIDER_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "RESERVED — the approved provider's API key (server-only, never rendered). See LINKEDIN_PROVIDER." },
   { name: "LINKEDIN_CLIENT_ID", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Documented-demo only: no LinkedIn OAuth flow exists in the app (no authorized provider). Kept for the future provider integration." },

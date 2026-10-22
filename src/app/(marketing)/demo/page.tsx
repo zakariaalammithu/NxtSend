@@ -1,11 +1,12 @@
 import Link from "next/link";
-import Image from "next/image";
 import type { Metadata } from "next";
 import {
   ArrowRight,
   Check,
   ShieldCheck,
   MessageCircle,
+  MonitorPlay,
+  PhoneCall,
 } from "lucide-react";
 import { DemoHeroVideo } from "@/components/marketing/DemoHeroVideo";
 import { DemoBookingForm } from "@/components/marketing/DemoBookingForm";
@@ -17,19 +18,16 @@ export const metadata: Metadata = {
 };
 
 /**
- * Demo page (mirror: aimfox.com/demo, ZIP 4 mirror).
+ * Demo page.
  *
- * Sections follow the mirror in order: hero with a static product
- * visual, the webinar / book-a-call options under a shared heading,
- * the booking-request form, and the standard final CTA. The review
- * wall that previously sat on this page has been removed — NxtSend
- * does not reuse another product's reviews.
+ * Sections in order: hero with a static product visual, the webinar /
+ * book-a-call options under a shared heading, the booking-request
+ * form, and the standard final CTA. No review wall sits on this
+ * page — NxtSend does not reuse another product's reviews.
  *
- * Booking substitution: on the mirror, booking runs through an
- * external calendar service and a webinar registration link. None of
- * those external services are embedded or linked here — both cards
- * lead to the app's own booking-request form (DemoBookingForm,
- * #book-a-demo).
+ * Booking: no external calendar service or webinar registration
+ * link is embedded or linked here — both cards lead to the app's
+ * own booking-request form (DemoBookingForm, #book-a-demo).
  */
 export default function DemoPage() {
   return (
@@ -39,12 +37,13 @@ export default function DemoPage() {
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative bg-black-900 px-2.5 pt-24 sm:pt-28">
         <div className="relative overflow-hidden rounded-5xl bg-white px-4 pt-12 pb-16 md:px-6 md:py-20 xl:rounded-8xl 2xl:px-40 2xl:py-28">
-          <Image
-            src="/images/demo/hero.webp"
-            alt=""
-            fill
-            priority
-            className="object-cover"
+          <div
+            aria-hidden="true"
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(70% 55% at 85% 0%, rgba(103,232,249,0.35) 0%, transparent 60%), radial-gradient(80% 60% at 0% 100%, rgba(196,181,253,0.4) 0%, transparent 60%), linear-gradient(150deg, #ffffff 0%, #eef1ff 52%, #e9f7ff 100%)",
+            }}
           />
           <div className="relative z-10 flex flex-col items-center">
             <h1 className="mb-4 max-w-[50rem] text-center text-36 font-semibold text-black-900 md:mb-6 md:text-54 2xl:text-64">
@@ -85,13 +84,12 @@ export default function DemoPage() {
           <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 xl:grid-cols-2 xl:gap-10">
             {/* Join a live webinar */}
             <div className="flex flex-col rounded-3xl bg-white p-6 md:p-8">
-              <Image
-                src="/images/demo/webinar.webp"
-                alt=""
-                width={404}
-                height={384}
-                className="mb-6 w-20 rounded-2xl object-cover md:mb-8"
-              />
+              <span
+                aria-hidden="true"
+                className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-lg md:mb-8"
+              >
+                <MonitorPlay className="h-9 w-9" />
+              </span>
               <h3 className="mb-4 text-24 font-bold text-black-900 md:text-30">
                 Join a live webinar
               </h3>
@@ -111,13 +109,12 @@ export default function DemoPage() {
 
             {/* Book a call */}
             <div className="flex flex-col rounded-3xl bg-white p-6 md:p-8">
-              <Image
-                src="/images/demo/sales.webp"
-                alt=""
-                width={402}
-                height={389}
-                className="mb-6 w-20 rounded-2xl object-cover md:mb-8"
-              />
+              <span
+                aria-hidden="true"
+                className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-lg md:mb-8"
+              >
+                <PhoneCall className="h-9 w-9" />
+              </span>
               <h3 className="mb-4 text-24 font-bold text-black-900 md:text-30">
                 Book a call with our sales team
               </h3>

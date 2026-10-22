@@ -121,6 +121,7 @@ const ENV_CATALOG: Array<Omit<EnvPresence, "present">> = [
   { name: "MODEL_API_KEY", visibility: "server", purpose: "Meta Model API (Muse Spark) for AI drafting" },
   { name: "NEXT_PUBLIC_META_PIXEL_ID", visibility: "public", purpose: "Meta Pixel ID (marketing analytics, consent-gated)" },
   { name: "CRON_SECRET", visibility: "server", purpose: "Authenticates the background-jobs worker endpoint" },
+  { name: "INTEGRATION_HUB_ENCRYPTION_KEY", visibility: "server", purpose: "Integration Hub credential vault key (migration 016)" },
 ];
 
 export function getEnvPresence(): EnvPresence[] {

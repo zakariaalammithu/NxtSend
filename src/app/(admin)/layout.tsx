@@ -9,7 +9,7 @@ import {
   Database, Inbox, Bell, Globe, Share2, TrendingUp, Gauge, Receipt,
   DollarSign, SlidersHorizontal, Mail, Table, Sparkles, Bot, Blocks,
   Wand2, ListOrdered, Radio, MonitorSmartphone, Settings2, HeartPulse,
-  FlaskConical, Stethoscope, KeyRound, Siren, MailCheck,
+  FlaskConical, Stethoscope, KeyRound, Siren, MailCheck, PlugZap,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -27,7 +27,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   TrendingUp, Gauge, Receipt, DollarSign, SlidersHorizontal, Mail,
   Table, Sparkles, Bot, Blocks, Wand2, ListOrdered, Radio,
   MonitorSmartphone, Settings2, HeartPulse, FlaskConical, Stethoscope,
-  KeyRound, Siren, MailCheck,
+  KeyRound, Siren, MailCheck, PlugZap,
 };
 
 export default function AdminLayout({

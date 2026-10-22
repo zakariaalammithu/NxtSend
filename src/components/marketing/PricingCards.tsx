@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { Check, Linkedin, Zap, Briefcase, Gem } from "lucide-react";
+import { AuroraBg } from "./AuroraBg";
 import {
   AGENCY_EXTRA_SEAT_PRICES,
   AGENCY_PRICES,
@@ -16,12 +16,12 @@ import { useBilling } from "./BillingContext";
 import { BillingToggle } from "./BillingToggle";
 
 /**
- * Pricing page plan cards (mirror: aimfox.com/pricing).
+ * Pricing page plan cards.
  *
  * Layout and card treatment match the homepage pricing section: two
- * artwork cards on top (Outreach seat, Agency) over the mirror's
- * aurora backgrounds (public/images/pricing/card-bg-1/2.webp) and one
- * wide artwork card below (Outreach avatar, card-bg-3).
+ * cards on top (Outreach seat, Agency) over native CSS aurora
+ * backgrounds (see AuroraBg) and one wide card below (Outreach
+ * avatar).
  *
  * Prices come from the shared model in src/lib/marketing-prices.ts.
  * The Monthly / Yearly toggle ("up to -25%") switches every figure on
@@ -37,7 +37,7 @@ export function PricingCards() {
 
   return (
     <div>
-      {/* Billing cycle toggle (mirror) */}
+      {/* Billing cycle toggle */}
       <div className="flex justify-center">
         <BillingToggle billing={billing} onChange={setBilling} />
       </div>
@@ -45,13 +45,7 @@ export function PricingCards() {
       <div className="mx-auto mt-14 grid max-w-5xl grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Outreach seat */}
         <div className="relative overflow-hidden rounded-[2rem] shadow-2xl ring-1 ring-white/10">
-          <Image
-            src="/images/pricing/card-bg-1.webp"
-            alt=""
-            fill
-            sizes="(max-width: 1024px) 100vw, 500px"
-            className="object-cover"
-          />
+          <AuroraBg variant="seat" />
           <div className="relative flex h-full flex-col p-8">
             <div className="flex items-center gap-2 text-white">
               <Zap className="h-5 w-5 fill-white" />
@@ -123,13 +117,7 @@ export function PricingCards() {
 
         {/* Agency */}
         <div className="relative overflow-hidden rounded-[2rem] shadow-2xl ring-1 ring-white/10">
-          <Image
-            src="/images/pricing/card-bg-2.webp"
-            alt=""
-            fill
-            sizes="(max-width: 1024px) 100vw, 500px"
-            className="object-cover"
-          />
+          <AuroraBg variant="agency" />
           <div className="relative flex h-full flex-col p-8">
             <div className="flex items-center gap-2 text-white">
               <Briefcase className="h-5 w-5" />
@@ -194,13 +182,7 @@ export function PricingCards() {
 
         {/* Outreach avatar — wide card */}
         <div className="relative overflow-hidden rounded-[2rem] shadow-2xl ring-1 ring-white/10 lg:col-span-2">
-          <Image
-            src="/images/pricing/card-bg-3.webp"
-            alt=""
-            fill
-            sizes="(max-width: 1024px) 100vw, 1024px"
-            className="object-cover"
-          />
+          <AuroraBg variant="avatar" />
           <div className="relative grid gap-8 p-8 md:grid-cols-2">
             <div>
               <div className="flex items-center gap-2 text-white">

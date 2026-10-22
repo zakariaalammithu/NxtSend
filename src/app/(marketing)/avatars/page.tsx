@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import {
   ArrowRight,
   Check,
+  Send,
   ShieldCheck,
   Headphones,
 } from "lucide-react";
@@ -17,14 +18,28 @@ export const metadata: Metadata = {
 };
 
 /* ──────────────────────────────────────────────────────────────────────── */
-/* Avatars page (layout provenance: aimfox.com/avatars mirror, ZIP 4).    */
+/* Avatars page.                                                          */
 /* Phase-2 branding: all body copy rewritten originally for NxtSend.      */
 /* Removed per owner-approved defaults: the two hero testimonials, the    */
 /* trusted-by ratings/claims row, the company wordmark row and the        */
 /* 16-review wall (D1–D4). The wall section is replaced by an original    */
 /* "What's included" product section below. No third-party tracking       */
 /* scripts/IDs and no external brand links are carried over.              */
+/* All visuals on this page are native compositions built from the        */
+/* app's illustrative persona set (public/images/agents).                 */
 /* ──────────────────────────────────────────────────────────────────────── */
+
+/* Illustrative personas — the same set the homepage uses. */
+const personas = [
+  { name: "Daniel C.", role: "Regional Director", photo: "/images/agents/daniel-c.webp" },
+  { name: "Emery E.", role: "Head of Sales", photo: "/images/agents/emery-e.webp" },
+  { name: "James Miller", role: "Senior Business Development", photo: "/images/agents/james-miller.webp" },
+  { name: "Michael B.", role: "Sales Agent", photo: "/images/agents/michael-b.webp" },
+  { name: "Emily Johnson", role: "Sales Agent", photo: "/images/agents/emily-johnson.webp" },
+  { name: "Olivia W.", role: "Sales Agent", photo: "/images/agents/olivia-w.webp" },
+  { name: "Chris H.", role: "Sales Agent", photo: "/images/agents/chris-h.webp" },
+  { name: "Thomas E.", role: "Sales Agent", photo: "/images/agents/thomas-e.webp" },
+];
 
 /* ── How it works (three steps) ────────────────────────────────────────── */
 const steps = [
@@ -32,21 +47,115 @@ const steps = [
     number: "1",
     title: "Choose your avatars",
     text: "Pick how many profiles you need and tell our team which market you want to cover",
-    image: "/images/avatars/step-1.webp",
+    visual: "select",
   },
   {
     number: "2",
     title: "Shape each profile",
     text: "Share the headline, photo, experience and location you want — we prepare and warm each profile for you",
-    image: "/images/avatars/step-2.svg",
+    visual: "form",
   },
   {
     number: "3",
     title: "Launch from one workspace",
     text: "Run campaigns and handle every reply from the same NxtSend inbox you use for your own accounts",
-    image: "/images/avatars/step-3.webp",
+    visual: "workspace",
   },
-];
+] as const;
+
+/* Step 1 visual — profile select cards (native composition). */
+function SelectVisual() {
+  const rows = personas.slice(0, 3);
+  return (
+    <div
+      aria-hidden="true"
+      className="mx-auto flex aspect-square w-full max-w-[21rem] items-center justify-center rounded-3xl bg-[linear-gradient(150deg,#f4f2ff_0%,#e8ecff_60%,#ffeef5_100%)] p-5"
+    >
+      <div className="w-full space-y-2.5">
+        {rows.map((persona, i) => (
+          <div
+            key={persona.name}
+            className={`flex items-center gap-3 rounded-2xl bg-white p-3 shadow-lg ${
+              i === 0 ? "ring-2 ring-purple-600" : "ring-1 ring-black-900/5"
+            }`}
+          >
+            <Image
+              src={persona.photo}
+              alt=""
+              width={72}
+              height={72}
+              className="h-10 w-10 shrink-0 rounded-full object-cover object-top"
+            />
+            <span className="min-w-0 flex-1 leading-tight">
+              <span className="block truncate text-14 font-bold text-black-900">
+                {persona.name}
+              </span>
+              <span className="block truncate text-12 text-black-400">
+                {persona.role}
+              </span>
+            </span>
+            <span
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                i === 0
+                  ? "bg-purple-600 text-white"
+                  : "border border-black-900/15 text-transparent"
+              }`}
+            >
+              <Check className="h-3 w-3" />
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* Step 3 visual — a mini workspace window (native composition). */
+function WorkspaceVisual() {
+  const rows = personas.slice(3, 6);
+  return (
+    <div
+      aria-hidden="true"
+      className="mx-auto flex aspect-square w-full max-w-[21rem] items-center justify-center rounded-3xl bg-[linear-gradient(160deg,#14142b_0%,#0b0b16_70%)] p-5"
+    >
+      <div className="w-full overflow-hidden rounded-2xl border border-white/10 bg-black-900 shadow-2xl">
+        <div className="flex items-center gap-1.5 border-b border-white/10 px-3.5 py-2.5">
+          <span className="h-2 w-2 rounded-full bg-white/15" />
+          <span className="h-2 w-2 rounded-full bg-white/15" />
+          <span className="h-2 w-2 rounded-full bg-white/15" />
+          <span className="ml-2 rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-medium text-white/40">
+            app.nxtsend.com
+          </span>
+        </div>
+        <div className="space-y-2 p-3.5">
+          {rows.map((persona) => (
+            <div
+              key={persona.name}
+              className="flex items-center gap-2.5 rounded-xl bg-white/5 px-3 py-2.5"
+            >
+              <Image
+                src={persona.photo}
+                alt=""
+                width={56}
+                height={56}
+                className="h-7 w-7 shrink-0 rounded-full object-cover object-top"
+              />
+              <span className="min-w-0 flex-1 space-y-1.5">
+                <span className="block h-1.5 w-4/5 rounded bg-white/25" />
+                <span className="block h-1.5 w-3/5 rounded bg-white/15" />
+              </span>
+              <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+            </div>
+          ))}
+          <div className="flex items-center justify-center gap-2 rounded-xl bg-gradient-brand px-3 py-2.5 text-12 font-semibold text-white">
+            <Send className="h-3.5 w-3.5" />
+            Launch campaign
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ── What's included with every avatar (original product section that ─── */
 /* replaces the removed review wall; product copy only, no testimonials)  */
@@ -81,27 +190,61 @@ export default function AvatarsPage() {
   return (
     <div className="relative overflow-hidden bg-black-900">
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* HERO (rounded banner — hero-bg artwork with the avatar profile     */}
-      {/* collage from hero.webp along the bottom, gradient headline)        */}
+      {/* HERO (rounded banner — gradient backdrop with a native fan of       */}
+      {/* persona profile cards along the bottom, gradient headline)         */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="px-2.5 pt-24 sm:pt-28">
         <div className="relative flex min-h-[720px] flex-col items-center overflow-hidden rounded-5xl px-4 pt-16 md:px-6 xl:rounded-8xl">
-          <Image
-            src="/images/avatars/hero-bg.webp"
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover"
+          <div
+            aria-hidden="true"
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(90% 60% at 50% 0%, rgba(124,58,237,0.35) 0%, transparent 60%), radial-gradient(60% 45% at 50% 110%, rgba(37,99,235,0.25) 0%, transparent 65%), linear-gradient(180deg, #0d0a1a 0%, #07070f 100%)",
+            }}
           />
-          <Image
-            src="/images/avatars/hero.webp"
-            alt=""
-            width={3362}
-            height={1442}
-            priority
-            className="pointer-events-none absolute bottom-0 left-1/2 w-[118%] max-w-none -translate-x-1/2 sm:w-full"
-          />
+          {/* Persona card fan — native composition */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-center"
+          >
+            {[
+              { persona: personas[3], rotate: "-13deg", y: "2.5rem", hide: "hidden lg:block" },
+              { persona: personas[4], rotate: "-6.5deg", y: "1rem", hide: "hidden sm:block" },
+              { persona: personas[0], rotate: "0deg", y: "0px", hide: "" },
+              { persona: personas[5], rotate: "6.5deg", y: "1rem", hide: "hidden sm:block" },
+              { persona: personas[6], rotate: "13deg", y: "2.5rem", hide: "hidden lg:block" },
+            ].map(({ persona, rotate, y, hide }) => (
+              <div
+                key={persona.name}
+                className={`-mx-3 w-44 shrink-0 sm:w-52 ${hide}`}
+                style={{ transform: `rotate(${rotate}) translateY(${y})` }}
+              >
+                <div className="overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black-900/10">
+                  <div className="h-12 bg-gradient-to-r from-purple-500 via-indigo-500 to-sky-400" />
+                  <div className="px-4 pb-4">
+                    <Image
+                      src={persona.photo}
+                      alt=""
+                      width={96}
+                      height={96}
+                      className="-mt-7 h-14 w-14 rounded-full object-cover object-top ring-4 ring-white"
+                    />
+                    <p className="mt-2 truncate text-15 font-bold text-black-900">
+                      {persona.name}
+                    </p>
+                    <p className="truncate text-12 text-black-400">
+                      {persona.role}
+                    </p>
+                    <div className="mt-3 space-y-1.5">
+                      <div className="h-1.5 w-full rounded bg-black-900/10" />
+                      <div className="h-1.5 w-2/3 rounded bg-black-900/10" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
           <h1 className="relative z-10 mb-5 max-w-4xl bg-gradient-purple-horizontal bg-clip-text text-center text-48 font-semibold text-transparent md:text-54 2xl:text-64">
             Additional LinkedIn profiles, tailored and ready to send
           </h1>
@@ -121,7 +264,7 @@ export default function AvatarsPage() {
       </section>
 
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* HOW IT WORKS (3 step cards over the bg-graphic artwork)             */}
+      {/* HOW IT WORKS (3 step cards over a soft gradient glow)               */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative border-t border-black-700/80 py-24 lg:py-32">
         <div className="section-container relative">
@@ -138,12 +281,9 @@ export default function AvatarsPage() {
               visual on top, text below); below xl they stack as wide
               horizontal cards. */}
           <div className="relative mx-auto mt-20 flex w-full max-w-[74.5rem] flex-col gap-y-16 px-6 md:px-2.5 xl:flex-row xl:justify-between xl:px-0">
-            <Image
-              src="/images/avatars/steps-bg.webp"
-              alt=""
-              width={1200}
-              height={806}
-              className="pointer-events-none absolute top-1/2 left-1/2 w-full max-w-3xl -translate-x-1/2 -translate-y-1/2 opacity-30"
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 left-1/2 h-[26rem] w-full max-w-3xl -translate-x-1/2 -translate-y-1/2 rounded-full bg-purple-600/25 opacity-30 blur-[130px]"
             />
             {steps.map((step) => (
               <div
@@ -154,19 +294,15 @@ export default function AvatarsPage() {
                   {step.number}
                 </div>
                 <div className="flex-1">
-                  {step.image?.endsWith(".svg") ? (
+                  {step.visual === "select" ? (
+                    <SelectVisual />
+                  ) : step.visual === "workspace" ? (
+                    <WorkspaceVisual />
+                  ) : (
                     /* Step 2's visual is a static form illustration file. */
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={step.image}
-                      alt={step.title}
-                      width={648}
-                      height={648}
-                      className="mx-auto h-full max-h-[21rem] w-auto"
-                    />
-                  ) : (
-                    <Image
-                      src={step.image!}
+                      src="/images/avatars/step-2.svg"
                       alt={step.title}
                       width={648}
                       height={648}
@@ -193,22 +329,34 @@ export default function AvatarsPage() {
             </Link>
           </div>
 
-          {/* Responsive app screenshot under the steps */}
-          <div className="mx-auto mt-16 max-w-6xl">
-            <Image
-              src="/images/avatars/showcase-desktop.webp"
-              alt="Rented LinkedIn avatars in NxtSend"
-              width={1200}
-              height={503}
-              className="hidden h-auto w-full sm:block"
-            />
-            <Image
-              src="/images/avatars/showcase-mobile.webp"
-              alt="Rented LinkedIn avatars in NxtSend"
-              width={1200}
-              height={825}
-              className="h-auto w-full sm:hidden"
-            />
+          {/* Persona grid under the steps (native composition) */}
+          <div
+            role="img"
+            aria-label="Rented LinkedIn avatars in NxtSend"
+            className="mx-auto mt-16 grid max-w-6xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+          >
+            {personas.map((persona) => (
+              <div
+                key={persona.name}
+                className="flex items-center gap-3 rounded-3xl border border-white/10 bg-white/[2.5%] p-4"
+              >
+                <Image
+                  src={persona.photo}
+                  alt=""
+                  width={96}
+                  height={96}
+                  className="h-12 w-12 shrink-0 rounded-full object-cover object-top"
+                />
+                <span className="min-w-0 leading-tight">
+                  <span className="block truncate text-15 font-bold text-white">
+                    {persona.name}
+                  </span>
+                  <span className="block truncate text-12 text-white/50">
+                    {persona.role}
+                  </span>
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </section>

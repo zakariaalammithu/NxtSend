@@ -3,14 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowUpRight, Search, Sparkles } from "lucide-react";
+import { ArrowUpRight, Blocks, Plus, Search, Sparkles, Webhook } from "lucide-react";
 
 /**
- * Integrations explorer (layout/structure from the mirror:
- * aimfox.com/integrations, downloaded as ZIP 2).
+ * Integrations explorer.
  *
  * Phase-2 branding (2026-10-19): all copy below was rewritten in
- * NxtSend's own words. The mirror's own product entry was removed
+ * NxtSend's own words. One third-party product entry was removed
  * entirely (D8): it described a session-sync/Chrome-extension product
  * NxtSend does not have. The category selector scrolls to a section
  * and highlights the one in view (scroll-spy), and the search box
@@ -212,7 +211,7 @@ const INTEGRATIONS: Record<string, IntegrationItem> = {
   },
 };
 
-/* ── Categories (mirror order; Automations is one shorter after D8) ────── */
+/* ── Categories (Automations is one shorter after D8) ──────────────────── */
 const CATEGORIES: { title: string; slugs: string[] }[] = [
   { title: "Top Choice", slugs: ["muse-ai", "instantly", "clay", "n8n", "slack", "smartlead"] },
   {
@@ -231,20 +230,28 @@ function categoryId(title: string) {
   return `category-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 }
 
-/* ── "Request integration" card (mirror: shown in the sidebar on xl,        */
-/* and again below the last section on smaller screens) ──────────────────── */
+/* ── "Request integration" card (shown in the sidebar on xl, and again     */
+/* below the last section on smaller screens). The visual is a native        */
+/* icon composition — no artwork file. ──────────────────────────────────── */
 function RequestIntegrationCard({ className = "" }: { className?: string }) {
   return (
     <div
       className={`flex flex-col gap-y-4 rounded-5xl bg-white p-4 md:flex-row-reverse md:items-center md:p-2.5 xl:flex-col xl:pb-6 ${className}`}
     >
-      <Image
-        src="/images/integrations/request-integration.webp"
-        alt=""
-        width={1200}
-        height={773}
-        className="mx-auto h-56 w-auto xl:h-52"
-      />
+      <div
+        aria-hidden="true"
+        className="relative mx-auto flex h-56 w-full max-w-[300px] items-center justify-center xl:h-52"
+      >
+        <span className="flex h-24 w-24 items-center justify-center rounded-[1.75rem] bg-black-900 shadow-xl">
+          <Blocks className="h-10 w-10 text-white" />
+        </span>
+        <span className="absolute right-6 top-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-black-900/10 bg-white shadow-lg">
+          <Plus className="h-5 w-5 text-black-900" />
+        </span>
+        <span className="absolute bottom-4 left-6 flex h-11 w-11 items-center justify-center rounded-2xl border border-black-900/10 bg-white shadow-lg">
+          <Webhook className="h-5 w-5 text-black-900" />
+        </span>
+      </div>
       <div className="flex flex-col gap-y-6 px-3 md:px-4 xl:px-2">
         <p className="text-center text-24 font-semibold text-black-900 md:text-left xl:text-20">
           Missing a tool you rely on? Tell us which integration to add next
@@ -260,7 +267,7 @@ function RequestIntegrationCard({ className = "" }: { className?: string }) {
   );
 }
 
-/* ── Integration card (mirror: whole card is a link) ─────────────────────── */
+/* ── Integration card (whole card is a link) ─────────────────────────────── */
 function IntegrationCard({ item }: { item: IntegrationItem }) {
   return (
     <Link
@@ -327,8 +334,8 @@ export function IntegrationsExplorer() {
     0,
   );
 
-  /* Scroll-spy: highlight the category whose heading has scrolled past,
-     like the mirror's on-window:scroll handler on its selector. */
+  /* Scroll-spy: highlight the category whose heading has scrolled past
+     (an on-window scroll handler drives the selector). */
   useEffect(() => {
     const onScroll = () => {
       let current: string | null = null;
@@ -362,7 +369,7 @@ export function IntegrationsExplorer() {
 
   return (
     <div className="section-container flex flex-col px-4 py-16 md:py-20 xl:flex-row xl:gap-20 xl:py-28">
-      {/* ─── Sidebar: categories + search (mirror) ─────────────────────── */}
+      {/* ─── Sidebar: categories + search ──────────────────────────────── */}
       <div className="h-fit shrink-0 self-start xl:sticky xl:top-24 xl:w-[22rem]">
         <div
           id="category-selector"
@@ -405,11 +412,11 @@ export function IntegrationsExplorer() {
           </div>
         </div>
 
-        {/* Request-integration card — sidebar placement (xl only, mirror) */}
+        {/* Request-integration card — sidebar placement (xl only) */}
         <RequestIntegrationCard className="max-xl:hidden" />
       </div>
 
-      {/* ─── Category sections (mirror) ────────────────────────────────── */}
+      {/* ─── Category sections ─────────────────────────────────────────── */}
       <div className="min-w-0 flex-1 pt-10 xl:pt-0">
         {visibleCategories.map((category, idx) => (
           <section key={category.title} className={idx > 0 ? "mt-6" : ""}>
@@ -455,7 +462,7 @@ export function IntegrationsExplorer() {
           </div>
         )}
 
-        {/* Request-integration card — below the sections (below xl, mirror) */}
+        {/* Request-integration card — below the sections (below xl) */}
         <RequestIntegrationCard className="mt-16 xl:hidden" />
       </div>
     </div>

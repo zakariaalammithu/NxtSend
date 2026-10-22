@@ -13,8 +13,8 @@ interface FooterColumn {
   links: FooterLink[];
 }
 
-/* Footer columns (mirror layout) — every link points at a route that exists. */
-const FOOTER_COLUMNS: FooterColumn[] = [
+/* Footer columns — every link points at a route that exists. */
+export const FOOTER_COLUMNS: FooterColumn[] = [
   {
     title: "Product",
     links: [
@@ -28,6 +28,8 @@ const FOOTER_COLUMNS: FooterColumn[] = [
     title: "Resources",
     links: [
       { label: "Academy", href: "/academy" },
+      { label: "Help & Support", href: "/support" },
+      { label: "Developers", href: "/developers" },
       { label: "Contact", href: "/contact" },
     ],
   },
@@ -59,7 +61,7 @@ export function Footer() {
 
   return (
     <footer className="relative w-full bg-black-900 px-3 pb-3 pt-2 text-white sm:px-4 sm:pb-4">
-      {/* Large dark navy rounded container (mirror layout) */}
+      {/* Large dark navy rounded container */}
       <div className="relative mx-auto max-w-[1400px] overflow-hidden rounded-[2.5rem] border border-white/5 bg-black-800 px-6 py-14 sm:px-10 lg:px-14">
         {/* Subtle ambient glow */}
         <div
@@ -145,6 +147,9 @@ export function Footer() {
             </Link>
             <Link href="/privacy" className="transition-colors hover:text-white">
               Privacy Policy
+            </Link>
+            <Link href="/cookies" className="transition-colors hover:text-white">
+              Cookie Policy
             </Link>
           </div>
           <span>© 2025 NxtSend. All rights reserved.</span>

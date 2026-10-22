@@ -1,37 +1,33 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Shield, AlertTriangle, Mail } from "lucide-react";
+import { Shield, Mail } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
-    "Learn how NxtSend collects, protects, and manages customer and prospect information under GDPR and CCPA standards.",
+    "How NxtSend handles data: what we collect, how we use it, the processors involved (Supabase, Stripe, Resend, and the mailbox and warm-up services you choose to connect), retention, and your rights.",
 };
 
+/**
+ * Privacy Policy (P8 rewrite). Written only from data practices the
+ * product actually implements: Supabase hosting (database, auth,
+ * storage), Stripe payments, Resend email delivery, Google/Microsoft
+ * mailboxes only when a user connects one via OAuth (access tokens
+ * stored encrypted), Instantly warm-up only when connected, and a
+ * Meta Pixel that loads only when a Pixel ID is configured and
+ * consent has been recorded. Workspace deletion is available in-app;
+ * account-level requests go through hello@nxtsend.com. No
+ * certifications are claimed anywhere in this document.
+ */
 export default function PrivacyPage() {
-  const lastUpdated = "October 2026";
+  const lastUpdated = "22 October 2026";
 
   return (
-    <div className="relative min-h-screen bg-black-900 pt-12 pb-24 text-white">
+    <div className="relative min-h-screen overflow-x-clip bg-black-900 pt-12 pb-24 text-white">
       {/* Background glow */}
       <div className="pointer-events-none absolute top-0 left-1/2 h-[400px] w-[750px] -translate-x-1/2 rounded-full bg-purple-600/10 blur-[140px]" />
 
       <div className="section-container relative z-10 max-w-4xl">
-        {/* Prominent Legal Disclaimer Banner */}
-        <div className="mb-10 rounded-2xl border border-yellow-500/40 bg-yellow-500/10 p-5 sm:p-6 backdrop-blur-md">
-          <div className="flex items-start gap-3.5">
-            <AlertTriangle className="h-6 w-6 shrink-0 text-yellow-400 mt-0.5" />
-            <div>
-              <h2 className="text-15 font-bold text-yellow-300">
-                ⚠️ Legal Notice & Draft Template
-              </h2>
-              <p className="mt-1 text-13 leading-relaxed text-yellow-200/90">
-                This is a draft template provided for demonstrative and structural purposes. Have a qualified legal professional review and adapt this document to your specific regulatory jurisdiction and operational practices before official publication.
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* Header */}
         <div className="border-b border-black-700/80 pb-8 mb-10">
           <div className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-900/30 px-3.5 py-1 text-12 font-semibold text-purple-300 mb-4">
@@ -42,7 +38,7 @@ export default function PrivacyPage() {
             Privacy Policy
           </h1>
           <p className="mt-3 text-14 text-black-400">
-            Last updated: {lastUpdated} &bull; Effective immediately for all registered users and visitors.
+            Last updated: {lastUpdated} &bull; This policy describes how NxtSend handles information when you visit our website, create an account, or use the NxtSend application.
           </p>
         </div>
 
@@ -50,130 +46,173 @@ export default function PrivacyPage() {
         <div className="prose prose-invert max-w-none space-y-10 text-15 leading-relaxed text-black-300">
           <section className="space-y-4">
             <h2 className="text-22 font-bold text-white tracking-tight">
-              1. Introduction
+              1. Information We Collect
             </h2>
-            <p>
-              NxtSend (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) operates the NxtSend SaaS platform, reachable via nxtsend.com and associated subdomains. We are committed to protecting the privacy, confidentiality, and security of both our users and the business contacts our users interact with through automated outreach.
-            </p>
-            <p>
-              This Privacy Policy explains how personal data is collected, processed, and safeguarded when you access our marketing website, create an account, connect social network accounts, or initiate communication workflows.
-            </p>
-          </section>
-
-          <section className="space-y-4">
-            <h2 className="text-22 font-bold text-white tracking-tight">
-              2. Data Collection
-            </h2>
-            <p>We collect information in the following categories:</p>
             <div className="rounded-2xl border border-black-700 bg-black-800/50 p-6 space-y-3">
-              <h3 className="text-16 font-semibold text-white">A. Information You Provide Directly</h3>
+              <h3 className="text-16 font-semibold text-white">A. Information you provide</h3>
               <ul className="list-disc list-inside space-y-1.5 text-14 text-black-300">
-                <li>Account credentials: Name, email address, password, company name.</li>
-                <li>Billing information: Processed securely via our payment gateway (Stripe). We do not store raw credit card numbers.</li>
-                <li>Prospect files & CSV imports: Prospect names, job titles, business email addresses, and LinkedIn profile URLs imported into campaigns.</li>
+                <li>Account and profile information: your name, email address and password (stored in hashed form by our authentication provider), and the workspace details you create.</li>
+                <li>Lead and campaign data you upload or enter: prospect names, business email addresses, LinkedIn profile URLs, company details, tags, campaign copy and sequence content.</li>
+                <li>Messages you send us: contact-form submissions, demo requests and support emails.</li>
               </ul>
             </div>
-
             <div className="rounded-2xl border border-black-700 bg-black-800/50 p-6 space-y-3">
-              <h3 className="text-16 font-semibold text-white">B. Data Collected Automatically</h3>
+              <h3 className="text-16 font-semibold text-white">B. Information created by your use of the Service</h3>
               <ul className="list-disc list-inside space-y-1.5 text-14 text-black-300">
-                <li>Log files and device identifiers: IP address, browser type, device specifications, referring URL, and session timestamps.</li>
-                <li>Performance metrics: Delivery timestamps, message open indicators, click counts, and response latency.</li>
+                <li>Email content and metadata for mailboxes you connect: messages sent and received through a connected mailbox, so your campaigns and unified inbox can work.</li>
+                <li>Outreach records: deliveries, replies, bounces, complaints, unsubscribes and the suppression lists built from them.</li>
+                <li>Usage records: activity totals per workspace that power the dashboard&apos;s usage views and plan-limit enforcement.</li>
+                <li>Technical and log data generated by your browser and our servers when pages and APIs are requested, used for operation and security.</li>
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-black-700 bg-black-800/50 p-6 space-y-3">
+              <h3 className="text-16 font-semibold text-white">C. Information from third parties you connect</h3>
+              <ul className="list-disc list-inside space-y-1.5 text-14 text-black-300">
+                <li>When you connect a Gmail or Outlook mailbox, Google or Microsoft returns your mailbox identity and access tokens under the permissions you approve; tokens are stored encrypted.</li>
+                <li>When you connect Instantly for warm-up, we receive warm-up status information about your mailboxes from Instantly.</li>
+                <li>Payment confirmations and subscription status come from Stripe; we never receive or store your full card number.</li>
               </ul>
             </div>
           </section>
 
           <section className="space-y-4">
             <h2 className="text-22 font-bold text-white tracking-tight">
-              3. Use of Data
+              2. How We Use Information
             </h2>
-            <p>NxtSend uses the collected information strictly for legitimate commercial purposes:</p>
             <ul className="list-disc list-inside space-y-2 text-14 text-black-300">
-              <li>To provide, operate, and maintain our multi-account automation and unified inbox services.</li>
-              <li>To execute AI-powered sentiment analysis and personalized message variable generation.</li>
-              <li>To detect and prevent fraudulent account creation, unauthorized scraping, and abuse of API limits.</li>
-              <li>To communicate critical account notices, invoices, system status updates, and security disclosures.</li>
-              <li>To comply with binding legal obligations, regulatory disclosures, and law enforcement requests.</li>
+              <li>To operate the Service: run your campaigns and sequences, deliver and receive email, show your inbox, and enforce plan limits.</li>
+              <li>To process the AI features you enable: when your workspace uses AI drafting or personalisation with a provider key you supply, the relevant message content is sent to that provider under your account with them.</li>
+              <li>To bill you: create and manage subscriptions and react to payment events from Stripe.</li>
+              <li>To keep accounts safe: detect abuse, honour suppression and unsubscribe requests, and investigate security incidents.</li>
+              <li>To support you: answer questions and troubleshoot problems you report.</li>
+              <li>To meet legal obligations that apply to us.</li>
             </ul>
-          </section>
-
-          <section className="space-y-4">
-            <h2 className="text-22 font-bold text-white tracking-tight">
-              4. Data Sharing & Third-Party Processors
-            </h2>
             <p>
-              We do not sell, rent, or trade your personal information or your imported prospect databases to third-party data brokers or advertisers. Data is shared exclusively with verified infrastructure sub-processors under strict data protection agreements:
+              We do not sell your personal information, your lead lists or your campaign data, and we do not use your workspace data to advertise other products to your contacts.
             </p>
-            <ul className="list-disc list-inside space-y-1.5 text-14 text-black-300">
-              <li><strong>Cloud Infrastructure:</strong> AWS and Supabase for redundant, encrypted database storage.</li>
-              <li><strong>Payment Processing:</strong> Stripe for PCI-DSS compliant subscription billing.</li>
-              <li><strong>AI Capabilities:</strong> OpenAI API for dynamic sentiment classification (data is not used for model training).</li>
-              <li><strong>Email Dispatch:</strong> Resend and Amazon SES for transactional notification delivery.</li>
-            </ul>
           </section>
 
           <section className="space-y-4">
             <h2 className="text-22 font-bold text-white tracking-tight">
-              5. Cookies and Tracking Technologies
+              3. Account and Campaign Data
             </h2>
             <p>
-              We use session cookies and authentication tokens to keep you signed in securely and remember workspace preferences. You can configure your browser to block cookies, although certain parts of our application may not function correctly. For detailed information, review our{" "}
+              The data inside a workspace — leads, campaigns, sequences, inbox history and usage — belongs to that workspace and is visible to its members according to their roles. Workspaces are separated from one another in the database with row-level access controls, and administrative actions are restricted by role. Administrators of the NxtSend platform itself access workspace data only where needed to operate, secure or support the Service.
+            </p>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-22 font-bold text-white tracking-tight">
+              4. Email and Contact Data
+            </h2>
+            <p>
+              Lead and contact data in NxtSend is supplied by our users, who are responsible for having a lawful basis to hold and contact it. We process that data on the user&apos;s instructions: storing it, sending the campaigns the user configures, and recording what comes back.
+            </p>
+            <p>
+              If you are a contact of a NxtSend user: campaign email carries an unsubscribe link, and an unsubscribe, bounce or complaint adds the address to that workspace&apos;s suppression list so it is not emailed again from that workspace. To ask about data a specific user holds about you, contact that user directly; if you contact us at hello@nxtsend.com we will route the request to the workspace concerned where we can identify it.
+            </p>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-22 font-bold text-white tracking-tight">
+              5. Cookies and Analytics
+            </h2>
+            <p>
+              We use the cookies and browser storage described in our{" "}
               <Link href="/cookies" className="text-purple-400 hover:underline">
                 Cookie Policy
               </Link>
-              .
+              : essential cookies that keep you signed in, and local storage for preferences such as your cookie-consent choice. If a Meta (Facebook) Pixel ID is configured for this website, Meta&apos;s pixel may load after consent is recorded and set its own cookie to measure advertising; when no Pixel ID is configured, no pixel loads. You can block cookies in your browser settings, though signing in will not work without the essential ones.
             </p>
           </section>
 
           <section className="space-y-4">
             <h2 className="text-22 font-bold text-white tracking-tight">
-              6. Your Data Rights (GDPR & CCPA)
+              6. Third-Party Integrations and Processors
             </h2>
             <p>
-              Depending on your location, you hold statutory rights under data protection regulations:
+              We share data only with the service providers needed to run NxtSend, and only the data each one needs:
+            </p>
+            <ul className="list-disc list-inside space-y-1.5 text-14 text-black-300">
+              <li><strong>Supabase</strong> — hosting for our database, authentication and file storage; this is where your account and workspace data is stored.</li>
+              <li><strong>Stripe</strong> — payment processing and subscription billing; card details go directly to Stripe.</li>
+              <li><strong>Resend</strong> — delivery of campaign and transactional email sent through our sending setup, and processing of email delivery events.</li>
+              <li><strong>Google and Microsoft</strong> — only when you connect a Gmail or Outlook mailbox: mailbox access under the OAuth permissions you approve.</li>
+              <li><strong>Instantly</strong> — only when you connect it: email warm-up and the warm-up status we display back to you.</li>
+              <li><strong>Meta</strong> — only if a Meta Pixel ID is configured for this website, as described in Section 5.</li>
+            </ul>
+            <p>
+              Beyond these processors, we disclose information only where the law requires it, or to protect the rights, property or safety of NxtSend, our users or others.
+            </p>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-22 font-bold text-white tracking-tight">
+              7. Data Storage and Security
+            </h2>
+            <p>
+              Application data is stored with Supabase and served over encrypted (HTTPS) connections. Access to connected-mailbox tokens is additionally protected: the tokens are stored encrypted (AES-256-GCM) and are never displayed after connection. We restrict internal access by role and audit administrative actions. No system is perfectly secure, and we do not claim certifications we have not obtained — if we become aware of a breach affecting your data, we will act on it and notify affected users where the law requires.
+            </p>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-22 font-bold text-white tracking-tight">
+              8. Data Sharing and Retention
+            </h2>
+            <p>
+              We keep account and workspace data for as long as the account or workspace exists and it is needed to provide the Service, to comply with legal obligations, or to resolve disputes. You can delete a workspace at any time from its settings, which permanently deletes that workspace&apos;s campaigns, lead contact data and active sequences. Backups and logs may persist for a limited period after deletion before being overwritten in the ordinary course. If you cancel a subscription without deleting your workspace, your data remains available to you as described in the product.
+            </p>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-22 font-bold text-white tracking-tight">
+              9. Your Rights and Data Deletion
+            </h2>
+            <p>
+              Depending on where you live, data-protection law may give you rights over your personal information. Here is how each one works with NxtSend today:
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="rounded-xl border border-black-700 bg-black-800/40 p-4">
-                <h4 className="text-14 font-semibold text-white">Right to Access & Portability</h4>
-                <p className="mt-1 text-12 text-black-400">Request an export of all personal data held in your account.</p>
+                <h4 className="text-14 font-semibold text-white">Access &amp; export</h4>
+                <p className="mt-1 text-12 text-black-400">Your leads can be exported as CSV from the Leads page at any time. For a copy of other personal data we hold about you, email hello@nxtsend.com.</p>
               </div>
               <div className="rounded-xl border border-black-700 bg-black-800/40 p-4">
-                <h4 className="text-14 font-semibold text-white">Right to Erasure (To Be Forgotten)</h4>
-                <p className="mt-1 text-12 text-black-400">Request permanent deletion of your profile and campaign history.</p>
+                <h4 className="text-14 font-semibold text-white">Correction</h4>
+                <p className="mt-1 text-12 text-black-400">Profile details can be corrected in Dashboard → Settings; anything else, email us and we will correct it.</p>
               </div>
               <div className="rounded-xl border border-black-700 bg-black-800/40 p-4">
-                <h4 className="text-14 font-semibold text-white">Right to Rectification</h4>
-                <p className="mt-1 text-12 text-black-400">Correct inaccurate or incomplete account and company records.</p>
+                <h4 className="text-14 font-semibold text-white">Deletion</h4>
+                <p className="mt-1 text-12 text-black-400">Delete a whole workspace in its settings for immediate, permanent removal of its campaign and lead data. For deletion of your account itself, email hello@nxtsend.com.</p>
               </div>
               <div className="rounded-xl border border-black-700 bg-black-800/40 p-4">
-                <h4 className="text-14 font-semibold text-white">Right to Object</h4>
-                <p className="mt-1 text-12 text-black-400">Opt out of automated processing or marketing communications.</p>
+                <h4 className="text-14 font-semibold text-white">Objection &amp; restriction</h4>
+                <p className="mt-1 text-12 text-black-400">To object to processing or ask us to restrict it, email hello@nxtsend.com and we will review and respond.</p>
               </div>
             </div>
           </section>
 
           <section className="space-y-4">
             <h2 className="text-22 font-bold text-white tracking-tight">
-              7. Security & Retention
+              10. Changes to This Policy
             </h2>
             <p>
-              We maintain SOC-2 standard controls, including TLS 1.3 in transit and AES-256 encryption at rest. Customer data is retained as long as your workspace account is active, and is permanently purged 30 days following verified account cancellation.
+              We may update this policy when our practices or the law change. Updates are published on this page with a revised &quot;Last updated&quot; date, and material changes will be notified through the Service or by email where reasonably possible.
             </p>
           </section>
 
           <section className="space-y-4 border-t border-black-700/80 pt-8">
             <h2 className="text-22 font-bold text-white tracking-tight">
-              8. Contact Our Data Protection Officer
+              11. Contact Information
             </h2>
             <p>
-              If you have inquiries, complaints, or wish to exercise your statutory privacy rights, contact our Data Protection Officer at:
+              For any privacy question or request, contact us at:
             </p>
             <div className="rounded-2xl border border-black-700 bg-black-800/60 p-6 flex items-center justify-between flex-wrap gap-4">
               <div>
-                <p className="text-14 font-semibold text-white">NxtSend Privacy & Compliance Team</p>
-                <p className="text-13 text-black-400">Austin, TX 73301, USA</p>
-                <a href="mailto:privacy@nxtsend.com" className="text-14 text-purple-400 hover:underline">
-                  privacy@nxtsend.com
+                <p className="text-14 font-semibold text-white">NxtSend</p>
+                <p className="text-13 text-black-400">Office: Austin, TX 73301, USA</p>
+                <a href="mailto:hello@nxtsend.com" className="text-14 text-purple-400 hover:underline">
+                  hello@nxtsend.com
                 </a>
               </div>
               <Link

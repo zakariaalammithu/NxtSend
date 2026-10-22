@@ -16,12 +16,10 @@ export const metadata: Metadata = {
 };
 
 /* ──────────────────────────────────────────────────────────────────────── */
-/* More-resources cards. The mirror page pointed two of these cards at   */
-/* its own help and documentation subdomains; those addresses are never */
-/* carried over, and this app has no separate help or docs routes, so   */
-/* both cards lead to /contact — the same target the app's Footer uses. */
-/* The mirror's third card promoted a directory of outside consultants; */
-/* it has been replaced with a direct route to the NxtSend team.        */
+/* More-resources cards. Two of these cards lead to /contact — help   */
+/* and documentation are routed through the contact page, the same    */
+/* target the app's Footer uses. The third card is a direct route to  */
+/* the NxtSend team.                                                  */
 /* ──────────────────────────────────────────────────────────────────────── */
 const resources = [
   {
@@ -42,7 +40,7 @@ const resources = [
   },
 ];
 
-/** Link glyph, path copied from the mirror's own icon set. */
+/** Link glyph (inline SVG path). */
 function LinkIcon({ className }: { className?: string }) {
   return (
     <svg

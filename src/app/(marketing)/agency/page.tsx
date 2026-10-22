@@ -13,10 +13,14 @@ import {
   Lock,
   Palette,
   Receipt,
+  Rocket,
+  Send,
   Settings2,
+  UserPlus,
   UserRound,
   Users,
   Webhook,
+  Workflow,
 } from "lucide-react";
 import { AgencyPricing } from "@/components/marketing/AgencyPricing";
 
@@ -26,25 +30,28 @@ export const metadata: Metadata = {
     "Run LinkedIn outreach for every client from separate workspaces, present it under your own brand, and handle replies together in one unified inbox.",
 };
 
-/* ── Support cards (mirror: aimfox.com/agency) ───────────────────────────── */
+/* ── Support cards ─────────────────────────────────────────────────────── */
 const supportCards = [
   {
     title: "Onboarding",
     text: "A specialist walks your team through account setup, workspace configuration and your first client campaign launch.",
-    image: "/images/agency/support-onboarding.webp",
-    alt: "Onboarding",
+    icon: Rocket,
+    art: "linear-gradient(150deg, #312e81 0%, #1e1b4b 55%, #0f0c29 100%)",
+    glow: "bg-purple-500/25",
   },
   {
     title: "Advanced workflows",
     text: "Apply ready-made sequence patterns designed for multi-client outreach work.",
-    image: "/images/agency/support-workflows.webp",
-    alt: "Advanced workflows",
+    icon: Workflow,
+    art: "linear-gradient(150deg, #0c4a6e 0%, #082f49 55%, #0b1226 100%)",
+    glow: "bg-sky-500/25",
   },
   {
     title: "Help when you need it",
     text: "Your account manager answers questions and troubleshoots issues as they arise.",
-    image: "/images/agency/support-help.webp",
-    alt: "Help when you need it",
+    icon: Headphones,
+    art: "linear-gradient(150deg, #4a044e 0%, #2a0a33 55%, #150a24 100%)",
+    glow: "bg-fuchsia-500/25",
   },
 ];
 
@@ -83,12 +90,11 @@ const processSteps = [
   },
 ];
 
-/* ── Hero artwork: the Agency Plan settings panel, rebuilt as native
-      JSX (P6 clip fix). The previous raster capture
-      (agency-plan.webp) was cropped inside the file itself — its right
-      column and bottom row are cut off in the source pixels, and its
-      overlay rendering clipped the panel's top as well — and it showed
-      the old aimfox.com app. A live panel cannot be clipped at any
+/* ── Hero artwork: the Agency Plan settings panel, built as native
+      JSX (P6 clip fix). The previous raster capture was cropped
+      inside the file itself — its right column and bottom row are
+      cut off in the source pixels, and its overlay rendering clipped
+      the panel's top as well. A live panel cannot be clipped at any
       viewport and carries NxtSend's own domain and branding. ──────── */
 const panelNav = [
   { label: "Profile settings", icon: UserRound },
@@ -225,6 +231,199 @@ function AgencyPlanPanel() {
   );
 }
 
+/* ── Privacy visibility table (native composition): who can see what
+      inside a client workspace. Illustrative rows only — data areas
+      and viewer roles, never client names or addresses. ─────────────── */
+const privacyRows = [
+  "Campaigns & sequences",
+  "Inbox conversations",
+  "Leads & contacts",
+  "Billing & invoices",
+];
+
+function PrivacyTable() {
+  return (
+    <div className="relative w-full overflow-hidden rounded-6xl bg-white text-left text-black-900 shadow-2xl">
+      <div className="flex items-center gap-2 border-b border-black-900/[0.06] px-4 py-3 sm:px-5">
+        <Lock className="h-3.5 w-3.5 text-purple-600" />
+        <span className="text-12 font-bold sm:text-13">
+          Workspace visibility
+        </span>
+        <span className="ml-auto rounded-full bg-purple-600/10 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
+          Per client
+        </span>
+      </div>
+      <div className="px-4 py-2 sm:px-5">
+        <div className="grid grid-cols-[1.5fr_0.8fr_0.8fr_0.9fr] items-center gap-2 border-b border-black-900/[0.06] py-2 text-[10px] font-bold tracking-wide text-black-400 uppercase sm:text-11">
+          <span>Data</span>
+          <span className="text-center">Your team</span>
+          <span className="text-center">The client</span>
+          <span className="text-center">Other clients</span>
+        </div>
+        {privacyRows.map((row) => (
+          <div
+            key={row}
+            className="grid grid-cols-[1.5fr_0.8fr_0.8fr_0.9fr] items-center gap-2 border-b border-black-900/[0.05] py-2.5 last:border-0"
+          >
+            <span className="text-12 font-semibold sm:text-13">{row}</span>
+            {[0, 1].map((col) => (
+              <span key={col} className="flex justify-center">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white">
+                  <Check className="h-3 w-3" />
+                </span>
+              </span>
+            ))}
+            <span className="flex items-center justify-center gap-1 text-11 font-semibold text-black-400">
+              <Lock className="h-3 w-3" />
+              Never
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Grow-card visuals (native compositions) ─────────────────────────────
+   Seats: owner-supplied headshots (public/images/people) orbit a
+   central briefcase tile over dashed connectors. Avatars: the
+   segment chips + a rounded-tile grid of the app's illustrative
+   persona photos (public/images/agents), echoing the homepage's
+   segment panel. ─────────────────────────────────────────────────────── */
+const seatPeople = [
+  { photo: "/images/people/austin-smith.jpg", left: "11%", top: "13%" },
+  { photo: "/images/people/emily-davidson.jpg", left: "29%", top: "10%" },
+  { photo: "/images/people/brandon-pindulic.jpg", left: "47%", top: "9%" },
+  { photo: "/images/people/misti-morgenstern.jpg", left: "65%", top: "10%" },
+  { photo: "/images/people/robert-tas.jpg", left: "13%", top: "76%" },
+  { photo: "/images/people/dave-mattso.jpg", left: "50%", top: "78%" },
+  { photo: "/images/people/bill-bradford.jpg", left: "87%", top: "74%" },
+];
+
+function GrowSeatsVisual() {
+  return (
+    <div
+      aria-hidden="true"
+      className="relative aspect-[1096/1067] w-full overflow-hidden bg-white"
+    >
+      <svg
+        className="absolute inset-0 h-full w-full"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+      >
+        {seatPeople.map((person) => (
+          <line
+            key={person.photo}
+            x1={parseFloat(person.left)}
+            y1={parseFloat(person.top)}
+            x2="50"
+            y2="48"
+            stroke="#d8d5ec"
+            strokeWidth="0.5"
+            strokeDasharray="2 2"
+          />
+        ))}
+        <line
+          x1="84"
+          y1="13"
+          x2="50"
+          y2="48"
+          stroke="#d8d5ec"
+          strokeWidth="0.5"
+          strokeDasharray="2 2"
+        />
+      </svg>
+      <div className="absolute top-[48%] left-1/2 flex aspect-square w-[24%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[1.6rem] bg-white shadow-[0_18px_50px_rgba(88,80,236,0.25)] ring-1 ring-purple-100">
+        <span className="flex h-3/5 w-3/5 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-400 to-indigo-500 text-white">
+          <Briefcase className="h-1/2 w-1/2" />
+        </span>
+      </div>
+      {seatPeople.map((person) => (
+        <span
+          key={person.photo}
+          className="absolute aspect-square w-[17%] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full shadow-xl ring-4 ring-white"
+          style={{ left: person.left, top: person.top }}
+        >
+          <Image
+            src={person.photo}
+            alt=""
+            fill
+            sizes="120px"
+            className="object-cover object-top"
+          />
+        </span>
+      ))}
+      <span className="absolute top-[13%] left-[84%] flex aspect-square w-[17%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[#f2f1fa] shadow-xl ring-4 ring-white">
+        <UserPlus className="h-2/5 w-2/5 text-indigo-500" />
+      </span>
+    </div>
+  );
+}
+
+const growAvatarTiles: (string | null)[] = [
+  null,
+  "/images/agents/emery-e.webp",
+  null,
+  "/images/agents/olivia-w.webp",
+  "/images/agents/james-miller.webp",
+  null,
+  "/images/agents/emily-johnson.webp",
+  null,
+  null,
+  "/images/agents/daniel-c.webp",
+  null,
+  "/images/agents/chris-h.webp",
+];
+
+const growSegmentChips = [
+  { label: "California", swatch: "bg-red-500" },
+  { label: "Bay Area", swatch: "bg-purple-600" },
+  { label: "HoReCa", swatch: "bg-sky-500" },
+  { label: "Procurement", swatch: "bg-pink-500" },
+  { label: "Business Development", swatch: "bg-blue-600" },
+];
+
+function GrowAvatarsVisual() {
+  return (
+    <div aria-hidden="true" className="relative w-full bg-[#f6f6fa] p-4 sm:p-5">
+      <div className="flex flex-wrap gap-2">
+        {growSegmentChips.map((chip) => (
+          <span
+            key={chip.label}
+            className="inline-flex items-center gap-1.5 rounded-full bg-black-900 px-3 py-1.5 text-12 font-semibold text-white"
+          >
+            <span className={`h-2.5 w-2.5 rounded-[4px] ${chip.swatch}`} />
+            {chip.label}
+          </span>
+        ))}
+      </div>
+      <div className="mt-4 grid grid-cols-4 gap-2.5 sm:gap-3">
+        {growAvatarTiles.map((photo, i) =>
+          photo ? (
+            <div
+              key={i}
+              className="relative aspect-square overflow-hidden rounded-[1.4rem] shadow-md ring-1 ring-black-900/5"
+            >
+              <Image
+                src={photo}
+                alt=""
+                fill
+                sizes="150px"
+                className="object-cover object-top"
+              />
+            </div>
+          ) : (
+            <div
+              key={i}
+              className="aspect-square rounded-[1.4rem] bg-white shadow-[inset_0_0_0_1px_rgba(15,15,30,0.04)]"
+            />
+          ),
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AgencyPage() {
   return (
     <div className="relative min-h-screen bg-black-900">
@@ -286,20 +485,19 @@ export default function AgencyPage() {
               </div>
             </div>
 
-            {/* Artwork frame: aspect-matched stage for the backdrop +
-                the JSX Agency Plan panel (clip fix — the old raster
-                overlay was cropped inside its own file and again by
-                this frame). The backdrop is abstract art (safe to
-                cover-crop); the panel is live markup, so no text in it
-                can be cut at any viewport. */}
+            {/* Artwork frame: aspect-matched stage for the gradient
+                backdrop + the JSX Agency Plan panel (clip fix — the
+                old raster overlay was cropped inside its own file and
+                again by this frame). The panel is live markup, so no
+                text in it can be cut at any viewport. */}
             <div className="relative aspect-[4/3] overflow-hidden rounded-3xl border border-black-700/80 shadow-2xl min-[500px]:aspect-[16/10] lg:aspect-[6/5]">
-              <Image
-                src="/images/agency/hero.webp"
-                alt=""
-                fill
-                sizes="(max-width: 1024px) 100vw, 50vw"
-                className="object-cover"
-                priority
+              <div
+                aria-hidden="true"
+                className="absolute inset-0"
+                style={{
+                  background:
+                    "radial-gradient(80% 70% at 85% 0%, rgba(255,196,150,0.65) 0%, transparent 55%), radial-gradient(90% 80% at 0% 100%, rgba(165,180,252,0.55) 0%, transparent 60%), linear-gradient(140deg, #f6f4ff 0%, #e9edff 48%, #ffe9db 100%)",
+                }}
               />
               <AgencyPlanPanel />
             </div>
@@ -323,29 +521,69 @@ export default function AgencyPage() {
             </p>
           </div>
 
-          {/* Bento grid — batch 2: rebuilt to the mirror's own card
-              compositions (mirror: agency.html "scale" bento). The mirror
-              lays the section on a white panel; the cards' internal
-              compositions (full-bleed artwork, title positions, Safety's
-              3D-visual panel + orange CTA panel) are the mirror's, while
-              the section keeps this site's dark theme. */}
+          {/* Bento grid — card compositions: full-bleed visual panels,
+              title positions per card, Safety's visual panel + orange
+              CTA panel; the section keeps this site's dark theme. */}
           <div className="mx-auto mt-14 grid w-full max-w-[73.75rem] gap-6 sm:gap-8">
-            {/* Fully whitelabel — title bottom-right at xl, as in the
-                mirror. Below xl the title sits above the card: the
-                artwork's bright UI panel fills the frame and leaves no
-                legible spot for white text over it (P6 clip fix). */}
+            {/* Fully whitelabel — title bottom-right at xl. Below xl
+                the title sits above the card: the card's bright mock
+                panel fills the frame and leaves no legible spot for
+                white text over it (P6 clip fix). */}
             <div>
               <h3 className="mb-4 text-24 font-bold text-white sm:text-30 xl:hidden">
                 Fully white-label. Entirely your brand.
               </h3>
-              <div className="relative aspect-[2384/1328] overflow-hidden rounded-7xl">
-                <Image
-                  src="/images/agency/whitelabel-bg.webp"
-                  alt="Fully white-label. Entirely your brand."
-                  fill
-                  sizes="(max-width: 1200px) 100vw, 1180px"
-                  className="object-cover"
-                />
+              <div className="relative aspect-[2384/1328] overflow-hidden rounded-7xl bg-[linear-gradient(140deg,#1e1b4b_0%,#312e81_52%,#4c1d95_100%)]">
+                {/* White-label preview mock — native composition */}
+                <div
+                  aria-hidden="true"
+                  className="absolute top-1/2 left-6 w-[64%] max-w-md -translate-y-1/2 sm:left-10 sm:w-[52%]"
+                >
+                  <div className="overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black-900/10">
+                    <div className="flex items-center gap-1.5 border-b border-black-900/[0.06] px-3.5 py-2.5">
+                      <span className="h-2 w-2 rounded-full bg-[#FF5F57]" />
+                      <span className="h-2 w-2 rounded-full bg-[#FEBC2E]" />
+                      <span className="h-2 w-2 rounded-full bg-[#28C840]" />
+                      <span className="ml-2 rounded-md bg-black-50 px-2 py-0.5 text-[10px] font-medium text-black-400">
+                        yourbrand.com
+                      </span>
+                    </div>
+                    <div className="p-4 sm:p-5">
+                      <div className="flex items-center gap-2.5">
+                        <span className="h-8 w-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600" />
+                        <span className="space-y-1.5">
+                          <span className="block h-2 w-28 rounded bg-black-900/25" />
+                          <span className="block h-2 w-20 rounded bg-black-900/10" />
+                        </span>
+                        <span className="ml-auto flex h-7 w-7 items-center justify-center rounded-full bg-purple-600/10 text-purple-600">
+                          <Palette className="h-3.5 w-3.5" />
+                        </span>
+                      </div>
+                      <div className="mt-4 flex items-center gap-1.5 sm:gap-2">
+                        {[
+                          "bg-violet-500",
+                          "bg-indigo-500",
+                          "bg-sky-500",
+                          "bg-emerald-500",
+                          "bg-orange-400",
+                          "bg-rose-500",
+                        ].map((swatch) => (
+                          <span
+                            key={swatch}
+                            className={`h-5 w-5 shrink-0 rounded-full sm:h-6 sm:w-6 ${swatch} ring-2 ring-white`}
+                          />
+                        ))}
+                        <span className="ml-1 hidden text-11 font-medium text-black-400 md:inline">
+                          Brand colours
+                        </span>
+                      </div>
+                      <div className="mt-4 space-y-2 border-t border-dashed border-black-900/10 pt-3">
+                        <div className="h-2 w-3/4 rounded bg-black-900/10" />
+                        <div className="h-2 w-1/2 rounded bg-black-900/10" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div className="absolute inset-0 hidden items-end justify-end p-14 xl:flex">
                   <h3 className="text-right text-30 font-bold text-white">
                     Fully white-label.
@@ -357,14 +595,11 @@ export default function AgencyPage() {
             </div>
 
             <div className="flex flex-col gap-6 sm:gap-8 xl:flex-row">
-              {/* Workspaces — title at the top, as in the mirror */}
-              <div className="relative aspect-[1480/1328] grow overflow-hidden rounded-7xl xl:aspect-auto xl:h-[41.5rem]">
-                <Image
-                  src="/images/agency/workspaces-bg.webp"
-                  alt="Workspaces"
-                  fill
-                  sizes="(max-width: 1280px) 100vw, 720px"
-                  className="object-cover object-center"
+              {/* Workspaces — title at the top, workspace rows below */}
+              <div className="relative aspect-[1480/1328] grow overflow-hidden rounded-7xl bg-[linear-gradient(165deg,#171431_0%,#0d0b1e_60%,#08070f_100%)] xl:aspect-auto xl:h-[41.5rem]">
+                <div
+                  aria-hidden="true"
+                  className="absolute -top-20 right-0 h-72 w-72 rounded-full bg-indigo-500/20 blur-[100px]"
                 />
                 <div className="relative z-10 px-4 pt-6 text-center sm:pt-14">
                   <h3 className="text-24 font-bold text-white sm:text-30">Workspaces</h3>
@@ -373,17 +608,39 @@ export default function AgencyPage() {
                     keeps oversight of every account.
                   </p>
                 </div>
+                {/* Workspace rows — native composition */}
+                <div
+                  aria-hidden="true"
+                  className="relative z-10 mx-auto mt-6 w-full max-w-sm space-y-2.5 px-6 sm:mt-10"
+                >
+                  {[
+                    "from-violet-500 to-indigo-600",
+                    "from-sky-400 to-blue-600",
+                    "from-orange-400 to-rose-500",
+                  ].map((gradient) => (
+                    <div
+                      key={gradient}
+                      className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 backdrop-blur-sm"
+                    >
+                      <span
+                        className={`h-9 w-9 shrink-0 rounded-lg bg-gradient-to-br ${gradient}`}
+                      />
+                      <span className="min-w-0 flex-1 space-y-1.5">
+                        <span className="block h-2 w-3/5 rounded bg-white/30" />
+                        <span className="block h-2 w-2/5 rounded bg-white/15" />
+                      </span>
+                      <Users className="h-4 w-4 shrink-0 text-white/40" />
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-white/15 px-4 py-3 text-12 font-semibold text-white/50">
+                    <span className="text-14 leading-none">+</span>
+                    New workspace
+                  </div>
+                </div>
               </div>
 
-              {/* Account manager — dark text on the light artwork (mirror) */}
-              <div className="relative aspect-[1568/1440] overflow-hidden rounded-7xl xl:aspect-auto xl:h-[41.5rem] xl:w-[26.25rem] xl:shrink-0">
-                <Image
-                  src="/images/agency/account-manager-bg.webp"
-                  alt="Account manager"
-                  fill
-                  sizes="(max-width: 1280px) 100vw, 420px"
-                  className="object-cover object-center"
-                />
+              {/* Account manager — dark text on a light gradient panel */}
+              <div className="relative aspect-[1568/1440] overflow-hidden rounded-7xl bg-[linear-gradient(165deg,#ffffff_0%,#eef0ff_55%,#ffe9f3_100%)] xl:aspect-auto xl:h-[41.5rem] xl:w-[26.25rem] xl:shrink-0">
                 <div className="relative z-10 px-4 pt-6 text-center text-black-900 sm:pt-14">
                   <h3 className="text-24 font-bold sm:text-30">Account manager</h3>
                   <p className="mx-auto mt-2 max-w-[18.25rem] text-13 sm:mt-3 sm:text-15">
@@ -391,20 +648,50 @@ export default function AgencyPage() {
                     Slack, and get help moving profiles over.
                   </p>
                 </div>
+                {/* Support chat — native composition */}
+                <div
+                  aria-hidden="true"
+                  className="relative z-10 mx-auto mt-6 w-full max-w-xs px-6 sm:mt-10"
+                >
+                  <div className="rounded-3xl bg-white p-4 shadow-2xl ring-1 ring-black-900/5">
+                    <div className="flex items-center gap-2.5 border-b border-black-900/[0.06] pb-3">
+                      <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white">
+                        <UserRound className="h-4.5 w-4.5" />
+                        <span className="absolute right-0 bottom-0 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-white" />
+                      </span>
+                      <span className="min-w-0 flex-1 space-y-1.5">
+                        <span className="block h-2 w-3/5 rounded bg-black-900/25" />
+                        <span className="block h-2 w-2/5 rounded bg-black-900/10" />
+                      </span>
+                      <Headphones className="h-4 w-4 shrink-0 text-black-300" />
+                    </div>
+                    <div className="space-y-2.5 pt-3">
+                      <div className="w-4/5 rounded-2xl rounded-tl-md bg-black-50 p-3">
+                        <div className="space-y-1.5">
+                          <div className="h-2 w-full rounded bg-black-900/15" />
+                          <div className="h-2 w-2/3 rounded bg-black-900/10" />
+                        </div>
+                      </div>
+                      <div className="ml-auto w-3/5 rounded-2xl rounded-tr-md bg-purple-600 p-3">
+                        <div className="space-y-1.5">
+                          <div className="h-2 w-full rounded bg-white/40" />
+                          <div className="h-2 w-1/2 rounded bg-white/25" />
+                        </div>
+                      </div>
+                      <div className="flex items-center rounded-full border border-black-900/10 px-3.5 py-2">
+                        <span className="h-2 w-24 rounded bg-black-900/10" />
+                        <Send className="ml-auto h-3.5 w-3.5 text-purple-600" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
             <div className="flex flex-col gap-6 sm:gap-8 xl:flex-row">
-              {/* Safety — tall card: header, 3D-visual panel with the
-                  feature chips, and the mirror's orange CTA panel */}
-              <div className="relative flex h-[38rem] flex-col overflow-hidden rounded-7xl sm:h-[59.5rem] xl:h-[41.5rem] xl:w-[26.25rem] xl:shrink-0">
-                <Image
-                  src="/images/agency/safety-bg.webp"
-                  alt=""
-                  fill
-                  sizes="(max-width: 1280px) 100vw, 420px"
-                  className="object-cover object-center"
-                />
+              {/* Safety — tall card: header, visual panel with the
+                  feature chips, and the orange CTA panel */}
+              <div className="relative flex h-[38rem] flex-col overflow-hidden rounded-7xl bg-[linear-gradient(170deg,#1b2340_0%,#101623_55%,#0a0e18_100%)] sm:h-[59.5rem] xl:h-[41.5rem] xl:w-[26.25rem] xl:shrink-0">
                 <div className="relative z-10 flex h-full flex-col p-1 pt-14 xl:pt-14">
                   <div className="px-4 text-center">
                     <h3 className="text-30 font-bold text-white">Safety</h3>
@@ -414,15 +701,20 @@ export default function AgencyPage() {
                     </p>
                   </div>
 
-                  <div className="relative mt-auto flex items-end justify-center overflow-hidden rounded-7xl bg-[#10171D] p-4">
-                    <Image
-                      src="/images/agency/safety-icon.webp"
-                      alt="Safety"
-                      fill
-                      sizes="(max-width: 1280px) 100vw, 420px"
-                      className="object-cover object-center"
+                  <div className="relative mt-auto flex flex-col items-center justify-center overflow-hidden rounded-7xl bg-[#10171D] p-4 pt-8">
+                    <div
+                      aria-hidden="true"
+                      className="absolute top-0 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full bg-sky-500/20 blur-[60px]"
                     />
-                    <div className="relative flex flex-row flex-wrap items-center justify-center gap-x-1.5 gap-y-2 pt-46">
+                    {/* Shield composition — native */}
+                    <div
+                      aria-hidden="true"
+                      className="relative flex h-28 w-28 items-center justify-center rounded-full border border-white/10 bg-white/[0.04]"
+                    >
+                      <span className="absolute inset-3 rounded-full border border-white/[0.07]" />
+                      <ShieldCheck className="h-12 w-12 text-sky-300" />
+                    </div>
+                    <div className="relative mt-6 flex flex-row flex-wrap items-center justify-center gap-x-1.5 gap-y-2">
                       {[
                         "Residential IP routing",
                         "Gradual account warm-up",
@@ -439,29 +731,18 @@ export default function AgencyPage() {
                     </div>
                   </div>
 
-                  <div className="relative mt-1 flex items-center justify-center overflow-hidden rounded-full p-4 py-10 shadow-[inset_0_0_20px_8px_rgba(255,255,255,0.58)] md:py-[3.375rem]">
-                    <Image
-                      src="/images/agency/safety-cta-bg.webp"
-                      alt=""
-                      fill
-                      sizes="(max-width: 1280px) 100vw, 420px"
-                      className="object-cover object-center"
-                    />
-                    {/* The mirror's CTA panel centres this pill
-                        artwork (extracted from the mirror HTML) */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src="/images/agency/safety-cta-pill.svg"
-                      alt="Protection included with every profile"
-                      className="relative h-8 w-auto"
-                    />
+                  <div className="relative mt-1 flex items-center justify-center overflow-hidden rounded-full bg-[linear-gradient(120deg,#ff9a3d_0%,#ff7a1a_55%,#ff5f3d_100%)] p-4 py-10 shadow-[inset_0_0_20px_8px_rgba(255,255,255,0.58)] md:py-[3.375rem]">
+                    <span className="relative flex items-center gap-2 rounded-full bg-white px-4 py-2 text-13 font-semibold whitespace-nowrap text-black-900 shadow-lg">
+                      <ShieldCheck className="h-4 w-4 text-orange-500" />
+                      Protection included with every profile
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Privacy — filled card (mirror): centred header, the
-                  comparison table artwork filling the card's lower half,
-                  privacy icon overlapping it */}
+              {/* Privacy — filled card: centred header, the visibility
+                  table filling the card's lower half, a shield
+                  composition overlapping it */}
               <div className="relative flex h-[38rem] grow flex-col justify-between overflow-hidden rounded-7xl border border-black-700/60 bg-black-900 px-4 pt-14 pb-4 sm:h-[48.5rem] xl:h-[41.5rem]">
                 <div className="px-4 text-center">
                   <h3 className="text-30 font-bold text-white">Privacy</h3>
@@ -472,29 +753,16 @@ export default function AgencyPage() {
                   </p>
                 </div>
                 <div className="relative">
-                  <Image
-                    src="/images/agency/privacy-icon.webp"
-                    alt="Privacy illustration"
-                    width={1200}
-                    height={1192}
-                    className="absolute -top-24 right-10 z-10 h-[207px] w-[204px] object-cover md:-top-44 md:right-18 md:h-[347px] md:w-[344px]"
-                  />
-                  <div className="relative w-full overflow-hidden rounded-6xl">
-                    <Image
-                      src="/images/agency/privacy-table.webp"
-                      alt="Privacy feature comparison table"
-                      width={1200}
-                      height={611}
-                      className="hidden h-auto w-full md:block"
-                    />
-                    <Image
-                      src="/images/agency/privacy-table-mobile.webp"
-                      alt="Privacy feature comparison table"
-                      width={1092}
-                      height={1131}
-                      className="block h-auto w-full md:hidden"
-                    />
+                  {/* Shield composition — native */}
+                  <div
+                    aria-hidden="true"
+                    className="absolute -top-32 right-4 z-10 flex h-[124px] w-[122px] items-center justify-center md:-top-44 md:right-18 md:h-[347px] md:w-[344px]"
+                  >
+                    <span className="absolute inset-0 rounded-full border border-white/[0.08] bg-white/[0.03]" />
+                    <span className="absolute inset-[18%] rounded-full border border-white/10 bg-white/[0.04]" />
+                    <ShieldCheck className="relative h-1/3 w-1/3 text-purple-300" />
                   </div>
+                  <PrivacyTable />
                 </div>
               </div>
             </div>
@@ -518,21 +786,26 @@ export default function AgencyPage() {
             </p>
           </div>
 
-          {/* Mirror card anatomy: tall full-bleed artwork (h-100),
-              centred narrow text block underneath */}
+          {/* Card anatomy: tall full-bleed gradient panel (h-100) with
+              a centred icon tile, narrow text block underneath */}
           <div className="mx-auto mt-14 grid w-full max-w-[73.75rem] grid-cols-1 gap-6 sm:gap-8 md:grid-cols-3">
             {supportCards.map((card) => (
               <div
                 key={card.title}
                 className="glass-card-hover flex h-full flex-col items-center justify-between overflow-hidden p-0"
               >
-                <Image
-                  src={card.image}
-                  alt={card.alt}
-                  width={1200}
-                  height={667}
-                  className="h-100 w-full object-cover"
-                />
+                <div
+                  aria-hidden="true"
+                  className="relative flex h-100 w-full items-center justify-center overflow-hidden"
+                  style={{ background: card.art }}
+                >
+                  <span
+                    className={`absolute h-56 w-56 rounded-full blur-[90px] ${card.glow}`}
+                  />
+                  <span className="relative flex h-24 w-24 items-center justify-center rounded-[2rem] border border-white/15 bg-white/[0.07] text-white shadow-2xl backdrop-blur-md">
+                    <card.icon className="h-11 w-11" />
+                  </span>
+                </div>
                 <div className="mx-auto flex max-w-[15.25rem] flex-col gap-3 pt-4 pb-13 text-center 2xl:max-w-72">
                   <h3 className="text-24 font-bold text-white">{card.title}</h3>
                   <p className="text-15 font-medium text-black-300">
@@ -573,13 +846,7 @@ export default function AgencyPage() {
           <div className="mx-auto mt-14 grid max-w-5xl grid-cols-1 gap-6 md:grid-cols-2">
             {/* Agency seats */}
             <div className="glass-card-hover overflow-hidden p-0">
-              <Image
-                src="/images/agency/grow-seats.webp"
-                alt="Agency seats"
-                width={1096}
-                height={1067}
-                className="h-auto w-full"
-              />
+              <GrowSeatsVisual />
               <div className="p-8">
                 <h3 className="text-22 font-bold text-white">Agency seats</h3>
                 <p className="mt-3 text-14 leading-relaxed text-black-400">
@@ -597,13 +864,7 @@ export default function AgencyPage() {
               href="/avatars"
               className="glass-card-hover group block overflow-hidden p-0"
             >
-              <Image
-                src="/images/agency/grow-avatars.webp"
-                alt="Outreach Avatars"
-                width={1124}
-                height={1061}
-                className="h-auto w-full"
-              />
+              <GrowAvatarsVisual />
               <div className="p-8">
                 <h3 className="flex items-center gap-2 text-22 font-bold text-white">
                   Outreach Avatars
@@ -633,8 +894,7 @@ export default function AgencyPage() {
             </h2>
           </div>
 
-          {/* Mirror order (batch 2, same as the homepage fix): borderless
-              artwork first, button below it */}
+          {/* Borderless artwork first, button below it */}
           <div className="mx-auto mt-12 max-w-5xl">
             <Image
               src="/images/home-integrations/integrations-desktop.webp"
@@ -676,7 +936,7 @@ export default function AgencyPage() {
           </div>
 
           {/* Wide artwork pricing card (batch 2) — the Monthly/Yearly
-              toggle lives inside the card, as in the mirror */}
+              toggle lives inside the card */}
           <div className="mt-14">
             <AgencyPricing />
           </div>

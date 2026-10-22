@@ -11,7 +11,7 @@ import {
  * "Built to start conversations" bento (P6 rework).
  *
  * Same section, grid, card sizes, titles and chips as before — but the
- * baked mirror artwork is retired. Each card is now a NxtSend-styled
+ * baked artwork is retired. Each card is now a NxtSend-styled
  * composition built in JSX/CSS: the owner's supplied headshots
  * (public/images/people/) plus native UI elements (voice-note player,
  * language/timezone rows, sequence steps, A/B variants, a message
@@ -29,11 +29,11 @@ function CardHeader({
   chips: readonly string[];
 }) {
   return (
-    <div className="absolute inset-x-0 top-0 z-10 flex flex-col items-center p-7 text-center sm:p-9">
+    <div className="relative z-10 flex flex-col items-center px-6 pt-5 pb-1 text-center sm:p-8">
       <h3 className="max-w-[340px] text-24 font-bold leading-snug text-white sm:text-28">
         {title}
       </h3>
-      <div className="mt-4 flex flex-wrap justify-center gap-2">
+      <div className="mt-3 flex flex-wrap justify-center gap-2 sm:mt-4">
         {chips.map((chip) => (
           <span key={chip} className={chipClass}>
             {chip}
@@ -46,7 +46,7 @@ function CardHeader({
 
 function Stage({ children }: { children: React.ReactNode }) {
   return (
-    <div className="absolute inset-x-0 bottom-0 top-[37%] flex items-center justify-center px-5 pb-6 sm:px-8">
+    <div className="relative flex flex-1 items-center justify-center px-5 pb-3 sm:px-8 sm:pb-6">
       {children}
     </div>
   );
@@ -166,10 +166,10 @@ function CampaignShapeVisual() {
           <div className="text-11 text-white/55">One list, every goal type</div>
         </div>
       </div>
-      <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t border-white/10 pt-4">
+      <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-white/10 pt-3 sm:mt-4 sm:pt-4">
         {STEP_FLOW.map((step, i) => (
           <span key={step.label} className="flex items-center gap-1.5">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-11 font-semibold text-white">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-11 font-semibold text-white sm:py-1.5">
               <step.icon className="h-3.5 w-3.5" />
               {step.label}
             </span>
@@ -236,8 +236,8 @@ function AbTestVisual() {
 /* ── Card 1 visual: personalised message thread ───────────────────────── */
 function MessageThreadVisual() {
   return (
-    <div className="absolute inset-x-5 top-5 bottom-[168px] sm:inset-x-9 sm:top-9 sm:bottom-[150px] lg:left-auto lg:w-[600px]">
-      <div className="ml-auto flex max-h-full w-full max-w-[600px] flex-col justify-start overflow-hidden rounded-3xl bg-white/10 p-4 shadow-2xl ring-1 ring-white/15 backdrop-blur-md sm:p-5">
+    <div className="absolute inset-x-5 top-4 bottom-[150px] sm:inset-x-9 sm:top-9 sm:bottom-[140px] lg:left-auto lg:w-[640px]">
+      <div className="ml-auto flex max-h-full w-full max-w-[640px] flex-col justify-start overflow-hidden rounded-3xl bg-white/10 p-3 shadow-2xl ring-1 ring-white/15 backdrop-blur-md sm:p-5">
         <div className="flex items-center gap-3">
           <Image
             src="/images/people/robert-tas.jpg"
@@ -251,7 +251,7 @@ function MessageThreadVisual() {
             <div className="text-11 text-white/55">Sequence · Step 2 of 5</div>
           </div>
         </div>
-        <div className="mt-4 max-w-[85%] self-start rounded-2xl rounded-tl-md bg-white/15 px-3.5 py-2.5 text-12 leading-relaxed text-white/90">
+        <div className="mt-3 max-w-[85%] self-start rounded-2xl rounded-tl-md bg-white/15 px-3.5 py-2.5 text-12 leading-relaxed text-white/90 sm:mt-4">
           Thanks for connecting! What is your team using for outbound today?
         </div>
         <div className="mt-2.5 max-w-[85%] self-end rounded-2xl rounded-tr-md bg-gradient-brand px-3.5 py-2.5 text-12 leading-relaxed text-white shadow-lg">
@@ -269,7 +269,7 @@ function MessageThreadVisual() {
 
 export function BentoFeatures() {
   return (
-    <section className="relative border-t border-black-700/80 bg-black-800/30 py-24 lg:py-32">
+    <section className="relative border-t border-black-700/80 bg-black-800/30 py-12 lg:py-20">
       <div className="pointer-events-none absolute top-1/2 left-0 h-[400px] w-[400px] -translate-y-1/2 rounded-full bg-purple-600/10 blur-[130px]" />
       <div className="section-container relative z-10">
         <div className="text-center">
@@ -278,9 +278,9 @@ export function BentoFeatures() {
           </h2>
         </div>
 
-        <div className="mx-auto mt-16 grid max-w-6xl grid-cols-1 gap-6 lg:grid-cols-12">
+        <div className="mx-auto mt-8 grid max-w-6xl grid-cols-1 gap-5 lg:mt-12 lg:grid-cols-12 lg:gap-6">
           {/* Card 1 — wide */}
-          <div className="group relative h-[440px] overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#2a1650] via-[#170b33] to-black-900 shadow-2xl ring-1 ring-white/10 sm:h-[520px] lg:col-span-12 lg:h-[600px]">
+          <div className="group relative h-[420px] overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#2a1650] via-[#170b33] to-black-900 shadow-2xl ring-1 ring-white/10 sm:h-[460px] lg:col-span-12 lg:h-[480px]">
             <div
               className="pointer-events-none absolute inset-0 opacity-[0.12]"
               style={{
@@ -305,7 +305,7 @@ export function BentoFeatures() {
           </div>
 
           {/* Card 2 — voice notes (narrow) */}
-          <div className="group relative h-[440px] overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#3b1470] via-[#1d0b40] to-black-900 shadow-2xl ring-1 ring-white/10 lg:col-span-5 lg:h-[560px]">
+          <div className="group relative flex h-[400px] flex-col overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#3b1470] via-[#1d0b40] to-black-900 shadow-2xl ring-1 ring-white/10 lg:col-span-5 lg:h-[460px]">
             <CardHeader title="Get noticed in a busy inbox" chips={["Voice notes"]} />
             <Stage>
               <VoiceNoteVisual />
@@ -313,7 +313,7 @@ export function BentoFeatures() {
           </div>
 
           {/* Card 3 — language / timezone (medium) */}
-          <div className="group relative h-[440px] overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#123a6b] via-[#0d1440] to-black-900 shadow-2xl ring-1 ring-white/10 lg:col-span-7 lg:h-[560px]">
+          <div className="group relative flex h-[400px] flex-col overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#123a6b] via-[#0d1440] to-black-900 shadow-2xl ring-1 ring-white/10 lg:col-span-7 lg:h-[460px]">
             <CardHeader
               title="Their language, their timezone"
               chips={["Automatic translation", "Timezone-aware sending"]}
@@ -324,7 +324,7 @@ export function BentoFeatures() {
           </div>
 
           {/* Card 4 — campaign shapes (medium) */}
-          <div className="group relative h-[440px] overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#4a154b] via-[#20093a] to-black-900 shadow-2xl ring-1 ring-white/10 lg:col-span-7 lg:h-[560px]">
+          <div className="group relative flex h-[400px] flex-col overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#4a154b] via-[#20093a] to-black-900 shadow-2xl ring-1 ring-white/10 lg:col-span-7 lg:h-[460px]">
             <CardHeader
               title="A campaign shape for every goal"
               chips={["Connection requests", "Message sequences", "Reactions"]}
@@ -335,7 +335,7 @@ export function BentoFeatures() {
           </div>
 
           {/* Card 5 — A/B testing (narrow) */}
-          <div className="group relative h-[440px] overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#173a2e] via-[#0c1f33] to-black-900 shadow-2xl ring-1 ring-white/10 lg:col-span-5 lg:h-[560px]">
+          <div className="group relative flex h-[400px] flex-col overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#173a2e] via-[#0c1f33] to-black-900 shadow-2xl ring-1 ring-white/10 lg:col-span-5 lg:h-[460px]">
             <CardHeader title="Test variations, keep what works" chips={["A/B testing"]} />
             <Stage>
               <AbTestVisual />

@@ -36,10 +36,10 @@ import {
 type TabKey = "inbox" | "leads" | "analytics";
 type PaneKey = TabKey | "overview" | "campaigns" | "accounts" | "settings";
 
-const TABS: { key: TabKey; label: string; icon: string }[] = [
-  { key: "inbox", label: "Unified inbox", icon: "/images/icons/unibox.png" },
-  { key: "leads", label: "Leads", icon: "/images/icons/leads.png" },
-  { key: "analytics", label: "Analytics", icon: "/images/icons/analytics.png" },
+const TABS: { key: TabKey; label: string; icon: typeof Inbox }[] = [
+  { key: "inbox", label: "Unified inbox", icon: Inbox },
+  { key: "leads", label: "Leads", icon: ContactRound },
+  { key: "analytics", label: "Analytics", icon: BarChart3 },
 ];
 
 const TAB_COPY: Record<
@@ -447,7 +447,7 @@ export function LiveView() {
                     }`}
                   >
                     {t.label}
-                    <Image src={t.icon} alt="" width={18} height={18} className="h-4 w-4 object-contain" />
+                    <t.icon className="h-4 w-4 shrink-0" />
                   </button>
                 );
               })}

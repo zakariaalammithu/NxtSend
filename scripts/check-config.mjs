@@ -56,6 +56,7 @@ const CATALOG = [
   ["META_MODEL", "ai", false],
   ["NEXT_PUBLIC_META_PIXEL_ID", "pixel", false],
   ["CRON_SECRET", "jobs", true],
+  ["INTEGRATION_HUB_ENCRYPTION_KEY", "integrations", false],
   ["LINKEDIN_CLIENT_ID", "integrations", false],
   ["LINKEDIN_CLIENT_SECRET", "integrations", false],
   ["LINKEDIN_REDIRECT_URI", "integrations", false],

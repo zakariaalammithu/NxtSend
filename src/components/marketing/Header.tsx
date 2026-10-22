@@ -61,6 +61,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Academy", href: "/academy" },
   { label: "Pricing", href: "/pricing" },
   { label: "Agency", href: "/agency" },
+  { label: "Developers", href: "/developers" },
 ];
 
 export function Header() {
@@ -161,7 +162,7 @@ export function Header() {
                 <img
                   src="/logo.png"
                   alt="NxtSend"
-                  className="h-7 w-auto object-contain"
+                  className="h-8 w-auto object-contain"
                   onError={() => setLogoError(true)}
                 />
                 <span className="font-bold text-20 tracking-tight text-white">
@@ -381,7 +382,7 @@ export function Header() {
                 <img
                   src="/logo.png"
                   alt="NxtSend"
-                  className="h-7 w-auto object-contain"
+                  className="h-8 w-auto object-contain"
                   onError={() => setLogoError(true)}
                 />
                 <span className="font-bold text-20 tracking-tight text-white">

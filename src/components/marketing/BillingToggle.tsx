@@ -4,7 +4,7 @@ import type { BillingCycle } from "@/lib/marketing-prices";
 
 /**
  * Monthly / Yearly billing toggle used by every marketing pricing
- * surface. Two sizes mirror the established designs: "lg" for the
+ * surface. Two sizes follow the established designs: "lg" for the
  * section-level toggle above the plan cards, "sm" for the mini toggle
  * inside the wide avatar/agency cards. The control is always a real
  * button pair wired to the caller's billing state — never a display

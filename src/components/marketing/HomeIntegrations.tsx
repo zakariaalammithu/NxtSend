@@ -31,8 +31,8 @@ import { INTEGRATION_REGISTRY } from "@/lib/integrations-center/registry";
  * squiggle served by muse.ai itself, the simple-icons brand glyphs
  * for OpenAI, Claude, Resend, Gmail, Outlook and Google Sheets in
  * their official brand colours (white variants for the two marks
- * whose brand colour is black), and the Phase-1 mirror files for
- * n8n, Zapier, Instantly and HubSpot. No fabricated logos.
+ * whose brand colour is black), and the brand files for n8n,
+ * Zapier, Instantly and HubSpot. No fabricated logos.
  */
 
 const byId = (id: string) => {
@@ -66,8 +66,8 @@ const LOGOS = "/images/integrations/logos";
 
 /**
  * Constellation layout (5 columns × 4 rows, row-major; null = the
- * empty outline tile). Filled positions mirror the reference's
- * scattered pattern and use only real logo files: Make, OpenAI,
+ * empty outline tile). Filled positions follow a scattered pattern
+ * and use only real logo files: Make, OpenAI,
  * Muse, Zapier, Google, Slack, n8n, and the outbound-sync mark.
  */
 const CONSTELLATION: (string | null)[] = [

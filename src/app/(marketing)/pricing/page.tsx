@@ -19,9 +19,9 @@ export const metadata: Metadata = {
     "Compare NxtSend plans for solo senders, teams and agencies. Start with a 14-day free trial, pay per outreach seat, add rented avatar profiles, or run clients from an agency workspace.",
 };
 
-/* ── Feature comparison (mirror: aimfox.com/pricing table) ──────────────── */
+/* ── Feature comparison table ──────────────────────────────────────────── */
 /* Cell values: "check" = included, "x" = not included, otherwise literal  */
-/* text from the mirror (e.g. "200/week", "Unlimited", "Not Applicable").   */
+/* text (e.g. "200/week", "Unlimited", "Not Applicable").                  */
 /* Column order: Outreach seat · Outreach avatar · Agency.                 */
 type CompareCell = "check" | "x" | string;
 
@@ -177,9 +177,7 @@ const comparisonGroups: CompareGroup[] = [
   },
 ];
 
-/* ── FAQ (mirror: aimfox.com/pricing — same 9 questions as the homepage;   */
-/* answers are the ones recovered from the homepage mirror's state, since  */
-/* the pricing mirror lazy-loads its answers and ships none in its HTML)   */
+/* ── FAQ — the same 9 questions as the homepage ─────────────────────────── */
 const faqs = [
   {
     question: "Can I rent LinkedIn profiles for outreach inside NxtSend?",
@@ -246,7 +244,7 @@ export default function PricingPage() {
           every Monthly/Yearly toggle on this page shares one state. */}
       <BillingProvider>
       {/* ──────────────────────────────────────────────────────────────────── */}
-      {/* HERO + PLAN CARDS (mirror: aimfox.com/pricing) */}
+      {/* HERO + PLAN CARDS */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative pt-12 pb-24 lg:pt-20">
         <div className="pointer-events-none absolute -top-40 left-1/2 h-[500px] w-[800px] -translate-x-1/2 rounded-full bg-purple-600/20 blur-[130px]" />

@@ -29,8 +29,18 @@ export interface PlanDefinition {
   /** Display price from the existing billing page. 0 = free trial tier. */
   monthlyPriceUsd: number;
   limits: PlanLimit;
-  /** Env var names holding the Stripe Price IDs for this plan. */
-  stripePriceEnv: { monthly: string; annual: string };
+  /**
+   * Env var names holding the Stripe Price IDs for this plan.
+   * Absent for plans that are never sold through Stripe (the free
+   * tier): there is deliberately NO STRIPE_PRICE_ID_FREE* variable —
+   * checkout rejects the free plan before any price lookup, so a
+   * free "price" in Stripe would be dead configuration. (P9 B6: two
+   * such phantom variables were referenced here while existing in
+   * neither the config catalogue, .env.example nor the docs; the
+   * parity test now scans code-referenced env names so this class
+   * of drift fails the suite.)
+   */
+  stripePriceEnv?: { monthly: string; annual: string };
 }
 
 export const PLAN_CATALOG: Record<PlanType, PlanDefinition> = {
@@ -40,10 +50,7 @@ export const PLAN_CATALOG: Record<PlanType, PlanDefinition> = {
     tagline: "14-day trial of the platform",
     monthlyPriceUsd: 0,
     limits: planLimits.free,
-    stripePriceEnv: {
-      monthly: "STRIPE_PRICE_ID_FREE",
-      annual: "STRIPE_PRICE_ID_FREE_ANNUAL",
-    },
+    // No stripePriceEnv: the free tier is never sold (see above).
   },
   starter: {
     id: "starter",

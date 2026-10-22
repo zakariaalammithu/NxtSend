@@ -4,7 +4,12 @@ import { PLAN_CATALOG } from "../plans";
 import { planLimits } from "@/lib/utils";
 import { getBillingState, getStripePriceId, planForStripePriceId } from "../state";
 import { checkLimit, canAdd, summarizeUsage, overLimitMetrics } from "../limits";
-import { handleStripeWebhook, type BillingStore, type SubscriptionUpsert } from "../webhook";
+import {
+  handleStripeWebhook,
+  STRIPE_HANDLED_EVENT_TYPES,
+  type BillingStore,
+  type SubscriptionUpsert,
+} from "../webhook";
 
 // ── Plan catalog: single-sourced, existing prices only ─────────────────────
 
@@ -115,6 +120,13 @@ class FakeBillingStore implements BillingStore {
   events = new Map<string, unknown>();
   upserts: SubscriptionUpsert[] = [];
   statusByCustomer = new Map<string, string>();
+  failures: Array<{
+    eventId: string;
+    eventType: string;
+    errorSummary: string;
+    resolved: boolean;
+  }> = [];
+  failOnRecordFailure = false;
   async hasEvent(id: string) {
     return this.events.has(id);
   }
@@ -132,6 +144,15 @@ class FakeBillingStore implements BillingStore {
   }
   async setSubscriptionStatusByCustomer(customerId: string, status: string) {
     this.statusByCustomer.set(customerId, status);
+  }
+  async recordWebhookFailure(eventId: string, eventType: string, errorSummary: string) {
+    if (this.failOnRecordFailure) throw new Error("failure log unavailable");
+    this.failures.push({ eventId, eventType, errorSummary, resolved: false });
+  }
+  async markWebhookFailuresResolved(eventId: string) {
+    for (const failure of this.failures) {
+      if (failure.eventId === eventId) failure.resolved = true;
+    }
   }
 }
 
@@ -275,5 +296,165 @@ describe("handleStripeWebhook", () => {
     });
     expect(result.status).toBe(200);
     expect(store.statusByCustomer.get("cus_123")).toBe("past_due");
+  });
+
+  // ── B3: refunds & disputes are recorded through the same pipeline ──
+
+  it("registers refund/dispute events in the handled-event list", () => {
+    expect(STRIPE_HANDLED_EVENT_TYPES).toContain("charge.refunded");
+    expect(STRIPE_HANDLED_EVENT_TYPES).toContain("charge.dispute.created");
+    expect(STRIPE_HANDLED_EVENT_TYPES).toContain("charge.dispute.closed");
+  });
+
+  it("records a verified refund exactly once, without touching the subscription", async () => {
+    const payload = JSON.stringify({
+      id: "evt_refund_1",
+      object: "event",
+      type: "charge.refunded",
+      data: {
+        object: {
+          id: "ch_123",
+          object: "charge",
+          customer: "cus_123",
+          amount: 4900,
+          amount_refunded: 4900,
+          currency: "usd",
+          status: "succeeded",
+          refunded: true,
+        },
+      },
+    });
+    const store = new FakeBillingStore();
+    const first = await handleStripeWebhook({
+      rawBody: payload,
+      signature: signedRequest(stripe, payload),
+      deps: deps(store),
+    });
+    expect(first.status).toBe(200);
+    expect(first.body.action).toBe("refund_recorded");
+    // Recorded for the admin view; NO subscription effect.
+    expect(await store.hasEvent("evt_refund_1")).toBe(true);
+    expect(store.upserts).toHaveLength(0);
+    expect(store.statusByCustomer.size).toBe(0);
+
+    const second = await handleStripeWebhook({
+      rawBody: payload,
+      signature: signedRequest(stripe, payload),
+      deps: deps(store),
+    });
+    expect(second.status).toBe(200);
+    expect(second.body.duplicate).toBe(true);
+    expect(store.failures).toHaveLength(0);
+  });
+
+  it("records dispute creation and closure for admin visibility", async () => {
+    const store = new FakeBillingStore();
+    for (const [id, type, action] of [
+      ["evt_dispute_open", "charge.dispute.created", "dispute_recorded"],
+      ["evt_dispute_shut", "charge.dispute.closed", "dispute_closed_recorded"],
+    ] as const) {
+      const payload = JSON.stringify({
+        id,
+        object: "event",
+        type,
+        data: {
+          object: {
+            id: "dp_123",
+            object: "dispute",
+            charge: "ch_123",
+            amount: 4900,
+            currency: "usd",
+            status: type.endsWith("created") ? "needs_response" : "won",
+          },
+        },
+      });
+      const result = await handleStripeWebhook({
+        rawBody: payload,
+        signature: signedRequest(stripe, payload),
+        deps: deps(store),
+      });
+      expect(result.status).toBe(200);
+      expect(result.body.action).toBe(action);
+      expect(await store.hasEvent(id)).toBe(true);
+    }
+    expect(store.upserts).toHaveLength(0);
+    expect(store.statusByCustomer.size).toBe(0);
+  });
+
+  // ── B4: apply failures land in the separate failure log ────────────
+
+  it("logs the failure, deletes the event record (retry stays possible), returns 500", async () => {
+    const store = new FakeBillingStore();
+    const header = signedRequest(stripe, checkoutPayload);
+    const failing = {
+      ...deps(store),
+      retrieveSubscription: async () => {
+        throw new Error("stripe api down");
+      },
+    };
+    const result = await handleStripeWebhook({
+      rawBody: checkoutPayload,
+      signature: header,
+      deps: failing,
+    });
+    expect(result.status).toBe(500);
+    // Exactly-once flow untouched: the idempotency record is gone.
+    expect(await store.hasEvent("evt_checkout_1")).toBe(false);
+    // ...but the failure itself is durably visible.
+    expect(store.failures).toHaveLength(1);
+    expect(store.failures[0]).toMatchObject({
+      eventId: "evt_checkout_1",
+      eventType: "checkout.session.completed",
+      resolved: false,
+    });
+    expect(store.failures[0].errorSummary).toContain("stripe api down");
+  });
+
+  it("marks the failure resolved when a redelivery finally succeeds — history kept", async () => {
+    const store = new FakeBillingStore();
+    const header = signedRequest(stripe, checkoutPayload);
+    const failing = {
+      ...deps(store),
+      retrieveSubscription: async () => {
+        throw new Error("stripe api down");
+      },
+    };
+    const failed = await handleStripeWebhook({
+      rawBody: checkoutPayload,
+      signature: header,
+      deps: failing,
+    });
+    expect(failed.status).toBe(500);
+    expect(store.failures).toHaveLength(1);
+
+    const retried = await handleStripeWebhook({
+      rawBody: checkoutPayload,
+      signature: header,
+      deps: deps(store),
+    });
+    expect(retried.status).toBe(200);
+    expect(store.upserts).toHaveLength(1);
+    // The failure row is NOT deleted — it is marked resolved.
+    expect(store.failures).toHaveLength(1);
+    expect(store.failures[0].resolved).toBe(true);
+  });
+
+  it("still returns 500 when the failure log itself is unavailable", async () => {
+    const store = new FakeBillingStore();
+    store.failOnRecordFailure = true;
+    const header = signedRequest(stripe, checkoutPayload);
+    const failing = {
+      ...deps(store),
+      retrieveSubscription: async () => {
+        throw new Error("stripe api down");
+      },
+    };
+    const result = await handleStripeWebhook({
+      rawBody: checkoutPayload,
+      signature: header,
+      deps: failing,
+    });
+    expect(result.status).toBe(500);
+    expect(await store.hasEvent("evt_checkout_1")).toBe(false);
   });
 });

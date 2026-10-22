@@ -12,6 +12,21 @@
  * and a 500 is returned so Stripe retries and the event is reprocessed
  * exactly once it can succeed — never double-applied, never swallowed.
  *
+ * Failure visibility (P9 B4): because an apply failure deletes the
+ * idempotency record (so the retry can reprocess), it would otherwise
+ * leave no trace. Every apply failure is therefore ALSO written to
+ * the separate `billing_webhook_failures` log (migration 017) —
+ * best-effort, never touching the exactly-once flow above — and a
+ * later successful processing of the same event marks the failure
+ * rows resolved (the history is kept, never deleted).
+ *
+ * Refunds and disputes (P9 B3) are recorded through the same
+ * pipeline: the verified event lands in `billing_events`, and the
+ * admin transactions view derives the refunded/disputed state from
+ * it. They deliberately do NOT mutate the subscription: a partial
+ * refund is not a cancellation, and a dispute is an allegation, not
+ * an outcome. `charge.dispute.closed` records the outcome.
+ *
  * Plan changes happen ONLY here (from verified events), never from the
  * checkout route: creating a checkout session is not a payment.
  */
@@ -37,7 +52,28 @@ export interface BillingStore {
   getWorkspaceIdByCustomerId(customerId: string): Promise<string | null>;
   upsertSubscription(row: SubscriptionUpsert): Promise<void>;
   setSubscriptionStatusByCustomer(customerId: string, status: string): Promise<void>;
+  /** Append-only failure log (migration 017) — separate from the idempotency store. */
+  recordWebhookFailure(eventId: string, eventType: string, errorSummary: string): Promise<void>;
+  /** Marks every still-open failure row for the event resolved (history is kept). */
+  markWebhookFailuresResolved(eventId: string): Promise<void>;
 }
+
+/**
+ * Every event type this handler acts on (applies an effect or records
+ * with a dedicated action). These are the events to register on the
+ * Stripe webhook endpoint; anything else Stripe sends is still
+ * recorded in `billing_events` with action "recorded_no_action".
+ */
+export const STRIPE_HANDLED_EVENT_TYPES = [
+  "checkout.session.completed",
+  "customer.subscription.created",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+  "invoice.payment_failed",
+  "charge.refunded",
+  "charge.dispute.created",
+  "charge.dispute.closed",
+] as const;
 
 export interface StripeWebhookDeps {
   stripe: Stripe | null;
@@ -131,9 +167,26 @@ export async function applyStripeEvent(
       await store.setSubscriptionStatusByCustomer(customerId, "past_due");
       return "subscription_past_due";
     }
+    case "charge.refunded":
+      // Recorded in billing_events by the pipeline; the admin
+      // transactions view derives the refunded amount/state from the
+      // stored payload. No subscription mutation: a (partial) refund
+      // is not a cancellation.
+      return "refund_recorded";
+    case "charge.dispute.created":
+      // Recorded for admin visibility only — a dispute is an
+      // allegation; the outcome arrives as charge.dispute.closed.
+      return "dispute_recorded";
+    case "charge.dispute.closed":
+      return "dispute_closed_recorded";
     default:
       return "recorded_no_action";
   }
+}
+
+function errorSummary(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  return (message || "Unknown error").slice(0, 500);
 }
 
 export async function handleStripeWebhook(args: {
@@ -190,10 +243,26 @@ export async function handleStripeWebhook(args: {
   await deps.store.recordEvent(event.id, event.type, event);
   try {
     const action = await applyStripeEvent(event, deps);
+    // Best-effort: close out any earlier failure rows for this event
+    // (a retry that finally succeeded). The history is kept; a
+    // failure-log problem must never fail an otherwise-applied event.
+    try {
+      await deps.store.markWebhookFailuresResolved(event.id);
+    } catch {
+      // Failure log unavailable (e.g. migration 017 not applied yet).
+    }
     return { status: 200, body: { received: true, duplicate: false, action } };
   } catch (err) {
     // Roll back the idempotency record so Stripe's retry reprocesses.
     await deps.store.deleteEvent(event.id);
+    // Best-effort failure log (B4): the ONLY durable trace of this
+    // failure, kept separate from the exactly-once flow — a logging
+    // failure must never mask the 500 Stripe needs to retry.
+    try {
+      await deps.store.recordWebhookFailure(event.id, event.type, errorSummary(err));
+    } catch {
+      // Failure log unavailable; the 500 + server logs remain.
+    }
     return {
       status: 500,
       body: {

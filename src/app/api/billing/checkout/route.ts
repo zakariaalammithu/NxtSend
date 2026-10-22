@@ -5,6 +5,10 @@ import { getBillingState, getStripePriceId } from "@/lib/billing/state";
 import { getStripeClient } from "@/lib/billing/stripe-client";
 import { resolveAppUrl } from "@/lib/billing/app-url";
 import { isPlanId, type BillingInterval } from "@/lib/billing/plans";
+import {
+  shouldBlockNewCheckout,
+  type SubscriptionRowLike,
+} from "@/lib/billing/entitlement";
 
 /**
  * POST /api/billing/checkout  { plan, interval? }
@@ -98,13 +102,35 @@ export async function POST(req: Request) {
     );
   }
 
-  // Reuse or create the Stripe customer for this workspace. Only the
-  // customer ID is persisted here — plan/status wait for the webhook.
+  // Load the workspace's subscription record once — it decides both
+  // the duplicate-subscription guard below and customer reuse.
   const { data: existing } = await admin
     .from("subscriptions")
-    .select("stripe_customer_id")
+    .select("plan, status, current_period_end, stripe_customer_id")
     .eq("workspace_id", workspaceId)
     .maybeSingle();
+
+  // Duplicate-subscription guard (P9 B2): while the stored
+  // subscription still entitles this workspace to a paid plan, a new
+  // Checkout would create a SECOND Stripe subscription billing
+  // alongside the first (the webhook would then follow whichever
+  // subscription's events arrive last). Plan changes for an active
+  // subscription belong in the Customer Portal.
+  if (shouldBlockNewCheckout(existing as SubscriptionRowLike | null)) {
+    return NextResponse.json(
+      {
+        error:
+          "This workspace already has an active Stripe subscription, so a new checkout would bill twice. Use “Manage Billing (Stripe Portal)” on the billing page to change plans, update payment details, or cancel.",
+        state,
+        code: "existing_subscription",
+        usePortal: true,
+      },
+      { status: 409 }
+    );
+  }
+
+  // Reuse or create the Stripe customer for this workspace. Only the
+  // customer ID is persisted here — plan/status wait for the webhook.
   let customerId = (existing?.stripe_customer_id as string | null) ?? null;
   if (!customerId) {
     const customer = await stripe.customers.create({

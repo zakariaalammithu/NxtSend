@@ -16,6 +16,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CampaignStep, Lead, PlanType } from "@/types";
+import { resolveWorkspaceEntitlement } from "@/lib/billing/entitlement";
 import { createInboxRepository, type InboxRepository } from "@/lib/data/inbox";
 import { normalizeEmail } from "@/lib/email/suppression";
 import type {
@@ -253,18 +254,11 @@ export class SupabaseExecutorStore implements ExecutorStore {
   }
 
   async getWorkspacePlan(workspaceId: string): Promise<PlanType> {
-    const { data } = await this.admin
-      .from("subscriptions")
-      .select("plan")
-      .eq("workspace_id", workspaceId)
-      .maybeSingle();
-    if (data?.plan) return String(data.plan) as PlanType;
-    const { data: ws } = await this.admin
-      .from("workspaces")
-      .select("plan")
-      .eq("id", workspaceId)
-      .maybeSingle();
-    return (ws?.plan ? String(ws.plan) : "free") as PlanType;
+    // Status-aware entitlement (P9 B1) via the shared resolver —
+    // the executor enforces the same effective plan as the dashboard
+    // and the jobs worker (cancelled/lapsed → Free quotas).
+    const entitlement = await resolveWorkspaceEntitlement(this.admin, workspaceId);
+    return entitlement.plan;
   }
 
   async countEmailsThisMonth(

@@ -68,5 +68,25 @@ export function createSupabaseBillingStore(admin: SupabaseClient): BillingStore 
         throw new Error(`Failed to update subscription status: ${error.message}`);
       }
     },
+    async recordWebhookFailure(eventId, eventType, errorSummary) {
+      const { error } = await admin.from("billing_webhook_failures").insert({
+        event_id: eventId,
+        event_type: eventType,
+        error_summary: errorSummary,
+      });
+      if (error) {
+        throw new Error(`Failed to record webhook failure: ${error.message}`);
+      }
+    },
+    async markWebhookFailuresResolved(eventId) {
+      const { error } = await admin
+        .from("billing_webhook_failures")
+        .update({ resolved: true, resolved_at: new Date().toISOString() })
+        .eq("event_id", eventId)
+        .eq("resolved", false);
+      if (error) {
+        throw new Error(`Failed to resolve webhook failures: ${error.message}`);
+      }
+    },
   };
 }

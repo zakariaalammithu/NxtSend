@@ -17,6 +17,11 @@ import {
   type WorkspaceUsage,
 } from "@/lib/data";
 import { PLAN_CATALOG, type PlanDefinition } from "@/lib/billing/plans";
+import {
+  checkoutReturnNotice,
+  billingUrlWithoutCheckoutParam,
+} from "@/lib/billing/checkout-return";
+import type { BillingInvoiceSummary } from "@/lib/billing/invoices";
 import type { PlanType } from "@/types";
 
 const METRIC_LABELS: Record<string, string> = {
@@ -27,7 +32,7 @@ const METRIC_LABELS: Record<string, string> = {
 };
 
 interface BillingNotice {
-  tone: "error" | "info";
+  tone: "error" | "info" | "success";
   text: string;
 }
 
@@ -40,6 +45,54 @@ export default function BillingPage() {
   const [notice, setNotice] = React.useState<BillingNotice | null>(null);
   const [busyPlan, setBusyPlan] = React.useState<string | null>(null);
   const [portalBusy, setPortalBusy] = React.useState(false);
+  const [invoices, setInvoices] = React.useState<BillingInvoiceSummary[] | null>(
+    null
+  );
+
+  // Post-checkout return (P9 B2): Stripe redirects back here with
+  // ?checkout=success|cancelled. Show the truthful notice once and
+  // consume the param so a refresh/back-button never replays it. The
+  // redirect alone never changes a plan — the copy says so.
+  React.useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get("checkout");
+    const returned = checkoutReturnNotice(param);
+    if (!returned) return;
+    setNotice({ tone: returned.tone, text: returned.text });
+    window.history.replaceState(
+      null,
+      "",
+      billingUrlWithoutCheckoutParam(
+        window.location.pathname,
+        window.location.search
+      )
+    );
+  }, []);
+
+  // Invoice history (P9 B7): live mode only — the route refuses
+  // (503) whenever Stripe is not configured, and the Billing
+  // History card then keeps its portal-delegation wording. A failed
+  // or refused fetch simply means "no list to show", never fake rows.
+  React.useEffect(() => {
+    if (isDemo) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/billing/invoices");
+        if (!res.ok) return;
+        const data = (await res.json().catch(() => ({}))) as {
+          invoices?: BillingInvoiceSummary[];
+        };
+        if (!cancelled && Array.isArray(data.invoices)) {
+          setInvoices(data.invoices);
+        }
+      } catch {
+        // History stays on the portal-delegation wording.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isDemo]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -167,7 +220,9 @@ export default function BillingPage() {
           className={`rounded-2xl px-5 py-3.5 text-13 flex items-start gap-2.5 border ${
             notice.tone === "error"
               ? "border-orange-500/40 bg-orange-950/20 text-orange-200"
-              : "border-purple-500/40 bg-purple-950/20 text-purple-100"
+              : notice.tone === "success"
+                ? "border-emerald-500/40 bg-emerald-950/20 text-emerald-100"
+                : "border-purple-500/40 bg-purple-950/20 text-purple-100"
           }`}
           role={notice.tone === "error" ? "alert" : "status"}
         >
@@ -198,6 +253,40 @@ export default function BillingPage() {
                 ? "Demo Mode: this plan comes from the demo dataset. No subscription exists and nothing is billed."
                 : "Resolved from your workspace's subscription record. Changes take effect when Stripe's webhook confirms them."}
             </p>
+            {/* Entitlement honesty (P9 B1): a past-due or ended
+                subscription must never read as silently paid. */}
+            {!isDemo && usage?.subscription_status === "past_due" && (
+              <p className="text-13 text-amber-300 mt-2">
+                {usage.entitlement_basis === "past_due_grace" ? (
+                  <>
+                    Payment is past due. Your paid plan continues until{" "}
+                    {usage.current_period_end
+                      ? new Date(usage.current_period_end).toLocaleDateString()
+                      : "the end of the period you already paid for"}
+                    ; after that the workspace drops to the Free plan unless
+                    payment succeeds. Update your payment method via Manage
+                    Billing.
+                  </>
+                ) : (
+                  <>
+                    Payment is past due and the period you paid for has
+                    ended, so this workspace is currently on the Free plan.
+                    Update your payment method via Manage Billing to restore
+                    your paid plan.
+                  </>
+                )}
+              </p>
+            )}
+            {!isDemo &&
+              usage &&
+              (usage.subscription_status === "canceled" ||
+                usage.subscription_status === "unpaid") &&
+              usage.entitlement_basis === "free_downgrade" && (
+                <p className="text-13 text-amber-300 mt-2">
+                  Your subscription has ended, so this workspace is on the
+                  Free plan. Choose a plan below to subscribe again.
+                </p>
+              )}
           </div>
 
           <button
@@ -398,21 +487,81 @@ export default function BillingPage() {
         </p>
       </div>
 
-      {/* Billing History */}
+      {/* Billing History — real Stripe invoices when configured
+          (P9 B7); otherwise the honest portal-delegation panel. */}
       <div className="glass-card p-6 space-y-4">
         <h3 className="text-16 font-semibold text-white">Billing History</h3>
-        <div className="rounded-xl border border-black-700/80 bg-black-800/40 p-8 text-center text-black-400 text-13">
-          <CreditCard className="h-8 w-8 mx-auto text-black-600 mb-2" />
-          <p>
-            {isDemo
-              ? "No billing history — Demo Mode"
-              : "No invoices recorded for this workspace yet"}
-          </p>
-          <p className="text-11 text-black-500 mt-0.5">
-            Invoices and receipts are issued by Stripe and available through
-            the billing portal once a subscription exists.
-          </p>
-        </div>
+        {!isDemo && invoices && invoices.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-13">
+              <thead>
+                <tr className="text-left text-11 uppercase tracking-wider text-black-500 border-b border-black-700/60">
+                  <th className="py-2 pr-4 font-semibold">Date</th>
+                  <th className="py-2 pr-4 font-semibold">Description</th>
+                  <th className="py-2 pr-4 font-semibold">Amount</th>
+                  <th className="py-2 pr-4 font-semibold">Status</th>
+                  <th className="py-2 font-semibold">Invoice</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoices.map((invoice) => (
+                  <tr key={invoice.id} className="border-b border-black-800/60">
+                    <td className="py-2.5 pr-4 text-black-300 whitespace-nowrap">
+                      {new Date(invoice.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="py-2.5 pr-4 text-black-200">
+                      {invoice.description}
+                      {invoice.number ? (
+                        <span className="block text-11 text-black-500">
+                          {invoice.number}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="py-2.5 pr-4 text-black-200">
+                      {invoice.amount.toFixed(2)}{" "}
+                      {(invoice.currency ?? "").toUpperCase()}
+                    </td>
+                    <td className="py-2.5 pr-4 text-black-300 capitalize">
+                      {invoice.status ?? "—"}
+                    </td>
+                    <td className="py-2.5">
+                      {invoice.hosted_invoice_url ? (
+                        <a
+                          href={invoice.hosted_invoice_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-purple-300 hover:text-purple-200"
+                        >
+                          View <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-11 text-black-500 mt-3">
+              Read live from Stripe for this workspace&apos;s customer.
+              Receipts and payment details are managed in the billing
+              portal.
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-black-700/80 bg-black-800/40 p-8 text-center text-black-400 text-13">
+            <CreditCard className="h-8 w-8 mx-auto text-black-600 mb-2" />
+            <p>
+              {isDemo
+                ? "No billing history — Demo Mode"
+                : "No invoices recorded for this workspace yet"}
+            </p>
+            <p className="text-11 text-black-500 mt-0.5">
+              Invoices and receipts are issued by Stripe and available through
+              the billing portal once a subscription exists.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

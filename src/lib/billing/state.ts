@@ -51,7 +51,8 @@ export function getStripePriceId(
   interval: BillingInterval = "monthly",
   env: Record<string, string | undefined> = process.env
 ): string | null {
-  const varName = PLAN_CATALOG[plan].stripePriceEnv[interval];
+  const varName = PLAN_CATALOG[plan].stripePriceEnv?.[interval];
+  if (!varName) return null; // Plan is never sold through Stripe (free tier).
   const value = env[varName];
   return isConfiguredValue(value) ? (value as string) : null;
 }

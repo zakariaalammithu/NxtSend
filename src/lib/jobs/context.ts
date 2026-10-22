@@ -15,6 +15,7 @@ import {
   getWorkspaceWebhookConfig,
 } from "@/lib/webhooks/store";
 import { runDeliveryAttempt } from "@/lib/webhooks/dispatch";
+import { resolveWorkspaceEntitlement } from "@/lib/billing/entitlement";
 import { SupabaseExecutorStore } from "@/lib/executor/supabase-store";
 import { createCampaignRoutingAdapter } from "@/lib/email";
 import { downloadVoiceNoteAsAttachment } from "@/lib/voice/storage";
@@ -28,18 +29,12 @@ export function createSupabaseJobsContext(admin: SupabaseClient): JobsContext {
       return (data ?? []).map((r) => String((r as { id: string }).id));
     },
     async getWorkspacePlan(workspaceId) {
-      const { data } = await admin
-        .from("subscriptions")
-        .select("plan")
-        .eq("workspace_id", workspaceId)
-        .maybeSingle();
-      if (data?.plan) return String(data.plan);
-      const { data: ws } = await admin
-        .from("workspaces")
-        .select("plan")
-        .eq("id", workspaceId)
-        .maybeSingle();
-      return ws?.plan ? String(ws.plan) : "free";
+      // Status-aware entitlement (P9 B1): the shared resolver reads
+      // plan + status + current_period_end, so a cancelled/lapsed
+      // subscription enforces Free quotas here too — not just the
+      // plan that was stored when the subscription was last active.
+      const entitlement = await resolveWorkspaceEntitlement(admin, workspaceId);
+      return entitlement.plan;
     },
     async countWorkspaceMetric(workspaceId, metric, periodStartIso) {
       if (metric === "leads") {

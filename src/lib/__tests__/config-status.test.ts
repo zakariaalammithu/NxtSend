@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import path from "node:path";
 import {
   CONFIG_CATALOG,
   buildConfigStatus,
   classifyEnvValue,
 } from "../config-status";
+import { PLAN_CATALOG } from "../billing/plans";
 
 describe("classifyEnvValue", () => {
   it("classifies a real-looking value as present_valid", () => {
@@ -110,5 +112,51 @@ describe("catalogue parity with .env.example", () => {
     expect(new Set(names)).toEqual(
       new Set(CONFIG_CATALOG.map((v) => v.name))
     );
+  });
+});
+
+describe("catalogue parity with code-referenced env names (P9 B6)", () => {
+  const catalogNames = new Set(CONFIG_CATALOG.map((v) => v.name));
+
+  it("every literal process.env.<NAME> read in src is catalogued", () => {
+    // The catalogue ↔ .env.example parity above cannot see drift in
+    // the other direction — a variable the CODE names but the
+    // catalogue/docs never mention (the STRIPE_PRICE_ID_FREE drift).
+    // This scan closes that hole: any literal env read in shipped
+    // (non-test) source must be a catalogued variable.
+    const srcRoot = fileURLToPath(new URL("../../", import.meta.url));
+    const files = readdirSync(srcRoot, { recursive: true })
+      .map((f) => String(f))
+      .filter((f) => /\.tsx?$/.test(f))
+      .filter((f) => !f.includes("__tests__") && !/\.test\.tsx?$/.test(f));
+    const referenced = new Set<string>();
+    const envReadPattern = /process\.env\.([A-Z][A-Z0-9_]+)/g;
+    for (const file of files) {
+      const text = readFileSync(path.join(srcRoot, file), "utf8");
+      let match: RegExpExecArray | null;
+      envReadPattern.lastIndex = 0;
+      while ((match = envReadPattern.exec(text)) !== null) {
+        referenced.add(match[1]);
+      }
+    }
+    expect(referenced.size).toBeGreaterThan(20); // scan actually found the reads
+    const uncatalogued = Array.from(referenced).filter(
+      (n) => !catalogNames.has(n)
+    );
+    expect(uncatalogued).toEqual([]);
+  });
+
+  it("every env var named by the plan catalog (Stripe Price IDs) is catalogued", () => {
+    const named: string[] = [];
+    for (const plan of Object.values(PLAN_CATALOG)) {
+      if (!plan.stripePriceEnv) continue;
+      named.push(plan.stripePriceEnv.monthly, plan.stripePriceEnv.annual);
+    }
+    expect(named.length).toBe(6); // starter/growth/agency × monthly/annual
+    expect(named.filter((n) => !catalogNames.has(n))).toEqual([]);
+  });
+
+  it("the free plan names no Stripe price env vars (it is never sold)", () => {
+    expect(PLAN_CATALOG.free.stripePriceEnv).toBeUndefined();
   });
 });

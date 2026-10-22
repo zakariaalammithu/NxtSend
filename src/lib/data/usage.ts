@@ -21,13 +21,23 @@
  *   dataset's plan for the demo workspace ("growth" — the demo
  *   subscription record sub_003 for Alex Vance's workspace).
  *
- * Plan resolution mirrors the jobs context: subscriptions.plan ->
- * workspaces.plan -> "free".
+ * Plan resolution is status-aware and shared: the entitlement
+ * resolver (src/lib/billing/entitlement.ts) decides which plan's
+ * quotas apply from the subscription's plan + status +
+ * current_period_end — a cancelled or lapsed subscription resolves
+ * to Free, a past_due one keeps its paid plan only until the
+ * paid-through date. The same resolver backs the jobs context and
+ * the sequence executor, so the rule cannot drift between surfaces.
  */
 
 import { createClient } from "@/lib/supabase/client";
 import type { PlanType } from "@/types";
 import { checkLimit, type LimitCheck, type UsageMetric } from "@/lib/billing/limits";
+import {
+  resolveWorkspaceEntitlement,
+  type EntitlementBasis,
+  type EntitlementResolution,
+} from "@/lib/billing/entitlement";
 import { getDataMode, type DataMode } from "./mode";
 import { createLeadsRepository } from "./leads";
 import { createCampaignsRepository } from "./campaigns";
@@ -40,7 +50,14 @@ export type UsageSource = "usage_records" | "computed";
 
 export interface WorkspaceUsage {
   workspace_id: string;
+  /** The EFFECTIVE plan (entitlement-resolved), whose quotas are checked below. */
   plan: PlanType;
+  /** Stored Stripe subscription status, when a subscription row exists. */
+  subscription_status: string | null;
+  /** Why `plan` applies — UIs use this to label past-due/downgraded states honestly. */
+  entitlement_basis: EntitlementBasis | null;
+  /** Stored paid-through date (ISO), when a subscription row provides one. */
+  current_period_end: string | null;
   /** First day of the usage period, "YYYY-MM-DD". */
   period_start: string;
   /** Where the numbers came from — UIs must label "computed" as such. */
@@ -77,10 +94,14 @@ export function buildWorkspaceUsage(input: {
   period_start: string;
   source: UsageSource;
   metrics: Partial<Record<UsageMetric, number>>;
+  entitlement?: EntitlementResolution | null;
 }): WorkspaceUsage {
   return {
     workspace_id: input.workspace_id,
     plan: input.plan,
+    subscription_status: input.entitlement?.status ?? null,
+    entitlement_basis: input.entitlement?.basis ?? null,
+    current_period_end: input.entitlement?.currentPeriodEnd ?? null,
     period_start: input.period_start,
     source: input.source,
     metrics: input.metrics,
@@ -150,20 +171,10 @@ class SupabaseUsageRepository implements UsageRepository {
     return supabase;
   }
 
-  private async resolvePlan(workspaceId: string): Promise<PlanType> {
-    const supabase = this.client();
-    const { data: sub } = await supabase
-      .from("subscriptions")
-      .select("plan")
-      .eq("workspace_id", workspaceId)
-      .maybeSingle();
-    if (sub?.plan) return sub.plan as PlanType;
-    const { data: ws } = await supabase
-      .from("workspaces")
-      .select("plan")
-      .eq("id", workspaceId)
-      .maybeSingle();
-    return (ws?.plan as PlanType | undefined) ?? "free";
+  private async resolveEntitlement(
+    workspaceId: string
+  ): Promise<EntitlementResolution> {
+    return resolveWorkspaceEntitlement(this.client(), workspaceId);
   }
 
   /** Live counts with the usage_rollup job's exact definitions. */
@@ -201,7 +212,8 @@ class SupabaseUsageRepository implements UsageRepository {
 
   async getWorkspaceUsage(workspaceId: string): Promise<WorkspaceUsage> {
     const supabase = this.client();
-    const plan = await this.resolvePlan(workspaceId);
+    const entitlement = await this.resolveEntitlement(workspaceId);
+    const plan = entitlement.plan;
 
     const { data, error } = await supabase
       .from("usage_records")
@@ -232,6 +244,7 @@ class SupabaseUsageRepository implements UsageRepository {
         period_start: latestPeriod,
         source: "usage_records",
         metrics,
+        entitlement,
       });
     }
 
@@ -244,6 +257,7 @@ class SupabaseUsageRepository implements UsageRepository {
       period_start: periodStart,
       source: "computed",
       metrics,
+      entitlement,
     });
   }
 }

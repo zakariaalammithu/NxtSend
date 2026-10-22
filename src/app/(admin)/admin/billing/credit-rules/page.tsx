@@ -65,10 +65,16 @@ export default function AdminCreditRulesPage() {
                 ))}
               </dl>
               <p className="text-12 text-black-500 mt-4">
-                Stripe Price env:{" "}
-                <span className="font-mono">{plan.stripePriceEnv.monthly}</span> /{" "}
-                <span className="font-mono">{plan.stripePriceEnv.annual}</span>{" "}
-                (annual)
+                {plan.stripePriceEnv ? (
+                  <>
+                    Stripe Price env:{" "}
+                    <span className="font-mono">{plan.stripePriceEnv.monthly}</span> /{" "}
+                    <span className="font-mono">{plan.stripePriceEnv.annual}</span>{" "}
+                    (annual)
+                  </>
+                ) : (
+                  <>Not sold through Stripe — no Price ID exists for this tier.</>
+                )}
               </p>
             </div>
           );

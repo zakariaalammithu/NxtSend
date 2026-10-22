@@ -63,6 +63,11 @@ import { getIntegrationStatuses } from "@/lib/integrations-center/status";
 import { getEmailState } from "@/lib/email/state";
 import { getBillingState } from "@/lib/billing/state";
 import { PLAN_CATALOG } from "@/lib/billing/plans";
+import {
+  mapBillingEventToTransaction,
+  type BillingEventRowLike,
+  type BillingTransaction,
+} from "@/lib/billing/transactions";
 import { MOCK_ADMIN_SUBSCRIPTIONS, MOCK_CAMPAIGNS, MOCK_LEADS } from "@/lib/db/mock/data";
 import type { JobRecord, JobRunRecord } from "@/lib/jobs/types";
 import type { Campaign, Lead, PlanType } from "@/types";
@@ -511,14 +516,16 @@ export async function getUsageOverview(mode: DataMode): Promise<WorkspaceUsageRo
 
 // ── Billing (transactions / subscriptions / revenue) ────────────────────────
 
-export interface BillingTransaction {
+export type { BillingTransaction } from "@/lib/billing/transactions";
+
+export interface BillingWebhookFailure {
   id: string;
-  provider: string;
+  event_id: string;
   event_type: string;
-  amount: number | null;
-  currency: string | null;
-  status: string | null;
-  processed_at: string;
+  error_summary: string;
+  received_at: string;
+  resolved: boolean;
+  resolved_at: string | null;
 }
 
 export interface BillingSubscriptionRow {
@@ -536,6 +543,8 @@ export interface BillingOverview {
   mode: DataMode;
   stripeState: string;
   transactions: BillingTransaction[];
+  /** Append-only webhook apply-failure log (migration 017), newest first. */
+  webhookFailures: BillingWebhookFailure[];
   subscriptions: BillingSubscriptionRow[];
   revenue: {
     /** Sum of plan prices for Stripe-linked active/trialing subscriptions. */
@@ -553,6 +562,7 @@ export async function getBillingOverview(mode: DataMode): Promise<BillingOvervie
       mode,
       stripeState,
       transactions: [],
+      webhookFailures: [],
       subscriptions: MOCK_ADMIN_SUBSCRIPTIONS.map((s) => ({
         id: s.id,
         workspace_name: s.workspaceName,
@@ -580,22 +590,33 @@ export async function getBillingOverview(mode: DataMode): Promise<BillingOvervie
     .limit(100);
   if (eventsError) throw new Error(`Failed to load billing events: ${eventsError.message}`);
 
-  const transactions: BillingTransaction[] = (eventRows ?? []).map((row) => {
-    const r = row as Record<string, unknown>;
-    const payload = (r.payload as Record<string, unknown>) ?? {};
-    const data = (payload.data as Record<string, unknown>) ?? {};
-    const object = (data.object as Record<string, unknown>) ?? {};
-    const amountRaw = object.amount_total ?? object.amount_paid ?? object.amount;
-    return {
-      id: String(r.event_id),
-      provider: String(r.provider ?? "stripe"),
-      event_type: String(r.event_type),
-      amount: typeof amountRaw === "number" ? amountRaw / 100 : null,
-      currency: typeof object.currency === "string" ? object.currency : null,
-      status: typeof object.status === "string" ? object.status : null,
-      processed_at: String(r.processed_at),
-    };
-  });
+  const transactions: BillingTransaction[] = (eventRows ?? []).map((row) =>
+    mapBillingEventToTransaction(row as BillingEventRowLike)
+  );
+
+  // Webhook failure log (migration 017). Auxiliary visibility only:
+  // until the owner applies 017 the table does not exist — that must
+  // read as "no rows", never take the whole billing overview down.
+  let webhookFailures: BillingWebhookFailure[] = [];
+  const { data: failureRows, error: failuresError } = await admin
+    .from("billing_webhook_failures")
+    .select("id, event_id, event_type, error_summary, received_at, resolved, resolved_at")
+    .order("received_at", { ascending: false })
+    .limit(50);
+  if (!failuresError) {
+    webhookFailures = (failureRows ?? []).map((row) => {
+      const r = row as Record<string, unknown>;
+      return {
+        id: String(r.id),
+        event_id: String(r.event_id),
+        event_type: String(r.event_type),
+        error_summary: String(r.error_summary ?? ""),
+        received_at: String(r.received_at),
+        resolved: Boolean(r.resolved),
+        resolved_at: (r.resolved_at as string | null) ?? null,
+      };
+    });
+  }
 
   const { data: subRows } = await admin
     .from("subscriptions")
@@ -651,6 +672,7 @@ export async function getBillingOverview(mode: DataMode): Promise<BillingOvervie
     mode,
     stripeState,
     transactions,
+    webhookFailures,
     subscriptions,
     revenue: {
       mrr_usd: mrr,

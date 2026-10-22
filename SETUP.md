@@ -49,6 +49,7 @@ Open **SQL Editor** in the Supabase dashboard and run each file from
 | 14 | `014_oauth_connections.sql` | `oauth_connections` table (P5 Stage G): the encrypted OAuth token vault for connected Gmail / Outlook mailboxes — workspace + `connected_accounts` FKs (CASCADE), provider CHECK (`google` / `microsoft`), mailbox address, scopes, `access_token_enc` / `refresh_token_enc` (AES-256-GCM ciphertext only), token expiry, grant status. **RLS enabled with NO client policies — service-role only by construction**; the UI reads metadata through guarded API routes that never return token fields |
 | 15 | `015_voice_notes.sql` | Voice notes (P6 Stage C): `messages` gains `voice_note_path` / `voice_note_duration_sec` / `voice_note_language` / `transcript`, plus the **private** Supabase Storage bucket `voice-notes` (public = false, 10 MB cap, audio MIME allowlist) with storage RLS policies scoping objects to workspaces the caller belongs to (first path segment = workspace id). Audio bytes live in the bucket, never in the table; playback goes through a server route using short-lived signed URLs. A voice note is delivered as an **email attachment only** — there is no LinkedIn voice-note delivery |
 | 16 | `016_integration_hub.sql` | Integration Hub (P7): `hub_integrations`, `hub_credentials`, `hub_test_accounts`, `hub_checklist_items`, `hub_checklist_state`, `hub_documents`. Credential values exist ONLY as AES-256-GCM ciphertext (`value_enc`, keyed by `INTEGRATION_HUB_ENCRYPTION_KEY`) — no plaintext column exists. **RLS enabled with NO client policies on all six tables — service-role only**, behind the admin gate. Seeds the six BRR records (Muse connector `in_review`, the other five `configuring`), their checklists/documents and 8 Hub-global templates — all idempotent (`ON CONFLICT DO NOTHING`), and **no credentials and no test accounts**. See §16 |
+| 17 | `017_billing_webhook_failures.sql` | Billing webhook failure log (P9): `billing_webhook_failures` — one row per FAILED Stripe webhook processing attempt (event id + type, error summary truncated to 500 chars, `resolved` flag set when a redelivery of the same event later succeeds; rows are never deleted). **RLS enabled with NO client policies — service-role only.** Written best-effort by the webhook handler AFTER its exactly-once idempotency rollback, so until 017 is applied failed events leave no admin-visible row (the 500/retry behaviour is unchanged). Surfaced in Admin → Billing → Transactions ("Webhook processing failures") |
 
 Do not skip or reorder — later migrations depend on earlier helpers
 (`is_workspace_member`, `is_workspace_admin`).
@@ -104,6 +105,8 @@ and treated as *not configured*.
 | `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | For Outlook mailboxes | Azure app registration (server-only secret value) — §15. Callback: `<NEXT_PUBLIC_APP_URL>/api/oauth/microsoft/callback` |
 | `TOKEN_ENCRYPTION_KEY` | For mailbox OAuth | ⚠️ Server-only. AES-256-GCM key for the OAuth token vault (migration 014) — exactly 32 bytes, base64. Generate: `openssl rand -base64 32`. Also derives the OAuth state + fallback unsubscribe signing keys. **Rotating it invalidates every stored grant — mailboxes must reconnect** |
 | `INTEGRATION_HUB_ENCRYPTION_KEY` | For the Integration Hub vault | ⚠️ Server-only. AES-256-GCM key for the Integration Hub credential vault (migration 016) — exactly 32 bytes, base64, DEDICATED to the Hub (not shared with the mailbox vault). Generate: `openssl rand -base64 32`. **Losing or rotating it makes every stored Hub credential undecryptable — they must all be re-entered** — §16 |
+| `INSTANTLY_API_KEY` | Optional | Instantly API v2 key (`accounts:read` scope) for **read-only** email warm-up status (server-only). Warm-up itself runs on Instantly's network; while unset, warm-up reads return "Unavailable" — never simulated |
+| `LINKEDIN_PROVIDER` / `LINKEDIN_PROVIDER_API_KEY` | — | Reserved for a future LinkedIn provider integration. **Setting them connects nothing** — no vendor adapter is implemented; the values are read only for presence display in the Integration Center |
 
 ## 5. Create the first Super Admin (bootstrap)
 
@@ -328,11 +331,18 @@ footer + headers are appended at send time — see "Unsubscribe" above.)
    product decision; this guide does not silently change either.
 2. Set `STRIPE_SECRET_KEY`.
 3. Register the webhook: Stripe dashboard → **Developers → Webhooks** →
-   endpoint `https://<your-domain>/api/webhooks/stripe`, events:
-   `checkout.session.completed`, `customer.subscription.created`,
-   `customer.subscription.updated`, `customer.subscription.deleted`,
-   `invoice.payment_failed`. Copy the signing secret →
-   `STRIPE_WEBHOOK_SECRET`.
+   endpoint `https://<your-domain>/api/webhooks/stripe`, events (the
+   eight the handler acts on — `STRIPE_HANDLED_EVENT_TYPES` in
+   `src/lib/billing/webhook.ts`): `checkout.session.completed`,
+   `customer.subscription.created`, `customer.subscription.updated`,
+   `customer.subscription.deleted`, `invoice.payment_failed`,
+   `charge.refunded`, `charge.dispute.created`,
+   `charge.dispute.closed`. Copy the signing secret →
+   `STRIPE_WEBHOOK_SECRET`. (Refunds/disputes are record-only: they
+   land in Admin → Billing → Transactions and never mutate a
+   subscription. Any other event Stripe sends is recorded as a
+   no-action — PRODUCTION.md §9.4. The full ordered test→live swap
+   sequence is PRODUCTION.md §9.2.)
 4. In **Settings → Billing → Customer portal**, enable the portal
    (payment-method updates, invoices, cancellation).
 5. Behaviour to expect:
@@ -457,7 +467,11 @@ producer UI yet); an empty queue is a normal state.
 > The step-by-step deployment runbook (project settings, the full
 > env table with build-vs-runtime split, webhook registrations,
 > cron notes, custom domain, go-live smoke checklist, rollback) is
-> **PRODUCTION.md** at the app root. The short version:
+> **PRODUCTION.md** at the app root. See especially **PRODUCTION.md
+> §9** for the Production-vs-Preview-vs-Development variable
+> strategy (never live Stripe keys or the production Supabase in
+> Preview) and the ordered Stripe test→live swap checklist. The
+> short version:
 
 1. Push the repo to GitHub (the project's established flow).
 2. Vercel → **Add New Project** → import the repo. Framework preset:

@@ -22,7 +22,7 @@ covers getting them live on Vercel safely.
 |---|---|
 | Framework Preset | **Next.js** (auto-detected) |
 | Root Directory | The folder containing this file (`nxtsend-app` if the repo root is its parent; the repo root itself when the app is at the root) |
-| Node.js Version | **20.x** (Project → Settings → General → Node.js Version; the app targets Node 20 APIs) |
+| Node.js Version | **20.x** (Project → Settings → General → Node.js Version; the app targets Node 20 APIs; also pinned via `engines` in `package.json`) |
 | Build Command | `npm run build` (default) |
 | Install Command | `npm install` (default; a lockfile is committed) |
 | Output Directory | default (`.next`) |
@@ -74,6 +74,10 @@ values): **Admin → System → Diagnostics** (`GET
 | `MICROSOFT_CLIENT_ID` | runtime | server | Azure → App registrations → Application (client) ID — SETUP.md §15.3 | Integration Center → Outlook (Microsoft 365) shows the client configured |
 | `MICROSOFT_CLIENT_SECRET` | runtime | **server secret** | Azure → Certificates & secrets → the secret **Value** (shown once) | Outlook → Connect completes the consent + Graph /me fetch |
 | `TOKEN_ENCRYPTION_KEY` | runtime | **server secret** | You generate it: `openssl rand -base64 32` (exactly 32 bytes decoded). Encrypts stored mailbox OAuth tokens (migration 014); also derives the OAuth state + fallback unsubscribe signing keys. **Rotating it invalidates every stored mailbox grant — mailboxes must reconnect** | Diagnostics → "Mailbox OAuth (Gmail / Outlook)" group; connect a mailbox and confirm `/api/oauth/connections` returns metadata with no token fields |
+| `INSTANTLY_API_KEY` | runtime | **server secret** | Instantly → Settings → API keys — an API v2 key with the `accounts:read` scope. Used for **read-only** email warm-up status; warm-up itself runs entirely on Instantly's network. Optional — while unset, warm-up reads return "Unavailable" (never simulated) | Integration Center → Email → warm-up panel stops showing "Unavailable" for accounts that exist in Instantly |
+| `INTEGRATION_HUB_ENCRYPTION_KEY` | runtime | **server secret** | You generate it: `openssl rand -base64 32` (exactly 32 bytes decoded). AES-256-GCM key for the Integration Hub credential vault (migration 016) — **dedicated to the Hub**, separate from `TOKEN_ENCRYPTION_KEY`. **Losing or rotating it makes every stored Hub credential undecryptable — they must all be re-entered** | Admin → Integration Hub: credential create/reveal/copy stop returning 503 (SETUP.md §16) |
+| `LINKEDIN_PROVIDER` | runtime | server | **Reserved — not an active integration.** The name of a LinkedIn-approved outreach provider, if/when you procure one. Setting it connects nothing: no vendor adapter is implemented, and the value is read only for presence display in the Integration Center. Leave unset until a provider exists | — |
+| `LINKEDIN_PROVIDER_API_KEY` | runtime | **server secret** | **Reserved** — the approved provider's API key, for the same future integration as `LINKEDIN_PROVIDER`. Server-only, never rendered. Leave unset until a provider exists | — |
 
 ## 3. Supabase: migrations + post-migration checklist
 
@@ -85,6 +89,7 @@ In the Supabase SQL Editor, run the migrations **in numeric order**:
 → `010_sequence_executor` → `011_campaign_config_step_types`
 → `012_notifications` → `013_connected_account_provider_health`
 → `014_oauth_connections` → `015_voice_notes`
+→ `016_integration_hub` → `017_billing_webhook_failures`
 
 Migration 015 in full: voice-note columns on `messages`
 (`voice_note_path`, `voice_note_duration_sec`, `voice_note_language`,
@@ -103,9 +108,23 @@ state, daily limits, sender identity for the `{my_*}` variables), and
 applied, live mode cannot persist wizard metadata, the new step types
 or connected accounts (Demo Mode has no such dependency).
 
+Migration 016 in full: the six Integration Hub tables (`hub_*`) —
+RLS enabled with **no** client policies, service-role only; it also
+seeds the Hub's BRR records, checklists and templates (no credentials
+— SETUP.md §16).
+
+Migration 017 in full: `billing_webhook_failures` — the durable log
+of failed Stripe webhook processing attempts (event id + type, error
+summary, resolved flag). RLS enabled with **no** client policies;
+written best-effort by the webhook handler *after* the exactly-once
+idempotency rollback, so until 017 is applied failed events simply
+leave no admin-visible row (the 500/retry behaviour is unchanged).
+Surfaced in Admin → Billing → Transactions ("Webhook processing
+failures").
+
 Post-migration checklist:
 
-- [ ] All 14 ran without errors (SQL Editor history). (014 creates
+- [ ] All 17 ran without errors (SQL Editor history). (014 creates
       `oauth_connections` — RLS enabled with **no** client policies by
       design; it must show "RLS enabled" with zero policies.)
 - [ ] RLS is enabled on every public table (Database → Tables — no
@@ -179,11 +198,15 @@ Post-migration checklist:
 ### Stripe
 
 - **Developers → Webhooks → Add endpoint**:
-  `https://<your-domain>/api/webhooks/stripe` — events:
-  `checkout.session.completed`, `customer.subscription.created`,
-  `customer.subscription.updated`, `customer.subscription.deleted`,
-  `invoice.payment_failed`. Copy the signing secret into
-  `STRIPE_WEBHOOK_SECRET`.
+  `https://<your-domain>/api/webhooks/stripe` — events (exactly the
+  eight the handler acts on, `STRIPE_HANDLED_EVENT_TYPES` in
+  `src/lib/billing/webhook.ts`): `checkout.session.completed`,
+  `customer.subscription.created`, `customer.subscription.updated`,
+  `customer.subscription.deleted`, `invoice.payment_failed`,
+  `charge.refunded`, `charge.dispute.created`,
+  `charge.dispute.closed`. Copy the signing secret into
+  `STRIPE_WEBHOOK_SECRET`. (What happens to any *other* event Stripe
+  sends: §9.4.)
 - Create the Customer Portal configuration (Settings → Billing →
   Customer portal) or portal sessions will fail at Stripe.
 - Do the full test-mode pass (§6) before swapping in live keys.
@@ -209,10 +232,10 @@ endpoint — token deletion + account state is the disconnect there.
 ## 5. Cron + worker notes
 
 - The schedule is **daily** because the Vercel **Hobby** plan allows
-  only daily cron jobs. On **Pro**, you may raise the frequency in
-  `vercel.json` (e.g. hourly `0 * * * *`) for faster sequence pacing —
-  step delays are measured in hours, so daily is functional,
-  hourly is nicer. Nothing else changes: the worker is idempotent.
+  only daily cron jobs. On **Pro**, raise the frequency in
+  `vercel.json` — see §9.3 for the decision (5–15 minutes is what
+  honours the +5/+30 min webhook-retry schedule; hourly still
+  stretches it). Nothing else changes: the worker is idempotent.
 - `CRON_SECRET` must exist in the Vercel project env; Vercel Cron
   presents it automatically. Without it `/api/jobs/run` refuses
   (503) — by design, never unauthenticated.
@@ -259,9 +282,11 @@ endpoint — token deletion + account state is the disconnect there.
        redeliver the event → no duplicate effect.
 10. [ ] Admin: suspend the test user → they are blocked at next
         login; audit log shows the action.
-11. [ ] Swap Stripe **test** keys/prices for **live** ones, redeploy,
-        repeat step 9's checkout with a real card at the smallest
-        amount, then refund.
+11. [ ] Swap Stripe **test** keys/prices for **live** ones (the
+        ordered swap sequence is §9.2 — all six price IDs and the
+        webhook signing secret change together), redeploy, repeat
+        step 9's checkout with a real card at the smallest amount,
+        then refund.
 
 ## 7. Custom domain
 
@@ -293,3 +318,150 @@ endpoint — token deletion + account state is the disconnect there.
   Vercel returns that feature to an honest Not Connected /
   configuration-required state on the next deploy — sends stop,
   nothing fails silently.
+
+## 9. Environment strategy — Production vs Preview vs Development
+
+The same variables exist in every environment; **which values**
+they hold is a safety decision, not a convenience one.
+
+> **Hard rule: NEVER put live Stripe keys (`sk_live_…`) or the
+> production Supabase project in Preview.** A preview deployment
+> with live keys takes real payments and writes to production data
+> from an unreviewed build.
+
+### 9.1 Per-environment checklist
+
+| Variable group | Production | Preview | Development (local) |
+|---|---|---|---|
+| Stripe `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, 6× `STRIPE_PRICE_ID_*` | **Live** keys + **live** price IDs (after the §9.2 swap pass) | **Test** keys (`sk_test_…`) + **test** price IDs + the test endpoint's signing secret — or omit entirely (billing then shows honest not-configured states) | `.env.local`, **test** keys only |
+| Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) | The production project | A **separate** staging project — or omit entirely and let previews run in **Demo Mode** | `.env.local`; a local/staging project, never the production service-role key for routine work |
+| `NEXT_PUBLIC_APP_URL` | The production origin | The preview origin. Billing routes refuse a mismatched/localhost origin rather than redirecting wrongly, so checkout on a preview whose URL differs from this value will refuse — expected, not a bug | `http://localhost:3000` |
+| Provider keys (Resend, OpenAI/Anthropic/Meta, Instantly, Google/Microsoft OAuth) | Real keys for the providers you use | Test/dedicated keys, or omit (each integration degrades to its honest not-configured state) | `.env.local`, test keys |
+| Vault keys (`TOKEN_ENCRYPTION_KEY`, `INTEGRATION_HUB_ENCRYPTION_KEY`) | Production values; back them up with the other production secrets | **Different** values from Production (a preview must never be able to decrypt production vault data) — or omit and leave the vaults inert | Any locally generated value |
+| `CRON_SECRET` | Set (required for the worker) | Optional — set a different value if you want preview job runs | Optional in `.env.local` |
+| `ADMIN_BOOTSTRAP_SECRET` | Only during the §3 bootstrap, then **deleted** | Never needed | Never needed |
+
+Mechanics: server secrets are read at **runtime**; `NEXT_PUBLIC_*`
+values are baked in at **build time** — changing any of them takes
+effect on the next deployment either way (§2).
+
+### 9.2 Stripe test → live swap checklist (ordered)
+
+Do the full pass in **test mode first** (steps 1–7), verify, then
+repeat the same sequence with live values (step 8). Do not skip
+straight to live.
+
+1. [ ] **Products + Prices (test mode).** Stripe Dashboard (test
+       mode) → Products: create the three sold plans from the app
+       catalog (`src/lib/billing/plans.ts`) — Starter, Growth,
+       Agency — each with a **monthly** and an **annual** Price
+       (six prices total). The Free plan is never sold and has **no**
+       Stripe price — do not create one. Copy the six Price IDs
+       into: `STRIPE_PRICE_ID_STARTER`, `STRIPE_PRICE_ID_STARTER_ANNUAL`,
+       `STRIPE_PRICE_ID_GROWTH`, `STRIPE_PRICE_ID_GROWTH_ANNUAL`,
+       `STRIPE_PRICE_ID_AGENCY`, `STRIPE_PRICE_ID_AGENCY_ANNUAL`.
+2. [ ] **Keys.** Vercel (target environment) → set `STRIPE_SECRET_KEY`
+       (`sk_test_…`) from Developers → API keys. Redeploy.
+3. [ ] **Webhook endpoint.** Developers → Webhooks → Add endpoint:
+       `https://<your-domain>/api/webhooks/stripe`, with exactly
+       the **eight handled events**: `checkout.session.completed`,
+       `customer.subscription.created`,
+       `customer.subscription.updated`,
+       `customer.subscription.deleted`, `invoice.payment_failed`,
+       `charge.refunded`, `charge.dispute.created`,
+       `charge.dispute.closed`. Copy that endpoint's signing secret
+       into `STRIPE_WEBHOOK_SECRET`. Redeploy. (While the secret is
+       unset the route rejects events with 503 — never accepts
+       unverified ones.)
+4. [ ] **Customer Portal.** Settings → Billing → Customer portal →
+       activate it (payment-method updates, invoices, cancellation)
+       — portal sessions fail at Stripe until this exists.
+5. [ ] **Test checkout.** Sign in → Dashboard → Billing → pick a
+       plan → pay with card `4242 4242 4242 4242` (any future date /
+       CVC). Then verify all four:
+       - Stripe Dashboard shows the webhook deliveries succeeded;
+       - the workspace's `subscriptions` row exists with the Stripe
+         customer/subscription IDs and status `active`;
+       - the Billing page shows the paid plan (entitlement resolves
+         from the subscription, not from the checkout redirect);
+       - after the first paid invoice, **Billing History** on the
+         same page lists it (read live from Stripe).
+6. [ ] **Duplicate-delivery test.** Developers → Webhooks → the
+       `customer.subscription.updated` event → **Resend** (or
+       `stripe events resend <evt_…>`). The endpoint answers
+       `{duplicate: true}` and nothing changes a second time — no
+       double effect, by design (event IDs are recorded before
+       effects apply).
+7. [ ] **Cancel via Portal.** Billing → Manage Billing (Stripe
+       Portal) → cancel. Verify: the plan stays in force until the
+       paid-through date; once the period ends and Stripe deletes
+       the subscription, the workspace's entitlement falls back to
+       the **Free** plan (Billing page shows the downgrade notice;
+       quotas drop to Free). A failed renewal instead lands in
+       `past_due`: the paid plan continues only until the
+       paid-through date, then falls back the same way.
+8. [ ] **Go live — repeat 1–7 with live values.** Create the
+       products/prices again in **live mode** (test and live Price
+       IDs are different objects), register a **separate live
+       webhook endpoint** (its signing secret is different too),
+       activate the Portal in live mode, and swap **all** of:
+       `STRIPE_SECRET_KEY` (`sk_live_…`), `STRIPE_WEBHOOK_SECRET`,
+       and **all six** `STRIPE_PRICE_ID_*` — together, in one
+       change. Swapping only some leaves checkout pointing at test
+       prices with a live key (Stripe rejects the mismatch). Finish
+       with §6 step 11: one real checkout at the smallest amount,
+       then refund it (the refund arrives as `charge.refunded` and
+       shows in Admin → Billing → Transactions).
+
+### 9.3 Cron-frequency decision
+
+`vercel.json` currently registers **one** cron — `GET
+/api/jobs/run`, daily 06:00 UTC — because the Vercel **Hobby** plan
+allows only daily crons. Everything deferred runs through that one
+route, so on a daily cadence:
+
+- outbound-webhook retries (scheduled **+5 min**, then **+30 min**,
+  max 3 attempts) fire on the *next daily run* instead — up to
+  ~24 h late;
+- sequence follow-up steps (`follow_up_due`) due during the day
+  wait for the next run — step delays stretch to **≤ 24 h**;
+- `usage_rollup` is a day stale (display-only impact).
+
+**Decision:** on **Pro**, raise `/api/jobs/run` in `vercel.json` to
+every **5–15 minutes** (e.g. `*/10 * * * *`) — that is the cadence
+the retry schedule was written for. The worker is idempotent and
+drains all due jobs per run, so nothing else changes. If you stay
+on Hobby, the alternative is an **external scheduler** (cron-job.org,
+a GitHub Actions schedule, etc.) POSTing
+`https://<your-domain>/api/jobs/run` with header
+`x-cron-secret: <CRON_SECRET>` every 5–15 minutes — the route
+accepts that today; the daily Vercel cron then remains as a
+backstop. Either way, keep the total cron count within your plan's
+limit.
+
+### 9.4 Stripe events the app does not act on
+
+The webhook verifies the signature of **every** delivery; event
+types outside the eight handled ones (§9.2 step 3) are then recorded
+in `billing_events` with action `recorded_no_action` and
+acknowledged — no state changes. Common examples you may see if
+you enable extra events in Stripe:
+
+- `invoice.payment_succeeded` — safe to ignore: a successful
+  renewal also fires `customer.subscription.updated` carrying the
+  new period end and `active` status, which is what entitlement
+  resolution reads. (Its counterpart `invoice.payment_failed`
+  **is** handled — that is the dunning signal.)
+- `payment_intent.*`, `charge.succeeded` — payment-attempt noise;
+  no app state keys off them.
+- `checkout.session.expired` / `checkout.session.async_payment_failed`
+  — an abandoned checkout changes nothing: plans mutate only via
+  subscription events, and at most a plan-less customer row remains.
+
+Registering "all events" in Stripe is harmless but only adds
+no-action rows; the eight in §9.2 are sufficient. If a webhook
+event ever *fails processing* (a handled event whose effects
+throw), the endpoint returns 500 so Stripe retries, and the attempt
+is logged in `billing_webhook_failures` (migration 017) — visible
+in Admin → Billing → Transactions under "Webhook processing
+failures", and marked resolved when a redelivery succeeds.

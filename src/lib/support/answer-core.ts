@@ -74,8 +74,6 @@ export const SUPPORT_SYNONYMS: ReadonlyArray<readonly [string, string]> = [
   ["delete my account", "delete account"],
   ["cancel my subscription", "cancel subscription"],
   ["sales navigator", "sales navigator"],
-  ["warm up", "warmup"],
-  ["warming up", "warmup"],
 ];
 
 /** Function words that carry no retrieval signal. */

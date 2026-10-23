@@ -128,7 +128,7 @@ export default function TermsPage() {
               <li>Lead and contact data you import remains yours; you warrant that you obtained it lawfully and may use it for outreach.</li>
               <li>Every email campaign must honour unsubscribe requests. NxtSend attaches unsubscribe links to campaign email and maintains suppression lists, but the lawfulness of your sending remains your responsibility.</li>
               <li>LinkedIn activity is governed by LinkedIn&apos;s own terms, which you must comply with for every account you connect. NxtSend is not affiliated with LinkedIn, and LinkedIn may restrict or close accounts at its own discretion — an outcome we cannot prevent or reverse.</li>
-              <li>Some capabilities depend on third-party connections — for example, LinkedIn sending runs through an authorised provider integration, and email warm-up runs through Instantly. Where a required connection is absent, the Service will say so and the affected steps will not be sent; we will not simulate delivery.</li>
+              <li>Some capabilities depend on third-party connections — for example, LinkedIn sending runs through an authorised provider integration. Where a required connection is absent, the Service will say so and the affected steps will not be sent; we will not simulate delivery.</li>
             </ul>
           </section>
 
@@ -137,7 +137,7 @@ export default function TermsPage() {
               6. Third-Party Services and Integrations
             </h2>
             <p>
-              The Service relies on and connects to third-party services, including Supabase (hosting, database, authentication and file storage), Stripe (payments), Resend (email delivery), Google and Microsoft (mailbox connections you authorise via OAuth), and Instantly (email warm-up you connect). Your use of those services through NxtSend is also subject to their own terms and privacy policies. We are not responsible for a third-party service&apos;s availability, changes or actions, and a third party&apos;s outage may affect features that depend on it.
+              The Service relies on and connects to third-party services, including Supabase (hosting, database, authentication and file storage), Stripe (payments), Resend (email delivery), and Google and Microsoft (mailbox connections you authorise via OAuth). Your use of those services through NxtSend is also subject to their own terms and privacy policies. We are not responsible for a third-party service&apos;s availability, changes or actions, and a third party&apos;s outage may affect features that depend on it.
             </p>
           </section>
 

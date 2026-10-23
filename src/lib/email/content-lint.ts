@@ -67,7 +67,7 @@ const SPAM_PHRASES = [
   "no catch",
   "credit card debt",
   "lowest price ever",
-  "increase sales instantly",
+  "increase sales",
 ];
 
 function lettersOf(text: string): string[] {

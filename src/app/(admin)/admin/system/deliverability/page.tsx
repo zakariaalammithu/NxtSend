@@ -37,78 +37,6 @@ import type {
   SendingErrorRow,
 } from "@/lib/email/deliverability-server";
 
-interface WarmupConfigResponse {
-  mode: string;
-  providerLabel: string;
-  configured: boolean;
-  state: string;
-  stateLabel: string;
-  envVar: string;
-  lastVerification: {
-    ok: boolean;
-    checkedAt: string;
-    message: string;
-    workspaceId: string;
-  } | null;
-}
-
-/**
- * Warm-up Configuration (P5 Stage E) — configuration facts only:
- * provider, credential-configured boolean, derived state, and the last
- * recorded Test Connection outcome. No secret value can appear here
- * (the API returns presence/state only). Warm-up activity itself runs
- * on the provider's network; per-mailbox status is the workspace
- * surface at Email → Warm-up.
- */
-function WarmupConfigCard() {
-  const { data, loading } = useAdminFetch<WarmupConfigResponse>(
-    "/api/admin/warmup",
-    []
-  );
-  return (
-    <div className="glass-card p-6 space-y-3" data-testid="admin-warmup-config">
-      <h2 className="text-16 font-bold text-white">Warm-up Configuration</h2>
-      {loading && <p className="text-13 text-black-400">Loading…</p>}
-      {data && (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-13">
-            <div>
-              <p className="text-black-500 text-12">Provider</p>
-              <p className="text-white mt-0.5">
-                {data.providerLabel} (external — warm-up runs on the
-                provider&apos;s network)
-              </p>
-            </div>
-            <div>
-              <p className="text-black-500 text-12">
-                Credential configured ({data.envVar})
-              </p>
-              <p className="text-white mt-0.5">
-                {data.configured ? "Yes" : "No"}
-              </p>
-            </div>
-            <div>
-              <p className="text-black-500 text-12">State</p>
-              <p className="text-white mt-0.5">{data.stateLabel}</p>
-            </div>
-          </div>
-          <p className="text-13 text-black-300">
-            {data.lastVerification
-              ? `Last Test Connection ${data.lastVerification.ok ? "succeeded" : "FAILED"} ${fmtDateTime(data.lastVerification.checkedAt)}: ${data.lastVerification.message}`
-              : "No Test Connection has been recorded for the warm-up provider yet. Until one succeeds, warm-up status reads Unavailable — key presence alone never counts as verified."}
-          </p>
-          <p className="text-12 text-black-500">
-            Only presence and state are shown — the API key value is never
-            rendered anywhere in admin. Per-mailbox warm-up status (as
-            reported by the provider) lives in the workspace under Email →
-            Warm-up.
-          </p>
-        </>
-      )}
-    </div>
-  );
-}
-
 interface DeliverabilityResponse {
   mode: string;
   classification: "provider" | "simulated";
@@ -282,9 +210,6 @@ export default function AdminDeliverabilityPage() {
               never a blanket &ldquo;Healthy&rdquo;: an empty or stale log says so.
             </p>
           </div>
-
-          {/* Warm-up configuration */}
-          <WarmupConfigCard />
 
           {/* Inbound webhook log */}
           <div className="glass-card p-6">

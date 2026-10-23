@@ -22,7 +22,6 @@ import { INTEGRATION_REGISTRY } from "@/lib/integrations-center/registry";
  *                  happens inside the app, per mailbox.
  * - n8n / zapier → both ride the registry's "webhooks" descriptor:
  *                  signed outbound events, not native apps.
- * - warmup (Instantly) → read-only warm-up status reporting.
  * - google-sheets / crm (HubSpot) → kind "info": NOT implemented;
  *                  the chips say so instead of implying a sync.
  *
@@ -32,7 +31,7 @@ import { INTEGRATION_REGISTRY } from "@/lib/integrations-center/registry";
  * for OpenAI, Claude, Resend, Gmail, Outlook and Google Sheets in
  * their official brand colours (white variants for the two marks
  * whose brand colour is black), and the brand files for n8n,
- * Zapier, Instantly and HubSpot. No fabricated logos.
+ * Zapier and HubSpot. No fabricated logos.
  */
 
 const byId = (id: string) => {
@@ -140,14 +139,6 @@ const CARDS: HomeCard[] = [
     chip: "Via outbound webhooks",
     tone: "neutral",
     logo: `${LOGOS}/zapier.svg`,
-  },
-  {
-    // Registry: warmup — "Email Warm-up (Instantly)", read-only status.
-    name: "Instantly — Email Warm-up",
-    purpose: byId("warmup").tagline,
-    chip: "Warm-up status — read-only",
-    tone: "neutral",
-    logo: `${LOGOS}/instantly.svg`,
   },
   {
     name: byId("google-sheets").name,

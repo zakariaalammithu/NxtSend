@@ -55,7 +55,7 @@ export const SEED_CATEGORIES: SeedCategory[] = [
   { slug: "account-login", name: "Account & Login", description: "Passwords, sign-in, roles and deletion.", sort_order: 2 },
   { slug: "campaigns", name: "Campaigns", description: "Building campaigns, leads and sequences.", sort_order: 3 },
   { slug: "linkedin", name: "LinkedIn", description: "LinkedIn outreach, profiles and Avatars.", sort_order: 4 },
-  { slug: "email", name: "Email", description: "Domains, mailboxes and warm-up.", sort_order: 5 },
+  { slug: "email", name: "Email", description: "Domains and mailboxes.", sort_order: 5 },
   { slug: "billing", name: "Billing", description: "Plans, pricing, trials and invoices.", sort_order: 6 },
   { slug: "integrations-developers", name: "Integrations & Developers", description: "Integration Center, webhooks and the API question.", sort_order: 7 },
   { slug: "contact-policies", name: "Contact & Policies", description: "How to reach us and the legal pages.", sort_order: 8 },
@@ -287,19 +287,6 @@ export const SEED_KNOWLEDGE: SeedKnowledge[] = [
     priority: 65,
     source: "Support page → Email outreach setup + Troubleshooting (/support#email)",
   },
-  {
-    slug: "how-warmup-works",
-    category_slug: "email",
-    title: "How does warm-up work?",
-    question: "How does email warm-up work?",
-    answer:
-      "Connect an Instantly account in the Integration Center to see per-mailbox warm-up status inside NxtSend. Warm-up itself runs on Instantly's network; NxtSend reports its status read-only. If warm-up shows “Unavailable”, no Instantly connection (or no API key) is configured for the workspace yet.",
-    keywords: ["warmup", "warm-up", "instantly", "deliverability", "mailbox health"],
-    related_url: "/support#email",
-    priority: 55,
-    source: "Support page → Email outreach setup + Troubleshooting (/support#email)",
-  },
-
   // ── Billing ──────────────────────────────────────────────────────
   {
     slug: "how-much-does-nxtsend-cost",

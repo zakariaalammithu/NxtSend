@@ -26,7 +26,7 @@ export const metadata: Metadata = {
  * Help & Support (P8). Every instruction here describes behaviour the
  * product actually implements today; where a step depends on a
  * provider or an owner-side setup (a connected LinkedIn provider, a
- * verified sending domain, an Instantly account), the guide says so
+ * verified sending domain, a connected provider), the guide says so
  * instead of inventing a flow. Billing is described as what it is —
  * per-seat Stripe subscriptions with plan usage limits; NxtSend has
  * no prepaid-balance system.
@@ -104,7 +104,6 @@ const GUIDES: GuideSection[] = [
     steps: [
       "Domain sending (via Resend): add your sending domain, publish the DNS records it asks for, then run the deliverability checker in the product — it reads your live SPF, DKIM and DMARC records and reports each one. The domain stays \u201cConfiguration Required\u201d until it verifies.",
       "Your own mailbox: connect a Gmail or Outlook mailbox with OAuth and select it as the campaign's sender. Sends and replies then run through that mailbox — there is no silent fallback to a different sender.",
-      "Warm-up: connect an Instantly account in the Integration Center to see per-mailbox warm-up status inside NxtSend. Warm-up itself runs on Instantly's network; NxtSend reports its status read-only.",
       "Every campaign email carries an unsubscribe link, and unsubscribes, bounces and complaints are added to your suppression list automatically.",
     ],
   },
@@ -145,7 +144,6 @@ const GUIDES: GuideSection[] = [
     bullets: [
       "Emails are not sending — check the campaign is launched (not a draft), the sending account's daily limit has not been reached, and the sending domain or mailbox is verified/connected. A contact on the suppression list is never emailed.",
       "LinkedIn steps show as skipped — expected until an authorised provider is connected to your workspace; the step's detail shows the reason. Email steps are unaffected.",
-      "Warm-up shows \u201cUnavailable\u201d — no Instantly connection (or no API key) is configured for the workspace yet.",
       "A mailbox shows its grant has expired — reconnect it from the Accounts page; OAuth grants can be revoked or expire on the provider's side.",
       "CSV import skipped rows — a row needs an email or a LinkedIn URL, and rows matching an existing lead on either are treated as duplicates. The import report lists both counts.",
       "Webhook deliveries are failing — see the Developers page: signature mismatches, non-2xx responses and the delivery log are covered there.",

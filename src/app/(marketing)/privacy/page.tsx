@@ -5,7 +5,7 @@ import { Shield, Mail } from "lucide-react";
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
-    "How NxtSend handles data: what we collect, how we use it, the processors involved (Supabase, Stripe, Resend, and the mailbox and warm-up services you choose to connect), retention, and your rights.",
+    "How NxtSend handles data: what we collect, how we use it, the processors involved (Supabase, Stripe, Resend, and the mailbox services you choose to connect), retention, and your rights.",
 };
 
 /**
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
  * product actually implements: Supabase hosting (database, auth,
  * storage), Stripe payments, Resend email delivery, Google/Microsoft
  * mailboxes only when a user connects one via OAuth (access tokens
- * stored encrypted), Instantly warm-up only when connected, and a
+ * stored encrypted), and a
  * Meta Pixel that loads only when a Pixel ID is configured and
  * consent has been recorded. Workspace deletion is available in-app;
  * account-level requests go through hello@nxtsend.com. No
@@ -69,7 +69,6 @@ export default function PrivacyPage() {
               <h3 className="text-16 font-semibold text-white">C. Information from third parties you connect</h3>
               <ul className="list-disc list-inside space-y-1.5 text-14 text-black-300">
                 <li>When you connect a Gmail or Outlook mailbox, Google or Microsoft returns your mailbox identity and access tokens under the permissions you approve; tokens are stored encrypted.</li>
-                <li>When you connect Instantly for warm-up, we receive warm-up status information about your mailboxes from Instantly.</li>
                 <li>Payment confirmations and subscription status come from Stripe; we never receive or store your full card number.</li>
               </ul>
             </div>
@@ -138,7 +137,6 @@ export default function PrivacyPage() {
               <li><strong>Stripe</strong> — payment processing and subscription billing; card details go directly to Stripe.</li>
               <li><strong>Resend</strong> — delivery of campaign and transactional email sent through our sending setup, and processing of email delivery events.</li>
               <li><strong>Google and Microsoft</strong> — only when you connect a Gmail or Outlook mailbox: mailbox access under the OAuth permissions you approve.</li>
-              <li><strong>Instantly</strong> — only when you connect it: email warm-up and the warm-up status we display back to you.</li>
               <li><strong>Meta</strong> — only if a Meta Pixel ID is configured for this website, as described in Section 5.</li>
             </ul>
             <p>

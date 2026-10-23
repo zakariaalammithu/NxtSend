@@ -34,7 +34,6 @@ const CATALOG = [
   ["RESEND_WEBHOOK_SECRET", "email", false],
   ["EMAIL_REPLY_TO", "email", false],
   ["UNSUBSCRIBE_SECRET", "email", false],
-  ["INSTANTLY_API_KEY", "email", false],
   ["GOOGLE_CLIENT_ID", "oauth", false],
   ["GOOGLE_CLIENT_SECRET", "oauth", false],
   ["MICROSOFT_CLIENT_ID", "oauth", false],

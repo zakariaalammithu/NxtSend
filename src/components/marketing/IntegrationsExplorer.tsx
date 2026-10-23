@@ -25,8 +25,6 @@ import { ArrowUpRight, Blocks, Plus, Search, Sparkles, Webhook } from "lucide-re
  * - n8n / Zapier / Make / Pabbly / Slack events ride the registry's
  *   "webhooks" descriptor: signed OUTBOUND events only — one-way,
  *   no native apps, nothing syncs back.
- * - Instantly is the registry's read-only warm-up status adapter —
- *   NxtSend reads its data and never sends through it.
  * - HubSpot is the registry's CRM entry: NOT implemented. The other
  *   CRMs and tools without a registry adapter say "Not implemented"
  *   too, with the real workaround where one exists (CSV export).
@@ -64,14 +62,6 @@ const INTEGRATIONS: Record<string, IntegrationItem> = {
       "Meta's Muse agent reaches NxtSend through the Muse Connector Platform — NxtSend exposes an API, Muse calls it. No public API exists for driving a user's Muse agent, so nothing connects from this side yet; the connector submission is prepared in the Integration Center",
     badge: "Connector Platform",
     logo: `${LOGOS}/muse.svg`,
-  },
-  instantly: {
-    slug: "instantly",
-    name: "Instantly",
-    description:
-      "Instantly runs mailbox warm-up on its own network. NxtSend only reads the warm-up status its API reports — per-mailbox state, provider-set limits and activity totals — and never sends mail through Instantly",
-    badge: "Warm-up status · read-only",
-    logo: `${LOGOS}/instantly.svg`,
   },
   clay: {
     slug: "clay",
@@ -213,7 +203,7 @@ const INTEGRATIONS: Record<string, IntegrationItem> = {
 
 /* ── Categories (Automations is one shorter after D8) ──────────────────── */
 const CATEGORIES: { title: string; slugs: string[] }[] = [
-  { title: "Top Choice", slugs: ["muse-ai", "instantly", "clay", "n8n", "slack", "smartlead"] },
+  { title: "Top Choice", slugs: ["muse-ai", "clay", "n8n", "slack", "smartlead"] },
   {
     title: "Automations",
     slugs: ["n8n", "zapier", "make", "pabbly", "slack", "clay", "outbound-sync"],
@@ -221,7 +211,7 @@ const CATEGORIES: { title: string; slugs: string[] }[] = [
   { title: "CRM", slugs: ["hubspot", "pipedrive", "close", "salesforce"] },
   {
     title: "Multi-channel",
-    slugs: ["instantly", "masterinbox", "smartlead", "emailbison"],
+    slugs: ["masterinbox", "smartlead", "emailbison"],
   },
   { title: "Intent-based", slugs: ["weezly", "trigify", "rb2b"] },
 ];

@@ -178,7 +178,6 @@ and treated as *not configured*.
 | `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | For Outlook mailboxes | Azure app registration (server-only secret value) — §15. Callback: `<NEXT_PUBLIC_APP_URL>/api/oauth/microsoft/callback` |
 | `TOKEN_ENCRYPTION_KEY` | For mailbox OAuth | ⚠️ Server-only. AES-256-GCM key for the OAuth token vault (migration 014) — exactly 32 bytes, base64. Generate: `openssl rand -base64 32`. Also derives the OAuth state + fallback unsubscribe signing keys. **Rotating it invalidates every stored grant — mailboxes must reconnect** |
 | `INTEGRATION_HUB_ENCRYPTION_KEY` | For the Integration Hub vault | ⚠️ Server-only. AES-256-GCM key for the Integration Hub credential vault (migration 016) — exactly 32 bytes, base64, DEDICATED to the Hub (not shared with the mailbox vault). Generate: `openssl rand -base64 32`. **Losing or rotating it makes every stored Hub credential undecryptable — they must all be re-entered** — §16 |
-| `INSTANTLY_API_KEY` | Optional | Instantly API v2 key (`accounts:read` scope) for **read-only** email warm-up status (server-only). Warm-up itself runs on Instantly's network; while unset, warm-up reads return "Unavailable" — never simulated |
 | `LINKEDIN_PROVIDER` / `LINKEDIN_PROVIDER_API_KEY` | — | Reserved for a future LinkedIn provider integration. **Setting them connects nothing** — no vendor adapter is implemented; the values are read only for presence display in the Integration Center |
 
 ## 5. Create the first Super Admin (bootstrap)

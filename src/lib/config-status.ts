@@ -70,7 +70,6 @@ export const CONFIG_CATALOG: ConfigVarSpec[] = [
   { name: "RESEND_WEBHOOK_SECRET", group: "email", visibility: "server", requiredForLive: false, purpose: "Svix signing secret verifying Resend delivery/inbound webhooks. Webhook rejects events while unset." },
   { name: "EMAIL_REPLY_TO", group: "email", visibility: "server", requiredForLive: false, purpose: "Reply-To for all outbound email (executor + inbox replies). Set to an address on the receiving domain so replies reach the Inbox; unset means replies go to EMAIL_FROM." },
   { name: "UNSUBSCRIBE_SECRET", group: "email", visibility: "server", requiredForLive: false, purpose: "HMAC signing secret for one-click unsubscribe links. Unset → the key is derived from SUPABASE_SERVICE_ROLE_KEY; both unset in live mode → sends omit the unsubscribe URL and warn in the result." },
-  { name: "INSTANTLY_API_KEY", group: "email", visibility: "server", requiredForLive: false, purpose: "Instantly API v2 key (accounts:read scope) for READ-ONLY email warm-up status. Warm-up itself runs entirely on Instantly's network; unset → warm-up reads Unavailable, never simulated." },
 
   // ── Mailbox OAuth ─────────────────────────────────────────────────
   { name: "GOOGLE_CLIENT_ID", group: "oauth", visibility: "server", requiredForLive: false, purpose: "Google Cloud OAuth client ID (Web application) for Gmail mailbox connections. Callback: <NEXT_PUBLIC_APP_URL>/api/oauth/google/callback (SETUP.md §15)." },

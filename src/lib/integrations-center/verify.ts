@@ -3,8 +3,6 @@
  *
  * One SAFE, read-only, documented verification call per provider:
  *   resend      Resend SDK: domains.list()
- *   warmup      Instantly API v2: GET /api/v2/accounts?limit=1
- *               (read-only; warm-up runs in Instantly, never here)
  *   stripe      Stripe SDK: accounts.retrieve()
  *   openai      GET https://api.openai.com/v1/models (Bearer)
  *   anthropic   GET https://api.anthropic.com/v1/models (x-api-key)
@@ -40,7 +38,6 @@ import {
 } from "@/lib/email/domains";
 import { getBillingState } from "@/lib/billing/state";
 import { NotConfiguredLinkedInAdapter } from "@/lib/linkedin/not-configured";
-import { InstantlyWarmupAdapter } from "@/lib/warmup/instantly";
 import { isPixelConfigured } from "@/lib/analytics/pixel";
 import type { CenterStatus, VerifyOutcome } from "./types";
 
@@ -268,32 +265,6 @@ export async function verifyIntegration(
         return outcome(
           id,
           notConfigured ? "Configuration Required" : "Not Connected",
-          false,
-          false,
-          result.message
-        );
-      }
-      return result.ok
-        ? outcome(id, "Connected and Verified", true, true, result.message)
-        : outcome(id, "Error", false, true, result.message);
-    }
-
-    case "warmup": {
-      // Read-only check against the warm-up provider: the adapter lists
-      // the Instantly accounts (limit=1) — key presence alone never
-      // verifies; only Instantly's actual acceptance counts.
-      const adapter = new InstantlyWarmupAdapter({
-        env: { INSTANTLY_API_KEY: env.INSTANTLY_API_KEY },
-        mode,
-        fetchFn,
-      });
-      const result = await adapter.verifyConnection();
-      if (!result.attempted) {
-        return outcome(
-          id,
-          result.state === "configuration_required"
-            ? "Configuration Required"
-            : "Not Connected",
           false,
           false,
           result.message

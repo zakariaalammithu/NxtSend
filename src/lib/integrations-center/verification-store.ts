@@ -19,7 +19,6 @@ import type { VerificationRecord } from "./types";
 export const VERIFICATION_PROVIDER_BY_ID: Record<string, string> = {
   supabase: "supabase",
   resend: "resend",
-  warmup: "instantly_warmup",
   stripe: "stripe",
   openai: "openai",
   anthropic: "anthropic",

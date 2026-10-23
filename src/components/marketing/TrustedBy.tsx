@@ -11,9 +11,11 @@ import Image from "next/image";
  *
  * Asset notes:
  * - Wordmark files (the image already contains the company name):
- *   HubSpot (canvas trimmed), Clay, Pavilion, Instantly, Flip
- *   Electronics, Indoorcare, XBag.
+ *   HubSpot (canvas trimmed), Clay, Pavilion, Flip Electronics,
+ *   Indoorcare, XBag.
  * - Icon-only files get a caption label with the company name.
+ *   Exter Media's file carries a short "EXTER" wordmark under its
+ *   mark; the caption gives the full company name.
  * - McKinsey: the supplied file contained abstract artwork, not a
  *   logo, so the brand is rendered as a typographic name tile rather
  *   than faking a logo.
@@ -22,7 +24,6 @@ const wordmarkTiles = [
   { name: "HubSpot", src: "/images/logos/hubspot.png", w: 900, h: 303 },
   { name: "Clay", src: "/images/logos/clay.png", w: 829, h: 467 },
   { name: "Pavilion", src: "/images/logos/pavilion.png", w: 701, h: 285 },
-  { name: "Instantly", src: "/images/logos/instantly.jpg", w: 385, h: 108 },
   { name: "Flip Electronics", src: "/images/logos/flip-electronics.jpg", w: 410, h: 150 },
   { name: "Indoorcare", src: "/images/logos/indoorcare.jpg", w: 131, h: 167 },
   { name: "XBag", src: "/images/logos/xbag.jpg", w: 200, h: 200 },
@@ -35,6 +36,8 @@ const iconTiles = [
   { name: "ContactReachout", src: "/images/logos/contactreachout.png" },
   { name: "BizReviewRadar", src: "/images/logos/bizreviewradar.png" },
   { name: "nsave", src: "/images/logos/nsave.png" },
+  { name: "Acquisition Systems", src: "/images/logos/acquisition-systems.jpg" },
+  { name: "Exter Media", src: "/images/logos/exter-media.jpg" },
 ] as const;
 
 const tileClass =

@@ -167,38 +167,6 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     verifySupported: true,
   },
   {
-    id: "warmup",
-    name: "Email Warm-up (Instantly)",
-    category: "Outreach & email",
-    tagline: "Mailbox warm-up status from Instantly — the provider runs warm-up; NxtSend only reports its data.",
-    description:
-      "Email warm-up is provided ENTIRELY by Instantly, an external warm-up provider: mailboxes are connected to Instantly, and Instantly's own network performs the gradual sending-volume ramp inside its infrastructure. NxtSend never sends, opens, replies to, or clicks warm-up mail, and it never computes a warm-up score — this integration only READS the status Instantly's API reports (per-mailbox warm-up state, provider-set daily limits and ramp, provider-reported activity totals). Until an Instantly API key is configured and verified, warm-up reads Unavailable — nothing in NxtSend simulates a running warm-up. Warm-up is enabled or paused in Instantly's own dashboard; this adapter deliberately does not call Instantly's warm-up enable/disable endpoints.",
-    docsUrl: "https://developer.instantly.ai/",
-    kind: "adapter",
-    envVars: [
-      { name: "INSTANTLY_API_KEY", required: true, visibility: "server-only", purpose: "Instantly API v2 key (Instantly → Settings → Integrations → API), with the accounts:read scope. Used ONLY for read-only warm-up status calls — NxtSend never sends mail or changes warm-up settings through Instantly. " + VERCEL_HINT },
-    ],
-    capabilities: [
-      "Per-mailbox warm-up status read from Instantly's API (active / paused / provider-reported issues)",
-      "Provider-set warm-up daily limit + ramp setting, shown verbatim",
-      "Provider-reported warm-up activity totals (sent / received / landed in inbox / landed in spam) and Instantly's own health score",
-    ],
-    setupSteps: [
-      "Create an Instantly account — warm-up is included with the Outreach plans (Growth: $47/month, or $37.60/month billed annually; a 14-day free trial is offered). API access starts at the Growth plan.",
-      "In Instantly, connect the mailboxes you want warmed and enable warm-up for them there — warm-up runs on Instantly's network, not through NxtSend.",
-      "In Instantly → Settings → Integrations → API, create an API key with the accounts:read scope.",
-      "Set INSTANTLY_API_KEY here (server-side env) and redeploy.",
-      "Use Test Connection — it lists your Instantly accounts (read-only) to prove the key and scope work.",
-    ],
-    troubleshooting: [
-      "Unavailable / Not Connected: INSTANTLY_API_KEY is unset — warm-up cannot be reported without the provider connection, and NxtSend never fakes it.",
-      "Verification fails with HTTP 401: the key is invalid, revoked, or lacks the accounts:read scope.",
-      "Verification fails with HTTP 402: the Instantly workspace has no active paid plan — API access requires one.",
-      "A mailbox shows no analytics: Instantly returned none for it (e.g. warm-up not enabled for that mailbox in Instantly) — enable it in Instantly's dashboard.",
-    ],
-    verifySupported: true,
-  },
-  {
     id: "stripe",
     name: "Stripe (Billing)",
     category: "Billing",

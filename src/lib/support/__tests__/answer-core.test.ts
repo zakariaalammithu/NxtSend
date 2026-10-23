@@ -68,7 +68,6 @@ describe("matcher — seeded golden questions", () => {
     { query: "How do I sign in with Google?", slug: "google-sign-in" },
     { query: "I forgot my password", slug: "forgot-password" },
     { query: "Does NxtSend use credits or a prepaid balance?", slug: "credits-or-balance" },
-    { query: "How does email warm-up work?", slug: "how-warmup-works" },
     { query: "How do I contact NxtSend?", slug: "how-to-contact" },
   ];
 

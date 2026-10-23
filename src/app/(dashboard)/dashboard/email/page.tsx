@@ -13,7 +13,6 @@ import {
   ListOrdered,
   ArrowUpRight,
   Ban,
-  Flame,
 } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import DeliverabilityCard from "@/components/dashboard/DeliverabilityCard";
@@ -270,12 +269,6 @@ export default function EmailPage() {
             className="btn-secondary !py-2 !px-3 text-13"
           >
             <Ban className="w-4 h-4" /> Suppression list
-          </Link>
-          <Link
-            href="/dashboard/email/warmup"
-            className="btn-secondary !py-2 !px-3 text-13"
-          >
-            <Flame className="w-4 h-4" /> Warm-up
           </Link>
         </div>
       </div>

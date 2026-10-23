@@ -1,6 +1,6 @@
 /**
  * LinkedIn provider state derivation — from actual env presence only
- * (same rules as src/lib/email/state.ts and src/lib/warmup/state.ts).
+ * (same rules as src/lib/email/state.ts).
  *
  * The reserved provider variables are:
  *   LINKEDIN_PROVIDER          the approved provider's name/key

@@ -20,7 +20,6 @@ import { getOAuthConfigStatus, OAUTH_PROVIDER_LABELS } from "@/lib/oauth/config"
 import type { OAuthProvider } from "@/lib/oauth/types";
 import type { OAuthMailboxSummary } from "@/lib/oauth/store";
 import { getEmailState, isEmailFromConfigured } from "@/lib/email/state";
-import { getWarmupState, isWarmupConfigured } from "@/lib/warmup/state";
 import { describeLinkedInProvider } from "@/lib/linkedin/state";
 import { getBillingState } from "@/lib/billing/state";
 import { isPixelConfigured } from "@/lib/analytics/pixel";
@@ -221,27 +220,6 @@ function deriveStatus(
         status: "Not Connected",
         message: `${label} OAuth client is configured, but no mailbox has been connected yet in this workspace. Use Connect in the Connected mailbox panel below — the connection completes only after the provider consent and profile fetch succeed.`,
         configured: false,
-      };
-    }
-    case "warmup": {
-      const state = getWarmupState(
-        { INSTANTLY_API_KEY: env.INSTANTLY_API_KEY },
-        mode
-      );
-      const configured = isWarmupConfigured({
-        INSTANTLY_API_KEY: env.INSTANTLY_API_KEY,
-      });
-      return {
-        status: mapProviderState(state),
-        message:
-          state === "connected"
-            ? "INSTANTLY_API_KEY is configured. Use Test Connection to verify it against Instantly — warm-up status is read from Instantly's API only."
-            : state === "configuration_required"
-              ? "INSTANTLY_API_KEY is present but still a placeholder value — paste the real key from Instantly (Settings → Integrations → API)."
-              : state === "demo"
-                ? "Demo Mode: no Instantly connection exists, so warm-up is Unavailable — NxtSend never simulates a running warm-up."
-                : "Unavailable — provider not connected: no Instantly API key is configured, so no warm-up status can be reported.",
-        configured,
       };
     }
     case "stripe": {

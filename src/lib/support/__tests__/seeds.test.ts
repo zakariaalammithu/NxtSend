@@ -8,8 +8,8 @@ import {
 import { validateRelatedUrl } from "../validate";
 
 describe("support seed content — traceability & honesty", () => {
-  it("ships 29 knowledge entries, each traced to a real source", () => {
-    expect(SEED_KNOWLEDGE.length).toBe(29);
+  it("ships 30 knowledge entries, each traced to a real source", () => {
+    expect(SEED_KNOWLEDGE.length).toBe(30);
     for (const entry of SEED_KNOWLEDGE) {
       expect(entry.source.length).toBeGreaterThan(0);
       expect(entry.title.length).toBeGreaterThan(0);

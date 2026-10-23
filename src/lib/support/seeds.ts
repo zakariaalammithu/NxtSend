@@ -261,6 +261,18 @@ export const SEED_KNOWLEDGE: SeedKnowledge[] = [
     priority: 60,
     source: "Support page → LinkedIn + Billing; src/lib/marketing-prices.ts",
   },
+  {
+    slug: "linkedin-warmup-program",
+    category_slug: "linkedin",
+    title: "How does LinkedIn account warm-up work?",
+    question: "How does the LinkedIn warm-up program work?",
+    answer:
+      "Each LinkedIn account can run a warm-up program from its card on the Accounts page. Pick a preset (Conservative: 21 days, Balanced: 18 days, Accelerated: 12 days) or build a custom schedule: the account's daily LinkedIn actions ramp up phase by phase, and each action's effective cap is the lower of the phase cap and your stored daily limit. You stay in control — edit the schedule, pin one action to a fixed cap, pause the program (its clock freezes), restart it, or mark the account ready at any time. While an account is warming, campaign steps that would pass today's cap are deferred, not dropped: they stay due, and the campaign's activity log records the deferral. Warm-up is a pacing tool, not a safety guarantee — LinkedIn's own limits and terms always apply.",
+    keywords: ["warm-up", "warmup", "warm up", "ramp up", "phase caps", "warming", "deferred warm-up", "daily caps"],
+    related_url: "/support#linkedin",
+    priority: 65,
+    source: "Support page → LinkedIn outreach setup (/support#linkedin); Accounts page warm-up program (migration 020)",
+  },
 
   // ── Email ────────────────────────────────────────────────────────
   {

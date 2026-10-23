@@ -70,6 +70,7 @@ function execution(partial: Partial<StepExecutionRecord>): StepExecutionRecord {
     channel: "linkedin",
     status: "skipped",
     detail: "",
+    account_id: null,
     message_id: null,
     provider: null,
     provider_message_id: null,

@@ -637,6 +637,7 @@ export default function CampaignDetailPage() {
                       {execSummary.stoppedReply + execSummary.stoppedSuppression}{" "}
                       enrollment(s) stopped by stop rules,{" "}
                       {execSummary.overLimit} deferred by plan limit,{" "}
+                      {execSummary.warmupDeferred} deferred by warm-up,{" "}
                       {execSummary.errors} transient error(s).
                     </p>
                     {execSummary.log.map((line, i) => (

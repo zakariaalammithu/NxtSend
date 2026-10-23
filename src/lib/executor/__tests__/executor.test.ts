@@ -157,6 +157,7 @@ class FakeStore implements ExecutorStore {
       channel: input.channel,
       status: "sending",
       detail: "",
+      account_id: input.account_id,
       message_id: null,
       provider: null,
       provider_message_id: null,
@@ -633,6 +634,7 @@ describe("executeDueSteps — limits, channels, idempotency", () => {
       step_order: 0,
       step_type: "email",
       channel: "email",
+      account_id: null,
       idempotency_key: "step:enr_1:0",
       simulated: false,
     });

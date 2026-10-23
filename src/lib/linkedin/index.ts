@@ -38,6 +38,7 @@ export {
   buildLinkedInActivity,
 } from "./activity";
 export type { LinkedInExecutionSummary, LinkedInActivityRow } from "./activity";
+export * from "./warmup";
 
 /**
  * The active LinkedIn adapter. Always the NotConfigured

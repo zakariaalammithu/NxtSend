@@ -317,6 +317,7 @@ class FakeExecutorStore implements ExecutorStore {
       channel: input.channel,
       status: "sending",
       detail: "",
+      account_id: input.account_id,
       message_id: null,
       provider: null,
       provider_message_id: null,

@@ -42,8 +42,10 @@ import {
   loadCampaignStats,
   aggregateCampaignStats,
   resolveWorkspaceId,
+  warmupStateOf,
   type CampaignStats,
 } from "@/lib/data";
+import { deriveStatus, phaseDay } from "@/lib/linkedin";
 import { campaignsToCsv } from "@/lib/data/csv";
 import type {
   Campaign,
@@ -896,14 +898,36 @@ export default function CampaignsListPage() {
                                 {senderAccount.handle_or_email}
                               </div>
                               {senderAccount.channel === "linkedin" &&
-                                senderAccount.warmup_enabled && (
-                                  <span
-                                    className="mt-1 inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-px text-10 font-medium text-amber-300"
-                                    data-testid="sender-warmup-label"
-                                  >
-                                    Warm-up mode
-                                  </span>
-                                )}
+                                senderAccount.warmup_enabled &&
+                                (() => {
+                                  // Program-aware label (migration
+                                  // 020): a warming sender shows its
+                                  // live day; paused says so; a
+                                  // graduated account drops the label;
+                                  // enabled-but-never-started keeps
+                                  // the plain "Warm-up mode".
+                                  const wState = warmupStateOf(senderAccount);
+                                  const wStatus = deriveStatus(
+                                    wState,
+                                    new Date()
+                                  );
+                                  const label =
+                                    wStatus === "warming"
+                                      ? `Warm-up · Day ${phaseDay(wState, new Date())}`
+                                      : wStatus === "paused"
+                                        ? "Warm-up paused"
+                                        : wStatus === "not_started"
+                                          ? "Warm-up mode"
+                                          : null;
+                                  return label ? (
+                                    <span
+                                      className="mt-1 inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-px text-10 font-medium text-amber-300"
+                                      data-testid="sender-warmup-label"
+                                    >
+                                      {label}
+                                    </span>
+                                  ) : null;
+                                })()}
                             </div>
                           </div>
                         ) : (

@@ -32,8 +32,34 @@ import type {
   AccountChannel,
   ConnectedAccount,
   ConnectedAccountStatus,
+  WarmupHistoryEntry,
   WarmupLimits,
+  WarmupPreset,
+  WarmupSchedule,
+  WarmupStatus,
 } from "@/types";
+import {
+  editScheduleTransition,
+  emptyWarmupUsage,
+  graduateTransition,
+  overrideTransition,
+  parseWarmupHistory,
+  parseWarmupOverrides,
+  parseWarmupPreset,
+  parseWarmupSchedule,
+  parseWarmupStatus,
+  pauseTransition,
+  resumeTransition,
+  restartTransition,
+  startTransition,
+  stepTypeToWarmupAction,
+  type AccountWarmupState,
+  type WarmupPresetKey,
+  type WarmupProgramPatch,
+  type WarmupTransition,
+  type WarmupUsageCounts,
+} from "@/lib/linkedin/warmup";
+import { countDemoLinkedInActions } from "@/lib/executor/demo-executions";
 import type { TemplateVariables } from "@/lib/ai/prompt";
 import { createClient } from "@/lib/supabase/client";
 import { generateId } from "@/lib/utils";
@@ -83,6 +109,15 @@ export type UpdateAccountPatch = Partial<
     | "last_error"
     | "warmup_enabled"
     | "daily_limits"
+    | "warmup_status"
+    | "warmup_preset"
+    | "warmup_schedule"
+    | "warmup_overrides"
+    | "warmup_started_at"
+    | "warmup_paused_at"
+    | "warmup_paused_ms"
+    | "warmup_graduated_at"
+    | "warmup_history"
     | "sender_first_name"
     | "sender_last_name"
     | "sender_job_title"
@@ -100,6 +135,19 @@ export interface AccountsRepository {
   ): Promise<ConnectedAccount>;
   updateAccount(id: string, patch: UpdateAccountPatch): Promise<ConnectedAccount>;
   deleteAccount(workspaceId: string, id: string): Promise<void>;
+  /**
+   * Today's counted LinkedIn usage for one account (UTC day starting
+   * at `dayStartIso`) — THE counter the executor's warm-up gate and
+   * the Accounts panel share, so the panel can never disagree with
+   * the gate. Live backend: execution rows with status 'sent'
+   * attributed to the account. Demo backend: today's dispatch
+   * ATTEMPTS (see countDemoLinkedInActions — demo-only semantics).
+   */
+  countLinkedInActionsToday(
+    workspaceId: string,
+    accountId: string,
+    dayStartIso: string
+  ): Promise<WarmupUsageCounts>;
 }
 
 // ============================================================================
@@ -135,6 +183,70 @@ export function withDefaultLimits(
 /** The account's effective daily limits (stored values over defaults). */
 export function accountLimits(account: ConnectedAccount): WarmupLimits {
   return withDefaultLimits(account.daily_limits);
+}
+
+/** The warm-up program fields of an account that has never started one. */
+export function notStartedWarmupFields(): Pick<
+  ConnectedAccount,
+  | "warmup_status"
+  | "warmup_preset"
+  | "warmup_schedule"
+  | "warmup_overrides"
+  | "warmup_started_at"
+  | "warmup_paused_at"
+  | "warmup_paused_ms"
+  | "warmup_graduated_at"
+  | "warmup_history"
+> {
+  return {
+    warmup_status: "not_started",
+    warmup_preset: null,
+    warmup_schedule: null,
+    warmup_overrides: null,
+    warmup_started_at: null,
+    warmup_paused_at: null,
+    warmup_paused_ms: 0,
+    warmup_graduated_at: null,
+    warmup_history: [],
+  };
+}
+
+/**
+ * Resolves an account record into the engine's warm-up state. Every
+ * stored field is re-parsed tolerantly (hand-edited localStorage /
+ * pre-020 rows degrade to an honest not_started program), and the
+ * daily limits go through THE derivation above.
+ */
+export function warmupStateOf(account: ConnectedAccount): AccountWarmupState {
+  return {
+    accountId: account.id,
+    displayName: account.display_name,
+    enabled: account.warmup_enabled,
+    status: parseWarmupStatus(account.warmup_status),
+    preset: parseWarmupPreset(account.warmup_preset),
+    schedule: parseWarmupSchedule(account.warmup_schedule),
+    overrides: parseWarmupOverrides(account.warmup_overrides),
+    startedAt:
+      typeof account.warmup_started_at === "string" && account.warmup_started_at
+        ? account.warmup_started_at
+        : null,
+    pausedAt:
+      typeof account.warmup_paused_at === "string" && account.warmup_paused_at
+        ? account.warmup_paused_at
+        : null,
+    pausedMs:
+      typeof account.warmup_paused_ms === "number" &&
+      Number.isFinite(account.warmup_paused_ms)
+        ? Math.max(0, Math.floor(account.warmup_paused_ms))
+        : 0,
+    graduatedAt:
+      typeof account.warmup_graduated_at === "string" &&
+      account.warmup_graduated_at
+        ? account.warmup_graduated_at
+        : null,
+    dailyLimits: accountLimits(account),
+    history: parseWarmupHistory(account.warmup_history),
+  };
 }
 
 /** Maps an account's sender identity onto the {my_*} template variables. */
@@ -196,6 +308,14 @@ export function resolveSenderVars(
  * LinkedIn account and the demo email identity as an email account.
  * Both are flagged demo via status, start with warm-up ON and carry
  * Closely's default daily limits (5/10/20/20/20/20).
+ *
+ * The LinkedIn account is seeded MID-PROGRAM so the warm-up panel and
+ * the executor gate have something real to show in Demo Mode: it
+ * started the Conservative preset two days before the seed is first
+ * created, which puts it on Day 3 of 21 (phase 1) under the engine's
+ * Day-N = elapsed-active-days + 1 rule. The start instant is computed
+ * at seed time (not a fixed date) so the fixture never goes stale.
+ * The email account has no program (LinkedIn-only feature).
  */
 export function seedDemoAccounts(): ConnectedAccount[] {
   const ts = "2024-09-15T08:30:00.000Z";
@@ -204,6 +324,22 @@ export function seedDemoAccounts(): ConnectedAccount[] {
     sender_last_name: "Vance",
     sender_job_title: "Account Executive",
     sender_company: "NxtSend",
+  };
+  const warmupStart = startTransition(
+    "conservative",
+    new Date(Date.now() - 2 * 86_400_000),
+    null
+  );
+  const linkedinWarmup = {
+    warmup_status: (warmupStart.patch.status ?? "warming") as WarmupStatus,
+    warmup_preset: (warmupStart.patch.preset ?? "conservative") as WarmupPreset,
+    warmup_schedule: (warmupStart.patch.schedule ?? null) as WarmupSchedule | null,
+    warmup_overrides: null,
+    warmup_started_at: warmupStart.patch.startedAt ?? null,
+    warmup_paused_at: null,
+    warmup_paused_ms: 0,
+    warmup_graduated_at: null,
+    warmup_history: [warmupStart.entry] as WarmupHistoryEntry[],
   };
   return [
     {
@@ -227,6 +363,7 @@ export function seedDemoAccounts(): ConnectedAccount[] {
       last_error: null,
       warmup_enabled: true,
       daily_limits: { ...DEFAULT_WARMUP_LIMITS },
+      ...linkedinWarmup,
       ...identity,
       created_at: ts,
       updated_at: ts,
@@ -246,6 +383,7 @@ export function seedDemoAccounts(): ConnectedAccount[] {
       last_error: null,
       warmup_enabled: true,
       daily_limits: { ...DEFAULT_WARMUP_LIMITS },
+      ...notStartedWarmupFields(),
       ...identity,
       created_at: ts,
       updated_at: ts,
@@ -302,6 +440,7 @@ class DemoAccountsRepository implements AccountsRepository {
       last_error: input.last_error ?? null,
       warmup_enabled: input.warmup_enabled ?? true,
       daily_limits: withDefaultLimits(input.daily_limits),
+      ...notStartedWarmupFields(),
       sender_first_name: input.sender_first_name ?? "",
       sender_last_name: input.sender_last_name ?? "",
       sender_job_title: input.sender_job_title ?? "",
@@ -344,6 +483,16 @@ class DemoAccountsRepository implements AccountsRepository {
         (a) => !(a.id === id && a.workspace_id === workspaceId)
       )
     );
+  }
+
+  async countLinkedInActionsToday(
+    _workspaceId: string,
+    accountId: string,
+    dayStartIso: string
+  ): Promise<WarmupUsageCounts> {
+    // Demo storage is single-workspace; the counter itself scopes to
+    // the demo workspace + account + UTC day.
+    return countDemoLinkedInActions(accountId, dayStartIso);
   }
 }
 
@@ -397,6 +546,30 @@ export function rowToAccount(row: Row): ConnectedAccount {
         ? (row.daily_limits as Partial<WarmupLimits>)
         : undefined
     ),
+    // Migration-020 columns — read tolerantly so a pre-020 database
+    // maps to an honest not_started program (never invent one).
+    warmup_status: parseWarmupStatus(row.warmup_status),
+    warmup_preset: parseWarmupPreset(row.warmup_preset),
+    warmup_schedule: parseWarmupSchedule(row.warmup_schedule),
+    warmup_overrides: parseWarmupOverrides(row.warmup_overrides),
+    warmup_started_at:
+      typeof row.warmup_started_at === "string" && row.warmup_started_at
+        ? row.warmup_started_at
+        : null,
+    warmup_paused_at:
+      typeof row.warmup_paused_at === "string" && row.warmup_paused_at
+        ? row.warmup_paused_at
+        : null,
+    warmup_paused_ms:
+      typeof row.warmup_paused_ms === "number" &&
+      Number.isFinite(row.warmup_paused_ms)
+        ? Math.max(0, Math.floor(row.warmup_paused_ms))
+        : 0,
+    warmup_graduated_at:
+      typeof row.warmup_graduated_at === "string" && row.warmup_graduated_at
+        ? row.warmup_graduated_at
+        : null,
+    warmup_history: parseWarmupHistory(row.warmup_history),
     sender_first_name: String(row.sender_first_name ?? ""),
     sender_last_name: String(row.sender_last_name ?? ""),
     sender_job_title: String(row.sender_job_title ?? ""),
@@ -501,6 +674,24 @@ class SupabaseAccountsRepository implements AccountsRepository {
       dbPatch.warmup_enabled = patch.warmup_enabled;
     if (patch.daily_limits !== undefined)
       dbPatch.daily_limits = withDefaultLimits(patch.daily_limits);
+    if (patch.warmup_status !== undefined)
+      dbPatch.warmup_status = patch.warmup_status;
+    if (patch.warmup_preset !== undefined)
+      dbPatch.warmup_preset = patch.warmup_preset;
+    if (patch.warmup_schedule !== undefined)
+      dbPatch.warmup_schedule = patch.warmup_schedule;
+    if (patch.warmup_overrides !== undefined)
+      dbPatch.warmup_overrides = patch.warmup_overrides;
+    if (patch.warmup_started_at !== undefined)
+      dbPatch.warmup_started_at = patch.warmup_started_at;
+    if (patch.warmup_paused_at !== undefined)
+      dbPatch.warmup_paused_at = patch.warmup_paused_at;
+    if (patch.warmup_paused_ms !== undefined)
+      dbPatch.warmup_paused_ms = patch.warmup_paused_ms;
+    if (patch.warmup_graduated_at !== undefined)
+      dbPatch.warmup_graduated_at = patch.warmup_graduated_at;
+    if (patch.warmup_history !== undefined)
+      dbPatch.warmup_history = patch.warmup_history;
     if (patch.sender_first_name !== undefined)
       dbPatch.sender_first_name = patch.sender_first_name;
     if (patch.sender_last_name !== undefined)
@@ -533,6 +724,39 @@ class SupabaseAccountsRepository implements AccountsRepository {
       throw new Error(`Failed to delete connected account: ${error.message}`);
     }
   }
+
+  async countLinkedInActionsToday(
+    workspaceId: string,
+    accountId: string,
+    dayStartIso: string
+  ): Promise<WarmupUsageCounts> {
+    const counts = emptyWarmupUsage();
+    try {
+      const { data, error } = await this.client()
+        .from("campaign_step_executions")
+        .select("step_type")
+        .eq("workspace_id", workspaceId)
+        .eq("account_id", accountId)
+        .eq("channel", "linkedin")
+        .eq("status", "sent")
+        .gte("created_at", dayStartIso);
+      if (error || !data) return counts;
+      for (const row of data as Array<{ step_type?: unknown }>) {
+        const action = stepTypeToWarmupAction(
+          String(row.step_type ?? "") as Parameters<
+            typeof stepTypeToWarmupAction
+          >[0]
+        );
+        if (action) counts[action] += 1;
+      }
+    } catch {
+      // Pre-020 database (no account_id column) or any read failure:
+      // report zeros rather than breaking the panel — the executor's
+      // own counter applies the same posture server-side.
+      return counts;
+    }
+    return counts;
+  }
 }
 
 // ============================================================================
@@ -545,4 +769,181 @@ export function createAccountsRepository(
   return mode === "supabase"
     ? new SupabaseAccountsRepository()
     : new DemoAccountsRepository();
+}
+
+// ============================================================================
+// Warm-up program control helpers
+// ============================================================================
+//
+// The Accounts panel's controls. Each helper is implemented ONCE over
+// getAccount + updateAccount — the engine computes the patch and the
+// history entry; the helper persists both through whichever backend
+// the repository wraps, so Demo Mode and Supabase behave identically.
+// A helper returns the updated account, the UNCHANGED account when the
+// transition does not apply (e.g. pausing a program that is not
+// warming), or null when the account does not exist.
+
+export interface WarmupControlOptions {
+  /** Acting profile id, recorded in the history entry when known. */
+  by?: string | null;
+  /** Injected clock (tests); defaults to now. */
+  now?: Date;
+}
+
+const MAX_WARMUP_HISTORY = 50;
+
+/**
+ * Maps an engine program patch + its history entry onto an account
+ * update patch (appending the entry, history capped at the latest
+ * MAX_WARMUP_HISTORY). Exported for the executor stores, which
+ * persist engine transitions (lazy graduation) through their own
+ * write paths but must produce byte-identical account patches.
+ */
+export function warmupPatchToAccountPatch(
+  currentHistory: WarmupHistoryEntry[],
+  patch: WarmupProgramPatch,
+  entry: WarmupHistoryEntry
+): UpdateAccountPatch {
+  const out: UpdateAccountPatch = {};
+  if (patch.status !== undefined) out.warmup_status = patch.status;
+  if (patch.preset !== undefined) out.warmup_preset = patch.preset;
+  if (patch.schedule !== undefined) out.warmup_schedule = patch.schedule;
+  if (patch.overrides !== undefined) out.warmup_overrides = patch.overrides;
+  if (patch.startedAt !== undefined) out.warmup_started_at = patch.startedAt;
+  if (patch.pausedAt !== undefined) out.warmup_paused_at = patch.pausedAt;
+  if (patch.pausedMs !== undefined) out.warmup_paused_ms = patch.pausedMs;
+  if (patch.graduatedAt !== undefined)
+    out.warmup_graduated_at = patch.graduatedAt;
+  out.warmup_history = [...currentHistory, entry].slice(-MAX_WARMUP_HISTORY);
+  return out;
+}
+
+function patchFromTransition(
+  account: ConnectedAccount,
+  transition: WarmupTransition
+): UpdateAccountPatch {
+  return warmupPatchToAccountPatch(
+    parseWarmupHistory(account.warmup_history),
+    transition.patch,
+    transition.entry
+  );
+}
+
+async function applyWarmupTransition(
+  repo: AccountsRepository,
+  workspaceId: string,
+  accountId: string,
+  make: (state: AccountWarmupState) => WarmupTransition | null
+): Promise<ConnectedAccount | null> {
+  const account = await repo.getAccount(workspaceId, accountId);
+  if (!account) return null;
+  const transition = make(warmupStateOf(account));
+  if (!transition) return account;
+  return repo.updateAccount(accountId, patchFromTransition(account, transition));
+}
+
+export function startWarmup(
+  repo: AccountsRepository,
+  workspaceId: string,
+  accountId: string,
+  choice: WarmupPresetKey | WarmupSchedule,
+  options: WarmupControlOptions = {}
+): Promise<ConnectedAccount | null> {
+  const now = options.now ?? new Date();
+  return applyWarmupTransition(repo, workspaceId, accountId, () =>
+    startTransition(choice, now, options.by ?? null)
+  );
+}
+
+export function pauseWarmup(
+  repo: AccountsRepository,
+  workspaceId: string,
+  accountId: string,
+  options: WarmupControlOptions = {}
+): Promise<ConnectedAccount | null> {
+  const now = options.now ?? new Date();
+  return applyWarmupTransition(repo, workspaceId, accountId, (state) =>
+    pauseTransition(state, now, options.by ?? null)
+  );
+}
+
+export function resumeWarmup(
+  repo: AccountsRepository,
+  workspaceId: string,
+  accountId: string,
+  options: WarmupControlOptions = {}
+): Promise<ConnectedAccount | null> {
+  const now = options.now ?? new Date();
+  return applyWarmupTransition(repo, workspaceId, accountId, (state) =>
+    resumeTransition(state, now, options.by ?? null)
+  );
+}
+
+export function restartWarmup(
+  repo: AccountsRepository,
+  workspaceId: string,
+  accountId: string,
+  options: WarmupControlOptions = {}
+): Promise<ConnectedAccount | null> {
+  const now = options.now ?? new Date();
+  return applyWarmupTransition(repo, workspaceId, accountId, (state) =>
+    restartTransition(state, now, options.by ?? null)
+  );
+}
+
+export function editWarmupSchedule(
+  repo: AccountsRepository,
+  workspaceId: string,
+  accountId: string,
+  schedule: WarmupSchedule,
+  options: WarmupControlOptions = {}
+): Promise<ConnectedAccount | null> {
+  const now = options.now ?? new Date();
+  return applyWarmupTransition(repo, workspaceId, accountId, (state) =>
+    editScheduleTransition(state, schedule, now, options.by ?? null)
+  );
+}
+
+export function setWarmupOverride(
+  repo: AccountsRepository,
+  workspaceId: string,
+  accountId: string,
+  action: keyof WarmupLimits,
+  value: number | null,
+  options: WarmupControlOptions = {}
+): Promise<ConnectedAccount | null> {
+  const now = options.now ?? new Date();
+  return applyWarmupTransition(repo, workspaceId, accountId, (state) =>
+    overrideTransition(state, action, value, now, options.by ?? null)
+  );
+}
+
+/** Owner action: end the program now — the account counts as ready. */
+export function markWarmupReady(
+  repo: AccountsRepository,
+  workspaceId: string,
+  accountId: string,
+  options: WarmupControlOptions = {}
+): Promise<ConnectedAccount | null> {
+  const now = options.now ?? new Date();
+  return applyWarmupTransition(repo, workspaceId, accountId, (state) =>
+    graduateTransition(state, now, options.by ?? null, "marked_ready")
+  );
+}
+
+/**
+ * System action: record a graduation the reader derived lazily (the
+ * schedule elapsed). Used by the Accounts panel and the executor's
+ * store so the stored status catches up with the derived one.
+ */
+export function recordWarmupGraduation(
+  repo: AccountsRepository,
+  workspaceId: string,
+  accountId: string,
+  options: WarmupControlOptions = {}
+): Promise<ConnectedAccount | null> {
+  const now = options.now ?? new Date();
+  return applyWarmupTransition(repo, workspaceId, accountId, (state) =>
+    graduateTransition(state, now, null, "lazy")
+  );
 }

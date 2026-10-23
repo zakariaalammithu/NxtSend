@@ -63,6 +63,8 @@ export interface CreateCampaignInput {
   description?: string;
   audience_source?: CampaignAudienceSource | null;
   warmup_limits?: WarmupLimits;
+  /** Sender's warm-up program day at save time (snapshot; see Campaign.warmup_day). */
+  warmup_day?: number | null;
   /**
    * Connected accounts the campaign sends from (migration 011
    * columns on `campaigns`). The demo backend stores them on the
@@ -107,7 +109,7 @@ export interface CampaignsRepository {
     patch: Partial<
       Pick<
         Campaign,
-        "name" | "type" | "status" | "description" | "audience_source" | "warmup_limits" | "sender_account_id" | "email_account_id"
+        "name" | "type" | "status" | "description" | "audience_source" | "warmup_limits" | "warmup_day" | "sender_account_id" | "email_account_id"
       >
     >
   ): Promise<Campaign>;
@@ -257,6 +259,9 @@ class DemoCampaignsRepository implements CampaignsRepository {
       ...(input.warmup_limits !== undefined
         ? { warmup_limits: input.warmup_limits }
         : {}),
+      ...(input.warmup_day !== undefined
+        ? { warmup_day: input.warmup_day }
+        : {}),
       ...(input.sender_account_id !== undefined
         ? { sender_account_id: input.sender_account_id }
         : {}),
@@ -282,7 +287,7 @@ class DemoCampaignsRepository implements CampaignsRepository {
     patch: Partial<
       Pick<
         Campaign,
-        "name" | "type" | "status" | "description" | "audience_source" | "warmup_limits" | "sender_account_id" | "email_account_id"
+        "name" | "type" | "status" | "description" | "audience_source" | "warmup_limits" | "warmup_day" | "sender_account_id" | "email_account_id"
       >
     >
   ): Promise<Campaign> {
@@ -354,6 +359,7 @@ class DemoCampaignsRepository implements CampaignsRepository {
       description: source.description,
       audience_source: source.audience_source ?? undefined,
       warmup_limits: source.warmup_limits,
+      warmup_day: source.warmup_day,
       sender_account_id: source.sender_account_id,
       email_account_id: source.email_account_id,
     });
@@ -487,6 +493,8 @@ function configFromMetadata(input: {
   description?: string;
   audience_source?: CampaignAudienceSource | null;
   warmup_limits?: WarmupLimits;
+  /** Sender's warm-up program day at save time (snapshot; see Campaign.warmup_day). */
+  warmup_day?: number | null;
 }): Record<string, unknown> {
   const config: Record<string, unknown> = {};
   if (input.description !== undefined) config.description = input.description;
@@ -494,6 +502,7 @@ function configFromMetadata(input: {
     config.audience_source = input.audience_source;
   if (input.warmup_limits !== undefined)
     config.warmup_limits = input.warmup_limits;
+  if (input.warmup_day !== undefined) config.warmup_day = input.warmup_day;
   return config;
 }
 
@@ -525,6 +534,9 @@ function rowToCampaign(row: Row): Campaign {
       : {}),
     ...(config.warmup_limits && typeof config.warmup_limits === "object"
       ? { warmup_limits: config.warmup_limits as WarmupLimits }
+      : {}),
+    ...(config.warmup_day === null || typeof config.warmup_day === "number"
+      ? { warmup_day: config.warmup_day as number | null }
       : {}),
     // Account references are real columns (migration 011); rows from
     // a pre-011 select simply lack the keys and stay undefined.
@@ -681,7 +693,7 @@ class SupabaseCampaignsRepository implements CampaignsRepository {
     patch: Partial<
       Pick<
         Campaign,
-        "name" | "type" | "status" | "description" | "audience_source" | "warmup_limits" | "sender_account_id" | "email_account_id"
+        "name" | "type" | "status" | "description" | "audience_source" | "warmup_limits" | "warmup_day" | "sender_account_id" | "email_account_id"
       >
     >
   ): Promise<Campaign> {
@@ -793,6 +805,7 @@ class SupabaseCampaignsRepository implements CampaignsRepository {
       description: source.description,
       audience_source: source.audience_source ?? undefined,
       warmup_limits: source.warmup_limits,
+      warmup_day: source.warmup_day,
       sender_account_id: source.sender_account_id,
       email_account_id: source.email_account_id,
     });

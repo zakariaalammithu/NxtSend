@@ -87,6 +87,61 @@ export interface WarmupLimits {
   find_email: number;
 }
 
+/**
+ * Warm-up program lifecycle (migration 020). A LinkedIn account's
+ * program is `not_started` until the owner starts it, `warming` while
+ * its phase caps bind sends, `paused` while its clock is frozen, and
+ * `graduated` once the schedule has elapsed (or the owner marked the
+ * account ready). The executor's warm-up gate engages only for
+ * `warming` — see src/lib/linkedin/warmup.ts.
+ */
+export type WarmupStatus = "not_started" | "warming" | "paused" | "graduated";
+
+/** Which preset a program started from; any schedule edit flips it to "custom". */
+export type WarmupPreset =
+  | "conservative"
+  | "balanced"
+  | "accelerated"
+  | "custom";
+
+/** One ramp phase: `days` long, with the per-action daily caps in force. */
+export interface WarmupPhase {
+  days: number;
+  caps: WarmupLimits;
+}
+
+/**
+ * The resolved schedule actually in force for a program
+ * (`connected_accounts.warmup_schedule`). Starting a preset snapshots
+ * the preset into this shape, so a program never changes when the
+ * presets in code are redefined.
+ */
+export interface WarmupSchedule {
+  phases: WarmupPhase[];
+}
+
+export type WarmupHistoryAction =
+  | "started"
+  | "paused"
+  | "resumed"
+  | "restarted"
+  | "schedule_edited"
+  | "override_set"
+  | "graduated"
+  | "marked_ready";
+
+/**
+ * One control action on a warm-up program
+ * (`connected_accounts.warmup_history`, append-only). `by` is the
+ * acting profile id when known, null for system/demo actions.
+ */
+export interface WarmupHistoryEntry {
+  action: WarmupHistoryAction;
+  at: string;
+  by: string | null;
+  detail?: string;
+}
+
 export type AccountChannel = "linkedin" | "email";
 
 export type ConnectedAccountStatus =
@@ -146,6 +201,27 @@ export interface ConnectedAccount {
   last_error: string | null;
   warmup_enabled: boolean;
   daily_limits: WarmupLimits;
+  /**
+   * Warm-up PROGRAM state (migration 020). `warmup_enabled` above is
+   * the master opt-in; these fields are the program itself. Read
+   * tolerantly: pre-020 rows map to a `not_started` program with null
+   * schedule/timestamps (see rowToAccount in src/lib/data/accounts.ts).
+   * Email-channel rows never leave `not_started`.
+   */
+  warmup_status: WarmupStatus;
+  warmup_preset: WarmupPreset | null;
+  /** The resolved schedule in force (preset snapshot or custom). */
+  warmup_schedule: WarmupSchedule | null;
+  /** Owner pins per action; a pin replaces the phase cap for that action. */
+  warmup_overrides: Partial<WarmupLimits> | null;
+  warmup_started_at: string | null;
+  /** Non-null while paused — the moment the program clock froze. */
+  warmup_paused_at: string | null;
+  /** Total milliseconds spent paused before the current pause. */
+  warmup_paused_ms: number;
+  warmup_graduated_at: string | null;
+  /** Append-only control-action audit trail (panel "last actions"). */
+  warmup_history: WarmupHistoryEntry[];
   sender_first_name: string;
   sender_last_name: string;
   sender_job_title: string;
@@ -172,6 +248,15 @@ export interface Campaign {
   description?: string;
   audience_source?: CampaignAudienceSource | null;
   warmup_limits?: WarmupLimits;
+  /**
+   * The sender account's warm-up program day when the wizard last
+   * saved this campaign (a save-time snapshot alongside
+   * `warmup_limits`, which carries the EFFECTIVE caps). Null/absent
+   * when the sender was not in a program. Live surfaces always
+   * recompute the current day from the account — this is a record of
+   * what the wizard showed, never a live value.
+   */
+  warmup_day?: number | null;
   /**
    * Connected accounts this campaign sends from (migration 011,
    * `campaigns.sender_account_id` / `email_account_id`). Nullable:

@@ -29,16 +29,40 @@ import {
   HeartPulse,
   RefreshCcw,
 } from "lucide-react";
-import type { ConnectedAccount, WarmupLimits } from "@/types";
+import type {
+  ConnectedAccount,
+  WarmupHistoryEntry,
+  WarmupLimits,
+  WarmupSchedule,
+} from "@/types";
 import {
   accountHealthActionHref,
   accountHealthView,
+  WARMUP_PRESETS,
+  WARMUP_PRESET_NOTE,
+  cloneSchedule,
+  currentPhase,
+  deriveStatus,
+  effectiveCaps,
+  phaseDay,
+  scheduleTotalDays,
+  warmupProgress,
+  type WarmupPresetKey,
 } from "@/lib/linkedin";
 import {
   getAccountsRepository,
   getCampaignsRepository,
   resolveWorkspaceId,
   accountLimits,
+  editWarmupSchedule,
+  markWarmupReady,
+  pauseWarmup,
+  recordWarmupGraduation,
+  restartWarmup,
+  resumeWarmup,
+  setWarmupOverride,
+  startWarmup,
+  warmupStateOf,
 } from "@/lib/data";
 import { WARMUP_LIMIT_ROWS } from "@/lib/data/audience-source";
 import { Avatar } from "@/components/ui/Avatar";
@@ -121,13 +145,789 @@ function HealthBlock({ account }: { account: ConnectedAccount }) {
   );
 }
 
+const HISTORY_ACTION_LABELS: Record<WarmupHistoryEntry["action"], string> = {
+  started: "Started",
+  paused: "Paused",
+  resumed: "Resumed",
+  restarted: "Restarted",
+  schedule_edited: "Schedule edited",
+  override_set: "Override changed",
+  graduated: "Graduated",
+  marked_ready: "Marked ready",
+};
+
+function formatHistoryDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+/** Start of the current UTC day — the same window the executor's
+ *  warm-up gate counts in (dayPeriodStartIso in the executor core). */
+function utcDayStartIso(now: Date): string {
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  ).toISOString();
+}
+
+const inputCls =
+  "w-full rounded-lg border border-black-600 bg-black-800 px-2 py-1.5 text-13 text-white";
+const btnCls =
+  "rounded-xl bg-black-800 hover:bg-black-700 border border-black-600 px-3 py-1.5 text-12.5 font-medium text-white transition-colors disabled:opacity-50";
+const btnPrimaryCls =
+  "rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3.5 py-1.5 text-12.5 font-semibold text-white transition-colors disabled:opacity-50";
+
+/**
+ * Phase editor: days + the six caps per phase, add/remove phases.
+ * Used for a custom start and for editing a running program (any
+ * save flips the program's preset to "custom").
+ */
+function ScheduleEditor({
+  accountId,
+  initial,
+  saveLabel,
+  busy,
+  onSave,
+  onCancel,
+}: {
+  accountId: string;
+  initial: WarmupSchedule;
+  saveLabel: string;
+  busy: boolean;
+  onSave: (schedule: WarmupSchedule) => void;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = React.useState<WarmupSchedule>(() =>
+    cloneSchedule(initial)
+  );
+  const setPhaseDays = (idx: number, days: number) =>
+    setDraft((prev) => ({
+      phases: prev.phases.map((p, i) =>
+        i === idx ? { ...p, days: Math.max(1, Math.floor(days) || 1) } : p
+      ),
+    }));
+  const setPhaseCap = (idx: number, key: keyof WarmupLimits, value: number) =>
+    setDraft((prev) => ({
+      phases: prev.phases.map((p, i) =>
+        i === idx
+          ? {
+              ...p,
+              caps: {
+                ...p.caps,
+                [key]: Math.max(0, Math.floor(value) || 0),
+              },
+            }
+          : p
+      ),
+    }));
+  return (
+    <div
+      className="space-y-3 rounded-xl border border-black-700/80 bg-black-900/40 p-3"
+      data-testid={`warmup-editor-${accountId}`}
+    >
+      {draft.phases.map((phase, idx) => (
+        <div
+          key={idx}
+          className="space-y-2 border-b border-black-800 pb-3 last:border-0 last:pb-0"
+        >
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-12.5 font-semibold text-white">
+              Phase {idx + 1}
+            </span>
+            <label className="flex items-center gap-1.5 text-12 text-black-400">
+              days
+              <input
+                type="number"
+                min={1}
+                value={phase.days}
+                onChange={(e) => setPhaseDays(idx, Number(e.target.value))}
+                className={`${inputCls} w-16`}
+                data-testid={`warmup-phase-days-${idx}-${accountId}`}
+              />
+            </label>
+            {draft.phases.length > 1 && (
+              <button
+                type="button"
+                className="text-12 text-rose-300 hover:text-rose-200"
+                onClick={() =>
+                  setDraft((prev) => ({
+                    phases: prev.phases.filter((_, i) => i !== idx),
+                  }))
+                }
+              >
+                Remove phase
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {WARMUP_LIMIT_ROWS.map((row) => (
+              <label key={row.key} className="block">
+                <span className="block text-11 text-black-400 mb-0.5">
+                  {row.label}
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  value={phase.caps[row.key]}
+                  onChange={(e) =>
+                    setPhaseCap(idx, row.key, Number(e.target.value))
+                  }
+                  className={inputCls}
+                  data-testid={`warmup-phase-cap-${idx}-${row.key}-${accountId}`}
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          className={btnCls}
+          disabled={busy}
+          onClick={() =>
+            setDraft((prev) => ({
+              phases: [
+                ...prev.phases,
+                {
+                  days: 5,
+                  caps: { ...prev.phases[prev.phases.length - 1].caps },
+                },
+              ],
+            }))
+          }
+          data-testid={`warmup-phase-add-${accountId}`}
+        >
+          Add phase
+        </button>
+        <span className="text-12 text-black-500">
+          {scheduleTotalDays(draft)} days total
+        </span>
+        <span className="flex-1" />
+        <button
+          type="button"
+          className={btnCls}
+          disabled={busy}
+          onClick={onCancel}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          className={btnPrimaryCls}
+          disabled={busy}
+          onClick={() => onSave(draft)}
+          data-testid={`warmup-schedule-save-${accountId}`}
+        >
+          {saveLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The warm-up PROGRAM panel (migration 020) for one LinkedIn account:
+ * lifecycle status, phase timeline, today's usage vs the effective
+ * caps (from the SAME counter the executor gate uses), the
+ * transparent cap math, every control action, and the control
+ * history. All actions persist through the accounts repository
+ * helpers, so Demo Mode and live mode behave identically.
+ */
+function WarmupPanel({
+  account,
+  workspaceId,
+  onAccountChange,
+  onUpdate,
+}: {
+  account: ConnectedAccount;
+  workspaceId: string;
+  onAccountChange: (updated: ConnectedAccount) => void;
+  onUpdate: (id: string, patch: Partial<ConnectedAccount>) => Promise<void>;
+}) {
+  const accountsRepo = React.useMemo(() => getAccountsRepository(), []);
+  const [busy, setBusy] = React.useState(false);
+  const [note, setNote] = React.useState<string | null>(null);
+  const [presetChoice, setPresetChoice] =
+    React.useState<WarmupPresetKey>("conservative");
+  const [editorOpen, setEditorOpen] = React.useState(false);
+  const [usageBump, setUsageBump] = React.useState(0);
+  const [usage, setUsage] = React.useState<Record<
+    keyof WarmupLimits,
+    number
+  > | null>(null);
+  const [overrideDraft, setOverrideDraft] = React.useState<
+    Record<string, string>
+  >({});
+  const graduationRef = React.useRef(false);
+
+  const now = new Date();
+  const state = warmupStateOf(account);
+  const status = deriveStatus(state, now);
+  const day = phaseDay(state, now);
+  const totalDays = scheduleTotalDays(state.schedule);
+  const position = currentPhase(state, now);
+  const caps = effectiveCaps(state, now);
+  const progress = usage ? warmupProgress(state, usage, now) : null;
+
+  // Today's usage from the same counter the executor gate uses.
+  React.useEffect(() => {
+    let cancelled = false;
+    accountsRepo
+      .countLinkedInActionsToday(
+        workspaceId,
+        account.id,
+        utcDayStartIso(new Date())
+      )
+      .then((counts) => {
+        if (!cancelled) setUsage(counts);
+      })
+      .catch(() => {
+        if (!cancelled) setUsage(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accountsRepo, workspaceId, account.id, usageBump]);
+
+  // Lazy graduation, panel side: when the derived status is
+  // "graduated" but the stored one is not, persist the transition so
+  // the record catches up (the executor gate does the same).
+  React.useEffect(() => {
+    if (graduationRef.current) return;
+    if (status === "graduated" && account.warmup_status !== "graduated") {
+      graduationRef.current = true;
+      recordWarmupGraduation(accountsRepo, workspaceId, account.id)
+        .then((updated) => {
+          if (updated) onAccountChange(updated);
+        })
+        .catch(() => {
+          /* derived status still renders correctly */
+        });
+    }
+  }, [status, account.warmup_status, account.id, accountsRepo, workspaceId, onAccountChange]);
+
+  const run = async (
+    fn: () => Promise<ConnectedAccount | null>,
+    noteText: string,
+    alsoEnable = false
+  ) => {
+    setBusy(true);
+    setNote(null);
+    try {
+      const updated = await fn();
+      if (updated) {
+        onAccountChange(updated);
+        if (alsoEnable && !updated.warmup_enabled) {
+          await onUpdate(updated.id, { warmup_enabled: true });
+        }
+      }
+      setEditorOpen(false);
+      setUsageBump((b) => b + 1);
+      setNote(noteText);
+      window.setTimeout(() => setNote(null), 3000);
+    } catch {
+      setNote("That didn't save — please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const chipCls =
+    status === "warming"
+      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+      : status === "paused"
+        ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
+        : status === "graduated"
+          ? "border-purple-500/40 bg-purple-500/10 text-purple-300"
+          : "border-black-600 bg-black-800 text-black-300";
+  const chipText =
+    status === "warming"
+      ? `Warming · Day ${day} of ${totalDays}`
+      : status === "paused"
+        ? `Paused · Day ${day} of ${totalDays}`
+        : status === "graduated"
+          ? "Ready"
+          : "Not started";
+
+  // The transparent math: wherever something other than the phase
+  // cap alone decides today's cap, say so in one line.
+  const mathLines: string[] = [];
+  if ((status === "warming" || status === "paused") && position) {
+    for (const row of WARMUP_LIMIT_ROWS) {
+      const phaseCap = position.phase.caps[row.key];
+      const pinned = state.overrides?.[row.key];
+      const daily = state.dailyLimits[row.key];
+      if (typeof pinned === "number") {
+        mathLines.push(
+          `${row.label}: pinned at ${pinned} · daily limit ${daily} → effective ${caps[row.key]}`
+        );
+      } else if (phaseCap > daily) {
+        mathLines.push(
+          `${row.label}: phase allows ${phaseCap} · your daily limit is ${daily} → effective ${daily}`
+        );
+      }
+    }
+  }
+
+  const history = [...state.history].slice(-5).reverse();
+
+  return (
+    <div
+      className="space-y-4 rounded-xl border border-black-700/80 bg-black-800/40 px-4 py-3"
+      data-testid={`warmup-panel-${account.id}`}
+    >
+      <div className="flex items-center gap-2 flex-wrap">
+        <h4 className="text-13 font-semibold text-white">Warm-up program</h4>
+        <span
+          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-11 font-medium ${chipCls}`}
+          data-testid={`warmup-status-${account.id}`}
+        >
+          {chipText}
+        </span>
+        {state.preset && status !== "not_started" && (
+          <span className="text-12 text-black-500 capitalize">
+            {state.preset} program
+          </span>
+        )}
+      </div>
+
+      {!account.warmup_enabled && status !== "not_started" && (
+        <p className="text-12 text-amber-200/90">
+          Warm-up mode is switched off above, so no caps are enforced
+          right now — the program and its day count are kept as shown.
+        </p>
+      )}
+
+      {status === "not_started" ? (
+        <div className="space-y-3">
+          <p className="text-12.5 text-black-300 leading-relaxed">
+            A warm-up program ramps this account&apos;s daily LinkedIn
+            actions over a few weeks: each phase caps how many actions
+            go out per day, and steps beyond today&apos;s cap stay due
+            instead of being dropped. You control the schedule and the
+            limits throughout.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {(
+              Object.values(WARMUP_PRESETS) as Array<
+                (typeof WARMUP_PRESETS)[WarmupPresetKey]
+              >
+            ).map((preset) => (
+              <button
+                key={preset.key}
+                type="button"
+                onClick={() => setPresetChoice(preset.key)}
+                aria-pressed={presetChoice === preset.key}
+                data-testid={`warmup-preset-${preset.key}-${account.id}`}
+                className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                  presetChoice === preset.key
+                    ? "border-emerald-500/50 bg-emerald-500/10"
+                    : "border-black-600 bg-black-800/60 hover:border-black-500"
+                }`}
+              >
+                <span className="block text-13 font-semibold text-white">
+                  {preset.label} · {scheduleTotalDays(preset.schedule)} days
+                </span>
+                <span className="block text-12 text-black-400 mt-0.5 leading-relaxed">
+                  {preset.blurb}
+                </span>
+                <span className="block text-12 text-black-300 mt-1">
+                  Connections{" "}
+                  {preset.schedule.phases
+                    .map((p) => p.caps.connection_requests)
+                    .join(" → ")}
+                  /day
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className="text-12 text-black-500">{WARMUP_PRESET_NOTE}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              className={btnPrimaryCls}
+              disabled={busy}
+              onClick={() =>
+                void run(
+                  () =>
+                    startWarmup(accountsRepo, workspaceId, account.id, presetChoice, {
+                      by: null,
+                    }),
+                  "Warm-up program started.",
+                  true
+                )
+              }
+              data-testid={`warmup-start-${account.id}`}
+            >
+              Start {WARMUP_PRESETS[presetChoice].label}
+            </button>
+            <button
+              type="button"
+              className={btnCls}
+              disabled={busy}
+              onClick={() => setEditorOpen((v) => !v)}
+            >
+              Custom schedule instead
+            </button>
+          </div>
+          {editorOpen && (
+            <ScheduleEditor
+              accountId={account.id}
+              initial={WARMUP_PRESETS.conservative.schedule}
+              saveLabel="Start with this schedule"
+              busy={busy}
+              onCancel={() => setEditorOpen(false)}
+              onSave={(schedule) =>
+                void run(
+                  () =>
+                    startWarmup(accountsRepo, workspaceId, account.id, schedule, {
+                      by: null,
+                    }),
+                  "Warm-up program started with your custom schedule.",
+                  true
+                )
+              }
+            />
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Phase timeline */}
+          {state.schedule && (
+            <div
+              className="flex gap-1.5"
+              data-testid={`warmup-timeline-${account.id}`}
+            >
+              {state.schedule.phases.map((phase, idx) => {
+                const isCurrent = position?.index === idx;
+                const isDone =
+                  status === "graduated" ||
+                  (position !== null && idx < position.index);
+                const startDay =
+                  state.schedule!.phases
+                    .slice(0, idx)
+                    .reduce((s, p) => s + p.days, 0) + 1;
+                return (
+                  <div
+                    key={idx}
+                    className={`flex-1 rounded-lg border px-2 py-1.5 ${
+                      isCurrent
+                        ? "border-emerald-500/50 bg-emerald-500/10"
+                        : isDone
+                          ? "border-black-600 bg-black-700/40"
+                          : "border-black-700 bg-black-800/40"
+                    }`}
+                  >
+                    <p className="text-11 font-semibold text-white">
+                      Phase {idx + 1}
+                      {isCurrent ? " · now" : isDone ? " · done" : ""}
+                    </p>
+                    <p className="text-11 text-black-400">
+                      Days {startDay}–{startDay + phase.days - 1} ·{" "}
+                      {phase.caps.connection_requests} conn/day
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Today vs effective caps — the gate's own counter */}
+          <div data-testid={`warmup-today-${account.id}`}>
+            <p className="text-12 font-medium text-black-300 mb-2">
+              Today (UTC) — sent vs effective cap
+            </p>
+            <div className="space-y-2">
+              {WARMUP_LIMIT_ROWS.map((row) => {
+                const p = progress?.[row.key];
+                const unenforced = row.key === "find_email";
+                return (
+                  <div
+                    key={row.key}
+                    data-testid={`warmup-usage-${row.key}-${account.id}`}
+                  >
+                    <div className="flex items-center justify-between text-12">
+                      <span className="text-black-300">{row.label}</span>
+                      <span className="text-black-400">
+                        {unenforced
+                          ? `— / ${caps[row.key]}`
+                          : `${p?.used ?? "…"} / ${caps[row.key]}`}
+                      </span>
+                    </div>
+                    <div className="mt-1 h-1.5 rounded-full bg-black-700 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          unenforced
+                            ? "bg-black-600"
+                            : (p?.pct ?? 0) >= 100
+                              ? "bg-rose-400"
+                              : "bg-emerald-400"
+                        }`}
+                        style={{
+                          width: unenforced ? "0%" : `${p?.pct ?? 0}%`,
+                        }}
+                      />
+                    </div>
+                    {unenforced && (
+                      <p className="text-11 text-black-500 mt-0.5">
+                        Stored limit only — no sequence step uses Find
+                        email, so nothing enforces this cap yet.
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {mathLines.length > 0 && (
+              <div
+                className="mt-2 space-y-0.5"
+                data-testid={`warmup-math-${account.id}`}
+              >
+                {mathLines.map((line) => (
+                  <p key={line} className="text-11.5 text-black-400">
+                    {line}
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Controls */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {status === "warming" && (
+              <button
+                type="button"
+                className={btnCls}
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    () => pauseWarmup(accountsRepo, workspaceId, account.id),
+                    "Warm-up paused — its clock is frozen."
+                  )
+                }
+                data-testid={`warmup-pause-${account.id}`}
+              >
+                Pause
+              </button>
+            )}
+            {status === "paused" && (
+              <button
+                type="button"
+                className={btnPrimaryCls}
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    () => resumeWarmup(accountsRepo, workspaceId, account.id),
+                    "Warm-up resumed."
+                  )
+                }
+                data-testid={`warmup-resume-${account.id}`}
+              >
+                Resume
+              </button>
+            )}
+            <button
+              type="button"
+              className={btnCls}
+              disabled={busy}
+              onClick={() => setEditorOpen((v) => !v)}
+              data-testid={`warmup-edit-${account.id}`}
+            >
+              Edit schedule
+            </button>
+            <button
+              type="button"
+              className={btnCls}
+              disabled={busy}
+              onClick={() =>
+                void run(
+                  () => restartWarmup(accountsRepo, workspaceId, account.id),
+                  "Warm-up restarted at Day 1 — schedule kept."
+                )
+              }
+              data-testid={`warmup-restart-${account.id}`}
+            >
+              Restart
+            </button>
+            {status !== "graduated" && (
+              <button
+                type="button"
+                className={btnCls}
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    () => markWarmupReady(accountsRepo, workspaceId, account.id),
+                    "Marked ready — warm-up caps no longer apply."
+                  )
+                }
+                data-testid={`warmup-ready-${account.id}`}
+              >
+                Mark ready
+              </button>
+            )}
+          </div>
+
+          {editorOpen && state.schedule && (
+            <ScheduleEditor
+              accountId={account.id}
+              initial={state.schedule}
+              saveLabel="Save schedule"
+              busy={busy}
+              onCancel={() => setEditorOpen(false)}
+              onSave={(schedule) =>
+                void run(
+                  () =>
+                    editWarmupSchedule(
+                      accountsRepo,
+                      workspaceId,
+                      account.id,
+                      schedule
+                    ),
+                  "Schedule saved — this program is now custom."
+                )
+              }
+            />
+          )}
+
+          {/* Per-action overrides */}
+          {(status === "warming" || status === "paused") && (
+            <div className="space-y-2">
+              <p className="text-12 font-medium text-black-300">
+                Per-action overrides
+              </p>
+              <p className="text-12 text-black-500">
+                Pin an action to a fixed daily cap, replacing its phase
+                cap (your daily limit still applies on top).
+              </p>
+              {WARMUP_LIMIT_ROWS.map((row) => {
+                const pinned = state.overrides?.[row.key];
+                return (
+                  <div
+                    key={row.key}
+                    className="flex items-center gap-2 flex-wrap"
+                  >
+                    <span className="w-36 text-12 text-black-300">
+                      {row.label}
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={
+                        overrideDraft[row.key] ??
+                        (typeof pinned === "number" ? String(pinned) : "")
+                      }
+                      placeholder={
+                        position
+                          ? `Phase cap ${position.phase.caps[row.key]}`
+                          : "Phase cap"
+                      }
+                      onChange={(e) =>
+                        setOverrideDraft((prev) => ({
+                          ...prev,
+                          [row.key]: e.target.value,
+                        }))
+                      }
+                      className={`${inputCls} w-24`}
+                      data-testid={`warmup-override-input-${row.key}-${account.id}`}
+                    />
+                    <button
+                      type="button"
+                      className={btnCls}
+                      disabled={busy}
+                      onClick={() => {
+                        const raw = overrideDraft[row.key];
+                        const value =
+                          raw === undefined || raw === ""
+                            ? null
+                            : Math.max(0, Math.floor(Number(raw) || 0));
+                        void run(
+                          () =>
+                            setWarmupOverride(
+                              accountsRepo,
+                              workspaceId,
+                              account.id,
+                              row.key,
+                              value
+                            ),
+                          value === null
+                            ? `${row.label} pin cleared.`
+                            : `${row.label} pinned at ${value}/day.`
+                        );
+                      }}
+                      data-testid={`warmup-override-set-${row.key}-${account.id}`}
+                    >
+                      Set
+                    </button>
+                    {typeof pinned === "number" && (
+                      <button
+                        type="button"
+                        className="text-12 text-black-400 hover:text-white"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(
+                            () =>
+                              setWarmupOverride(
+                                accountsRepo,
+                                workspaceId,
+                                account.id,
+                                row.key,
+                                null
+                              ),
+                            `${row.label} pin cleared.`
+                          )
+                        }
+                        data-testid={`warmup-override-clear-${row.key}-${account.id}`}
+                      >
+                        Clear pin ({pinned}/day)
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* History */}
+          {history.length > 0 && (
+            <div data-testid={`warmup-history-${account.id}`}>
+              <p className="text-12 font-medium text-black-300 mb-1">
+                Recent program actions
+              </p>
+              <ul className="space-y-0.5">
+                {history.map((h, i) => (
+                  <li key={i} className="text-12 text-black-400">
+                    {HISTORY_ACTION_LABELS[h.action]} ·{" "}
+                    {formatHistoryDate(h.at)}
+                    {h.detail ? ` — ${h.detail}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {note && (
+        <p className="text-12 text-emerald-300" role="status">
+          {note}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function AccountCard({
   account,
+  workspaceId,
   onUpdate,
+  onAccountChange,
   onDelete,
 }: {
   account: ConnectedAccount;
+  workspaceId: string | null;
   onUpdate: (id: string, patch: Partial<ConnectedAccount>) => Promise<void>;
+  onAccountChange: (updated: ConnectedAccount) => void;
   onDelete: (account: ConnectedAccount) => void;
 }) {
   const [busy, setBusy] = React.useState(false);
@@ -227,8 +1027,8 @@ function AccountCard({
           <p className="text-13 font-medium text-white">Warm-up mode</p>
           <p className="text-12 text-black-400">
             {account.warmup_enabled
-              ? "On — daily actions ramp up gradually within the limits below."
-              : "Off — the account is not treated as warming up."}
+              ? "On — the master switch for this account's warm-up program below."
+              : "Off — no warm-up caps are enforced for this account."}
           </p>
         </div>
         <button
@@ -250,6 +1050,16 @@ function AccountCard({
           />
         </button>
       </div>
+
+      {/* Warm-up program (LinkedIn accounts, migration 020) */}
+      {isLinkedin && workspaceId && (
+        <WarmupPanel
+          account={account}
+          workspaceId={workspaceId}
+          onAccountChange={onAccountChange}
+          onUpdate={onUpdate}
+        />
+      )}
 
       {/* Sender identity — feeds {my_first_name} etc. */}
       <div className="space-y-3">
@@ -573,6 +1383,15 @@ export default function ConnectedAccountsPage() {
     };
   }, [refresh]);
 
+  const handleAccountChange = React.useCallback(
+    (updated: ConnectedAccount) => {
+      setAccounts((prev) =>
+        prev.map((a) => (a.id === updated.id ? updated : a))
+      );
+    },
+    []
+  );
+
   const handleUpdate = async (
     id: string,
     patch: Partial<ConnectedAccount>
@@ -712,7 +1531,9 @@ export default function ConnectedAccountsPage() {
                 <AccountCard
                   key={a.id}
                   account={a}
+                  workspaceId={workspaceId}
                   onUpdate={handleUpdate}
+                  onAccountChange={handleAccountChange}
                   onDelete={setDeleteTarget}
                 />
               ))}
@@ -736,7 +1557,9 @@ export default function ConnectedAccountsPage() {
                 <AccountCard
                   key={a.id}
                   account={a}
+                  workspaceId={workspaceId}
                   onUpdate={handleUpdate}
+                  onAccountChange={handleAccountChange}
                   onDelete={setDeleteTarget}
                 />
               ))}

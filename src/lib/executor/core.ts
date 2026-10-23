@@ -34,8 +34,19 @@ import {
   resolveStepVoiceAttachment,
 } from "@/lib/voice/attachments";
 import {
+  deriveStatus,
+  effectiveCaps,
+  graduateTransition,
+  isWarmupComplete,
+  phaseDay,
+  stepTypeToWarmupAction,
+  type AccountWarmupState,
+} from "@/lib/linkedin/warmup";
+import type { WarmupLimits } from "@/types";
+import {
   stepExecutionKey,
   emptyRunSummary,
+  type ExecutorCampaign,
   type ExecutorEnrollment,
   type ExecutorStore,
   type ExecutorRunSummary,
@@ -116,6 +127,27 @@ export function monthPeriodStartIso(now: Date): string {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
 }
 
+/** Start of the current UTC day — the warm-up counters' window. */
+export function dayPeriodStartIso(now: Date): string {
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  ).toISOString();
+}
+
+/**
+ * The account a claim row is attributed to (migration 020): the
+ * campaign's sender account for the step's channel. Wait/condition
+ * steps belong to no account.
+ */
+export function claimAccountId(
+  campaign: ExecutorCampaign,
+  channel: StepChannel
+): string | null {
+  if (channel === "linkedin") return campaign.sender_account_id ?? null;
+  if (channel === "email") return campaign.email_account_id ?? null;
+  return null;
+}
+
 export function leadDisplayName(lead: Lead): string {
   const name = `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim();
   return name || lead.email || "Prospect";
@@ -163,6 +195,26 @@ export async function executeDueSteps(
   const overLimitCampaigns = new Map<string, { workspaceId: string; name: string; deferred: number }>();
   // Sender identities ({my_*} variables) resolved once per campaign.
   const senderByCampaign = new Map<string, SenderIdentity | null>();
+  // Warm-up gate state (migration 020): program states resolved once
+  // per account per scan; today's usage counted once per
+  // (account, action) and incremented locally per dispatch — the
+  // same once-per-scan discipline as the plan limit above, so a
+  // single scan can never overshoot a warm-up cap either.
+  const warmupStateByAccount = new Map<string, AccountWarmupState | null>();
+  const warmupUsageByAccountAction = new Map<string, number>();
+  const warmupDeferredCampaigns = new Map<
+    string,
+    {
+      workspaceId: string;
+      campaignId: string;
+      name: string;
+      accountName: string;
+      day: number;
+      action: keyof WarmupLimits;
+      cap: number;
+      deferred: number;
+    }
+  >();
 
   for (const enrollment of enrollments) {
     summary.scanned++;
@@ -205,6 +257,7 @@ export async function executeDueSteps(
         step_order: step.step_order,
         step_type: step.step_type,
         channel: stepChannel(step),
+        account_id: claimAccountId(campaign, stepChannel(step)),
         idempotency_key: stepExecutionKey(enrollment.id, step.step_order),
         simulated: store.simulated,
       });
@@ -238,6 +291,7 @@ export async function executeDueSteps(
         step_order: step.step_order,
         step_type: step.step_type,
         channel: stepChannel(step),
+        account_id: claimAccountId(campaign, stepChannel(step)),
         idempotency_key: stepExecutionKey(enrollment.id, step.step_order),
         simulated: store.simulated,
       });
@@ -272,6 +326,7 @@ export async function executeDueSteps(
         step_order: step.step_order,
         step_type: step.step_type,
         channel,
+        account_id: claimAccountId(campaign, channel),
         idempotency_key: stepExecutionKey(enrollment.id, step.step_order),
         simulated: store.simulated,
       });
@@ -304,6 +359,90 @@ export async function executeDueSteps(
     // claimed once (at-most-once) and recorded `skipped` with the
     // reason — never sent, never simulated as sent.
     if (channel === "linkedin") {
+      const senderAccountId = campaign.sender_account_id ?? null;
+      const warmupAction = stepTypeToWarmupAction(step.step_type);
+
+      // ── Warm-up gate ──────────────────────────────────────────────
+      // Runs BEFORE the claim: when the sender account's program is
+      // warming and today's counted usage for this action reached
+      // the effective cap, the step is DEFERRED — no claim, no
+      // execution row, the step stays due (the plan-limit deferral
+      // pattern, one level down: per account + action instead of per
+      // workspace). Paused / not_started / graduated programs and
+      // accounts with warm-up switched off are never gated.
+      if (
+        senderAccountId &&
+        warmupAction &&
+        store.getAccountWarmupState &&
+        store.countLinkedInActionsToday
+      ) {
+        let wState = warmupStateByAccount.get(senderAccountId);
+        if (wState === undefined) {
+          wState = await store
+            .getAccountWarmupState(workspaceId, senderAccountId)
+            .catch(() => null);
+          // Lazy graduation: a program whose schedule has elapsed IS
+          // graduated — record it (best-effort) the first time a scan
+          // observes it, and treat it as graduated from here on.
+          if (wState && wState.enabled && isWarmupComplete(wState, now)) {
+            const grad = graduateTransition(wState, now, null, "lazy");
+            if (grad) {
+              if (store.persistWarmupTransition) {
+                await store
+                  .persistWarmupTransition(
+                    workspaceId,
+                    senderAccountId,
+                    grad.patch,
+                    wState,
+                    grad.entry
+                  )
+                  .catch(() => {});
+              }
+              wState = {
+                ...wState,
+                status: "graduated",
+                graduatedAt: grad.patch.graduatedAt ?? nowIso,
+                pausedAt: null,
+              };
+            }
+          }
+          warmupStateByAccount.set(senderAccountId, wState);
+        }
+        if (wState && wState.enabled && deriveStatus(wState, now) === "warming") {
+          const cap = effectiveCaps(wState, now)[warmupAction];
+          const usageKey = `${senderAccountId}:${warmupAction}`;
+          let used = warmupUsageByAccountAction.get(usageKey);
+          if (used === undefined) {
+            const counts = await store
+              .countLinkedInActionsToday(
+                workspaceId,
+                senderAccountId,
+                dayPeriodStartIso(now)
+              )
+              .catch(() => null);
+            used = counts ? counts[warmupAction] : 0;
+            warmupUsageByAccountAction.set(usageKey, used);
+          }
+          if (used >= cap) {
+            summary.warmupDeferred++;
+            const aggKey = `${campaign.id}:${senderAccountId}:${warmupAction}`;
+            const agg = warmupDeferredCampaigns.get(aggKey) ?? {
+              workspaceId,
+              campaignId: campaign.id,
+              name: campaign.name,
+              accountName: wState.displayName,
+              day: phaseDay(wState, now),
+              action: warmupAction,
+              cap,
+              deferred: 0,
+            };
+            agg.deferred++;
+            warmupDeferredCampaigns.set(aggKey, agg);
+            continue;
+          }
+        }
+      }
+
       const claim = await store.claimStepExecution({
         workspace_id: workspaceId,
         campaign_id: campaign.id,
@@ -312,12 +451,22 @@ export async function executeDueSteps(
         step_order: step.step_order,
         step_type: step.step_type,
         channel,
+        account_id: senderAccountId,
         idempotency_key: stepExecutionKey(enrollment.id, step.step_order),
         simulated: store.simulated,
       });
       if (!claim) {
         summary.alreadyClaimed++;
         continue;
+      }
+      // The dispatch counts against today's warm-up budget (when the
+      // gate seeded a counter for this account + action this scan).
+      if (senderAccountId && warmupAction) {
+        const usageKey = `${senderAccountId}:${warmupAction}`;
+        const counted = warmupUsageByAccountAction.get(usageKey);
+        if (counted !== undefined) {
+          warmupUsageByAccountAction.set(usageKey, counted + 1);
+        }
       }
       await store.completeStepExecution(claim.id, {
         status: "skipped",
@@ -345,6 +494,7 @@ export async function executeDueSteps(
         step_order: step.step_order,
         step_type: step.step_type,
         channel,
+        account_id: claimAccountId(campaign, channel),
         idempotency_key: stepExecutionKey(enrollment.id, step.step_order),
         simulated: store.simulated,
       });
@@ -395,6 +545,7 @@ export async function executeDueSteps(
       step_order: step.step_order,
       step_type: step.step_type,
       channel,
+      account_id: claimAccountId(campaign, channel),
       idempotency_key: stepExecutionKey(enrollment.id, step.step_order),
       simulated: store.simulated,
     });
@@ -601,8 +752,23 @@ export async function executeDueSteps(
     );
   }
 
+  // One aggregated activity entry per (campaign, account, action)
+  // for warm-up deferrals — same aggregation discipline as the plan
+  // limit, so a capped account produces one honest entry, not a flood.
+  for (const entry of Array.from(warmupDeferredCampaigns.values())) {
+    const actionLabel = entry.action.replace(/_/g, " ");
+    await store.appendActivity(entry.workspaceId, {
+      campaign_id: entry.campaignId,
+      action: "step_deferred_warmup",
+      details: `${entry.deferred} due LinkedIn step(s) deferred: ${entry.accountName} is on day ${entry.day} of its warm-up program and reached today's limit of ${entry.cap} ${actionLabel}. Warm-up limit reached for today — nothing was sent; the steps remain due.`,
+    });
+    summary.log.push(
+      `Campaign "${entry.name}": ${entry.deferred} LinkedIn step(s) deferred — warm-up limit reached for ${entry.accountName} (day ${entry.day}, ${actionLabel} cap ${entry.cap}/day).`
+    );
+  }
+
   summary.log.push(
-    `Scanned ${summary.scanned} enrollment(s): ${summary.sent} sent, ${summary.simulated} simulated, ${summary.skippedLinkedIn} LinkedIn skipped, ${summary.waitsExecuted} wait/condition executed, ${summary.stoppedReply + summary.stoppedSuppression + summary.stoppedMissingLead} stopped, ${summary.overLimit} over-limit deferred, ${summary.errors} transient error(s).`
+    `Scanned ${summary.scanned} enrollment(s): ${summary.sent} sent, ${summary.simulated} simulated, ${summary.skippedLinkedIn} LinkedIn skipped, ${summary.waitsExecuted} wait/condition executed, ${summary.stoppedReply + summary.stoppedSuppression + summary.stoppedMissingLead} stopped, ${summary.overLimit} over-limit deferred, ${summary.warmupDeferred} warm-up deferred, ${summary.errors} transient error(s).`
   );
   return summary;
 }

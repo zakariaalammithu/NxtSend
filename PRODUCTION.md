@@ -91,6 +91,7 @@ In the Supabase SQL Editor, run the migrations **in numeric order**:
 → `014_oauth_connections` → `015_voice_notes`
 → `016_integration_hub` → `017_billing_webhook_failures`
 → `018_submission_notifications` → `019_support_chat`
+→ `020_linkedin_warmup`
 
 Migration 015 in full: voice-note columns on `messages`
 (`voice_note_path`, `voice_note_duration_sec`, `voice_note_language`,
@@ -141,9 +142,18 @@ from the app layer on first use (SETUP.md §17). The transport is
 short-interval API polling, **not** Realtime/WebSocket; admin-inbox
 Realtime is a documented optional phase 2.
 
+Migration 020 in full: the LinkedIn warm-up program columns on
+`connected_accounts` (lifecycle status, preset, the resolved schedule
+JSONB, per-action overrides, the pause-aware program clock,
+graduation timestamp, and the append-only control history) plus
+`campaign_step_executions.account_id` — the executor's claim-time
+account attribution the warm-up usage counters derive from. No new
+tables, no policy changes, no SQL seeding (presets live in app code
+and snapshot into `warmup_schedule` when a program starts).
+
 Post-migration checklist:
 
-- [ ] All 19 ran without errors (SQL Editor history). (014 creates
+- [ ] All 20 ran without errors (SQL Editor history). (014 creates
       `oauth_connections` — RLS enabled with **no** client policies by
       design; it must show "RLS enabled" with zero policies.)
 - [ ] RLS is enabled on every public table (Database → Tables — no

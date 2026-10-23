@@ -408,6 +408,7 @@ function rowToExecution(row: Record<string, unknown>): StepExecutionRecord {
     channel: row.channel as StepExecutionRecord["channel"],
     status: row.status as StepExecutionRecord["status"],
     detail: String(row.detail ?? ""),
+    account_id: (row.account_id as string | null) ?? null,
     message_id: (row.message_id as string | null) ?? null,
     provider: (row.provider as string | null) ?? null,
     provider_message_id: (row.provider_message_id as string | null) ?? null,

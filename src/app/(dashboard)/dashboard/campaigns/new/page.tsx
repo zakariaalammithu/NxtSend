@@ -53,7 +53,14 @@ import {
   getLeadsRepository,
   resolveSenderVars,
   resolveWorkspaceId,
+  warmupStateOf,
 } from "@/lib/data";
+import {
+  currentPhase,
+  deriveStatus,
+  effectiveCaps,
+  phaseDay,
+} from "@/lib/linkedin";
 import { getUserSettingsRepository } from "@/lib/data/user-settings";
 import { CsvImport } from "@/components/dashboard/CsvImport";
 import type { CsvImportResult } from "@/lib/data/csv";
@@ -208,11 +215,45 @@ export default function NewCampaignWizardPage() {
   const selectedEmailAccount =
     emailAccounts.find((a) => a.id === emailAccount) ?? null;
   // The limits card and the persisted campaign snapshot both read the
-  // SELECTED account's stored limits (merged over the defaults) —
-  // never hardcoded defaults — when an account is selected.
-  const selectedLimits = selectedLinkedinAccount
-    ? accountLimits(selectedLinkedinAccount)
-    : DEFAULT_WARMUP_LIMITS;
+  // SELECTED account's limits — never hardcoded defaults — when an
+  // account is selected. While the account's warm-up PROGRAM binds
+  // (warming/paused, migration 020) those are the EFFECTIVE caps —
+  // min(stored daily limit, phase cap / override) from the engine —
+  // and the snapshot also records the program day. Otherwise the
+  // stored limits (merged over the defaults) apply as before.
+  const selectedWarmupState = selectedLinkedinAccount
+    ? warmupStateOf(selectedLinkedinAccount)
+    : null;
+  const wizardNow = new Date();
+  const selectedWarmupStatus = selectedWarmupState
+    ? deriveStatus(selectedWarmupState, wizardNow)
+    : null;
+  const selectedWarmupDay =
+    selectedWarmupState &&
+    (selectedWarmupStatus === "warming" || selectedWarmupStatus === "paused")
+      ? phaseDay(selectedWarmupState, wizardNow)
+      : null;
+  const selectedWarmupPhase = selectedWarmupState
+    ? currentPhase(selectedWarmupState, wizardNow)
+    : null;
+  // The program BINDS only with the master switch on (the executor
+  // gate requires enabled AND warming) — the card must not present
+  // phase caps as in force while the switch is off.
+  const selectedWarmupBinds =
+    selectedWarmupState !== null &&
+    selectedWarmupState.enabled &&
+    (selectedWarmupStatus === "warming" || selectedWarmupStatus === "paused");
+  const selectedLimits =
+    selectedLinkedinAccount && selectedWarmupState
+      ? selectedWarmupBinds
+        ? effectiveCaps(selectedWarmupState, wizardNow)
+        : accountLimits(selectedLinkedinAccount)
+      : DEFAULT_WARMUP_LIMITS;
+  // The persisted snapshot pairs the effective caps with the program
+  // day they came from — null whenever the program is not binding.
+  const selectedWarmupSnapshotDay = selectedWarmupBinds
+    ? selectedWarmupDay
+    : null;
 
   // -------------------------------------------------------------------------
   // Load: workspace, leads, connected accounts — and resume when
@@ -443,6 +484,7 @@ export default function NewCampaignWizardPage() {
         description: campaignDescription,
         audience_source: source,
         warmup_limits: selectedLimits,
+        warmup_day: selectedWarmupSnapshotDay,
         sender_account_id: linkedinAccount || null,
         email_account_id: emailAccount || null,
       });
@@ -456,6 +498,7 @@ export default function NewCampaignWizardPage() {
         description: campaignDescription,
         audience_source: source,
         warmup_limits: selectedLimits,
+        warmup_day: selectedWarmupSnapshotDay,
         sender_account_id: linkedinAccount || null,
         email_account_id: emailAccount || null,
       });
@@ -864,6 +907,20 @@ export default function NewCampaignWizardPage() {
                         ? "Warm-up on"
                         : "Warm-up off"}
                     </span>
+                    {selectedWarmupBinds && selectedWarmupDay !== null && (
+                      <span
+                        className="inline-flex items-center rounded-full px-2 py-0.5 text-11 font-medium border border-purple-500/40 bg-purple-500/10 text-purple-300"
+                        data-testid="wizard-warmup-chip"
+                      >
+                        {selectedWarmupStatus === "paused"
+                          ? `Warm-up paused · Day ${selectedWarmupDay}`
+                          : `Warming · Day ${selectedWarmupDay}${
+                              selectedWarmupPhase
+                                ? ` (Phase ${selectedWarmupPhase.index + 1})`
+                                : ""
+                            }`}
+                      </span>
+                    )}
                     {selectedLinkedinAccount.status === "demo" && (
                       <span className="demo-badge">Demo account</span>
                     )}
@@ -874,13 +931,29 @@ export default function NewCampaignWizardPage() {
                         ? `Warm-up mode is on for ${selectedLinkedinAccount.display_name}.`
                         : `Warm-up mode is off for ${selectedLinkedinAccount.display_name}.`}
                     </strong>{" "}
-                    We&apos;ll gradually increase the number of daily
-                    connections, messages, profiles views, posts likes,
-                    skills endorses and find emails. These are the{" "}
-                    <strong className="text-black-100">
-                      daily limits stored on the selected account
-                    </strong>
-                    .
+                    {selectedWarmupBinds ? (
+                      <>
+                        This account is in a warm-up program, so the
+                        numbers below are{" "}
+                        <strong className="text-black-100">
+                          today&apos;s effective caps
+                        </strong>{" "}
+                        — the lower of the account&apos;s stored daily
+                        limits and the current phase&apos;s caps. Steps
+                        beyond today&apos;s cap stay due; they are not
+                        dropped.
+                      </>
+                    ) : (
+                      <>
+                        We&apos;ll gradually increase the number of daily
+                        connections, messages, profiles views, posts likes,
+                        skills endorses and find emails. These are the{" "}
+                        <strong className="text-black-100">
+                          daily limits stored on the selected account
+                        </strong>
+                        .
+                      </>
+                    )}
                   </p>
                   <p className="text-12 font-semibold text-black-200">
                     Maximum number of LinkedIn actions per day:
@@ -1091,6 +1164,34 @@ export default function NewCampaignWizardPage() {
       {/* ============================ STEP 4 ============================ */}
       {currentStep === 4 && (
         <div className="space-y-6">
+          {/* Warm-up disclosure (NOT a block): launching is allowed;
+              the sender's program simply paces the sends. */}
+          {selectedWarmupBinds &&
+            selectedWarmupStatus === "warming" &&
+            selectedLinkedinAccount &&
+            selectedWarmupDay !== null && (
+              <div
+                className="rounded-2xl border border-amber-500/40 bg-amber-950/20 px-5 py-4"
+                data-testid="wizard-warmup-banner"
+              >
+                <p className="text-13 text-amber-100 leading-relaxed">
+                  <strong>{selectedLinkedinAccount.display_name}</strong>{" "}
+                  is on day {selectedWarmupDay} of its warm-up program:
+                  at most {selectedLimits.connection_requests} connection
+                  requests and {selectedLimits.messages} messages per day
+                  will go out from this account; the rest stay due —
+                  nothing is dropped. You can launch now and let the
+                  program pace the sends, or manage the program on the{" "}
+                  <Link
+                    href="/dashboard/accounts"
+                    className="underline underline-offset-2"
+                  >
+                    Accounts page
+                  </Link>
+                  .
+                </p>
+              </div>
+            )}
           <div className="glass-card p-6 sm:p-8 space-y-4">
             <h2 className="text-18 font-bold text-white">Audience</h2>
 

@@ -15,9 +15,21 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CampaignStep, Lead, PlanType } from "@/types";
+import type { CampaignStep, Lead, PlanType, StepType, WarmupHistoryEntry } from "@/types";
 import { resolveWorkspaceEntitlement } from "@/lib/billing/entitlement";
 import { createInboxRepository, type InboxRepository } from "@/lib/data/inbox";
+import {
+  rowToAccount,
+  warmupPatchToAccountPatch,
+  warmupStateOf,
+} from "@/lib/data/accounts";
+import {
+  emptyWarmupUsage,
+  stepTypeToWarmupAction,
+  type AccountWarmupState,
+  type WarmupProgramPatch,
+  type WarmupUsageCounts,
+} from "@/lib/linkedin/warmup";
 import { normalizeEmail } from "@/lib/email/suppression";
 import type {
   ClaimStepExecutionInput,
@@ -43,6 +55,7 @@ function rowToExecution(row: Row): StepExecutionRecord {
     channel: row.channel as StepExecutionRecord["channel"],
     status: row.status as StepExecutionRecord["status"],
     detail: String(row.detail ?? ""),
+    account_id: (row.account_id as string | null) ?? null,
     message_id: (row.message_id as string | null) ?? null,
     provider: (row.provider as string | null) ?? null,
     provider_message_id: (row.provider_message_id as string | null) ?? null,
@@ -109,7 +122,7 @@ export class SupabaseExecutorStore implements ExecutorStore {
   ): Promise<ExecutorCampaign | null> {
     const { data, error } = await this.admin
       .from("campaigns")
-      .select("id, workspace_id, name, type, status")
+      .select("id, workspace_id, name, type, status, sender_account_id, email_account_id")
       .eq("workspace_id", workspaceId)
       .eq("id", campaignId)
       .maybeSingle();
@@ -122,6 +135,8 @@ export class SupabaseExecutorStore implements ExecutorStore {
       name: String(r.name ?? ""),
       type: (r.type as ExecutorCampaign["type"]) ?? "linkedin",
       status: String(r.status ?? "draft"),
+      sender_account_id: (r.sender_account_id as string | null) ?? null,
+      email_account_id: (r.email_account_id as string | null) ?? null,
     };
   }
 
@@ -167,6 +182,95 @@ export class SupabaseExecutorStore implements ExecutorStore {
       };
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Warm-up gate: the account's program state, mapped through the
+   * data layer's tolerant row mapper. Any failure (020 not applied,
+   * account deleted) resolves to null — the gate stays inert rather
+   * than blocking sends on a throttle it cannot read.
+   */
+  async getAccountWarmupState(
+    workspaceId: string,
+    accountId: string
+  ): Promise<AccountWarmupState | null> {
+    try {
+      const { data, error } = await this.admin
+        .from("connected_accounts")
+        .select("*")
+        .eq("workspace_id", workspaceId)
+        .eq("id", accountId)
+        .maybeSingle();
+      if (error || !data) return null;
+      return warmupStateOf(rowToAccount(data as Row));
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Warm-up gate + panel: today's counted usage for one account.
+   * LIVE counting rule: execution rows with status 'sent' ONLY — a
+   * warm-up cap budgets real sends. (Demo Mode counts dispatch
+   * attempts instead; see demo-executions.ts for why the rules
+   * deliberately differ.)
+   */
+  async countLinkedInActionsToday(
+    workspaceId: string,
+    accountId: string,
+    dayStartIso: string
+  ): Promise<WarmupUsageCounts> {
+    const counts = emptyWarmupUsage();
+    try {
+      const { data, error } = await this.admin
+        .from("campaign_step_executions")
+        .select("step_type")
+        .eq("workspace_id", workspaceId)
+        .eq("account_id", accountId)
+        .eq("channel", "linkedin")
+        .eq("status", "sent")
+        .gte("created_at", dayStartIso);
+      if (error || !data) return counts;
+      for (const row of data as Row[]) {
+        const action = stepTypeToWarmupAction(row.step_type as StepType);
+        if (action) counts[action] += 1;
+      }
+    } catch {
+      return counts;
+    }
+    return counts;
+  }
+
+  /**
+   * Persists an engine transition (lazy graduation) as a service-role
+   * read-modify-write of the account row. Best-effort by contract:
+   * errors are swallowed and the next scan re-derives the graduation.
+   */
+  async persistWarmupTransition(
+    workspaceId: string,
+    accountId: string,
+    patch: WarmupProgramPatch,
+    entryState: AccountWarmupState,
+    entry: WarmupHistoryEntry
+  ): Promise<void> {
+    try {
+      const accountPatch = warmupPatchToAccountPatch(
+        entryState.history,
+        patch,
+        entry
+      );
+      const update: Row = { updated_at: new Date().toISOString() };
+      for (const [key, value] of Object.entries(accountPatch)) {
+        if (value !== undefined) update[key] = value;
+      }
+      await this.admin
+        .from("connected_accounts")
+        .update(update)
+        .eq("workspace_id", workspaceId)
+        .eq("id", accountId);
+    } catch {
+      // Best-effort (see ExecutorStore contract).
     }
   }
 
@@ -291,6 +395,7 @@ export class SupabaseExecutorStore implements ExecutorStore {
         channel: input.channel,
         status: "sending",
         detail: "",
+        account_id: input.account_id,
         idempotency_key: input.idempotency_key,
         simulated: input.simulated,
       })

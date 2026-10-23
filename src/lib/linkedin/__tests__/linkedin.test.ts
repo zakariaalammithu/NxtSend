@@ -191,6 +191,7 @@ function execution(
     channel: "linkedin",
     status: "skipped",
     detail: "Skipped: no authorized LinkedIn provider is integrated.",
+    account_id: null,
     message_id: null,
     provider: null,
     provider_message_id: null,

@@ -22,15 +22,24 @@
  * LIVE send path (Supabase store + adapter) remains fail-closed.
  */
 
-import type { CampaignStep, Lead } from "@/types";
+import type { CampaignStep, Lead, WarmupHistoryEntry } from "@/types";
 import type { CampaignsRepository } from "@/lib/data/campaigns";
 import type { LeadsRepository } from "@/lib/data/leads";
 import type { InboxRepository } from "@/lib/data/inbox";
-import { createAccountsRepository } from "@/lib/data/accounts";
-import { loadDemoCollection, saveDemoCollection } from "@/lib/data/demo-store";
+import {
+  createAccountsRepository,
+  warmupPatchToAccountPatch,
+  warmupStateOf,
+} from "@/lib/data/accounts";
 import { DEMO_WORKSPACE_ID } from "@/lib/data/workspace";
 import { DEMO_WORKSPACE_PLAN } from "@/lib/data/usage";
 import { generateId } from "@/lib/utils";
+import type {
+  AccountWarmupState,
+  WarmupProgramPatch,
+  WarmupUsageCounts,
+} from "@/lib/linkedin/warmup";
+import { loadDemoExecutions, saveDemoExecutions } from "./demo-executions";
 import type {
   ClaimStepExecutionInput,
   ExecutorCampaign,
@@ -40,8 +49,6 @@ import type {
   SenderIdentity,
   StepExecutionRecord,
 } from "./types";
-
-const DEMO_EXECUTIONS_KEY = "nxtsend_demo_step_executions_v1";
 
 export interface DemoExecutorStoreDeps {
   campaigns: CampaignsRepository;
@@ -93,10 +100,10 @@ export class DemoExecutorStore implements ExecutorStore {
   }
 
   private loadExecutions(): StepExecutionRecord[] {
-    return loadDemoCollection<StepExecutionRecord>(DEMO_EXECUTIONS_KEY, () => []);
+    return loadDemoExecutions();
   }
   private saveExecutions(items: StepExecutionRecord[]): void {
-    saveDemoCollection(DEMO_EXECUTIONS_KEY, items);
+    saveDemoExecutions(items);
   }
 
   async listEnrollments(
@@ -139,6 +146,8 @@ export class DemoExecutorStore implements ExecutorStore {
       name: campaign.name,
       type: campaign.type,
       status: campaign.status,
+      sender_account_id: campaign.sender_account_id ?? null,
+      email_account_id: campaign.email_account_id ?? null,
     };
   }
 
@@ -176,6 +185,50 @@ export class DemoExecutorStore implements ExecutorStore {
       jobTitle: account.sender_job_title || undefined,
       companyName: account.sender_company || undefined,
     };
+  }
+
+  /** Warm-up gate: the account's program state from the demo accounts repo. */
+  async getAccountWarmupState(
+    workspaceId: string,
+    accountId: string
+  ): Promise<AccountWarmupState | null> {
+    const account = await createAccountsRepository("demo").getAccount(
+      workspaceId,
+      accountId
+    );
+    return account ? warmupStateOf(account) : null;
+  }
+
+  /** Warm-up gate + panel: today's usage under the DEMO counting rule. */
+  async countLinkedInActionsToday(
+    workspaceId: string,
+    accountId: string,
+    dayStartIso: string
+  ): Promise<WarmupUsageCounts> {
+    return createAccountsRepository("demo").countLinkedInActionsToday(
+      workspaceId,
+      accountId,
+      dayStartIso
+    );
+  }
+
+  /** Persists an engine transition (lazy graduation). Best-effort. */
+  async persistWarmupTransition(
+    _workspaceId: string,
+    accountId: string,
+    patch: WarmupProgramPatch,
+    entryState: AccountWarmupState,
+    entry: WarmupHistoryEntry
+  ): Promise<void> {
+    try {
+      await createAccountsRepository("demo").updateAccount(
+        accountId,
+        warmupPatchToAccountPatch(entryState.history, patch, entry)
+      );
+    } catch {
+      // Best-effort by contract: a failed graduation write must not
+      // fail the executor run; the next scan re-derives it.
+    }
   }
 
   async getLead(workspaceId: string, leadId: string): Promise<Lead | null> {
@@ -264,6 +317,7 @@ export class DemoExecutorStore implements ExecutorStore {
       channel: input.channel,
       status: "sending",
       detail: "",
+      account_id: input.account_id,
       message_id: null,
       provider: null,
       provider_message_id: null,

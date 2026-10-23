@@ -52,7 +52,19 @@ export {
   profileSenderVars,
   resolveSenderVars,
   withDefaultLimits,
+  warmupStateOf,
+  notStartedWarmupFields,
+  warmupPatchToAccountPatch,
+  startWarmup,
+  pauseWarmup,
+  resumeWarmup,
+  restartWarmup,
+  editWarmupSchedule,
+  setWarmupOverride,
+  markWarmupReady,
+  recordWarmupGraduation,
 } from "./accounts";
+export type { WarmupControlOptions } from "./accounts";
 export type {
   AdminRepository,
   AdminUserRecord,

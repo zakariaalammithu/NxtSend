@@ -92,6 +92,8 @@ const GUIDES: GuideSection[] = [
     bullets: [
       "Actual LinkedIn sending runs through an authorised provider integration. Until a provider is connected to your workspace, the LinkedIn integration shows \u201cConfiguration Required\u201d and LinkedIn steps in a running sequence are recorded as skipped — with the reason shown — while email steps send normally. Nothing is silently simulated.",
       "You never share your LinkedIn password with the NxtSend team; account connection follows a guided sign-in flow.",
+      "Each LinkedIn account can run a warm-up program from the Accounts page: pick a preset (Conservative — 21 days, Balanced — 18 days, Accelerated — 12 days) or build your own schedule, and the account's daily actions ramp up phase by phase. The program is yours to control — edit the schedule, pin a single action to a fixed cap, pause it (its clock freezes), restart it, or mark the account ready at any time. Your stored daily limits always apply when they are lower than a phase cap.",
+      "While an account is warming, campaign steps that would pass today's cap are deferred, not dropped: they stay due, go out on a later day, and the campaign's activity log says so plainly. Warm-up is a pacing tool, not a safety guarantee — LinkedIn's own limits and terms always apply to every account.",
       "Rented outreach profiles (Avatars) are ordered inside the app and added straight to your workspace, ready to include in campaigns alongside your own profiles.",
       "Keep volumes reasonable and your targeting relevant: you are responsible for complying with LinkedIn's own terms for every account you connect, and for the messages your campaigns send.",
     ],

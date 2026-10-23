@@ -17,8 +17,20 @@
  *  - In Demo Mode every record is flagged `simulated`.
  */
 
-import type { CampaignStep, CampaignType, Lead, PlanType, StepType } from "@/types";
+import type {
+  CampaignStep,
+  CampaignType,
+  Lead,
+  PlanType,
+  StepType,
+  WarmupHistoryEntry,
+} from "@/types";
 import type { InboxMessage, InsertMessageInput } from "@/lib/data/inbox";
+import type {
+  AccountWarmupState,
+  WarmupProgramPatch,
+  WarmupUsageCounts,
+} from "@/lib/linkedin/warmup";
 
 export type StepChannel = "email" | "linkedin" | "none";
 
@@ -48,6 +60,15 @@ export interface ExecutorCampaign {
   name: string;
   type: CampaignType;
   status: string;
+  /**
+   * The campaign's connected accounts (migration 011). Optional so
+   * older fakes keep compiling — both real stores always set them.
+   * The warm-up gate resolves the LinkedIn sender from
+   * `sender_account_id`; claim rows attribute executions to the
+   * account of the step's channel.
+   */
+  sender_account_id?: string | null;
+  email_account_id?: string | null;
 }
 
 export interface StepExecutionRecord {
@@ -61,6 +82,13 @@ export interface StepExecutionRecord {
   channel: StepChannel;
   status: StepExecutionStatus;
   detail: string;
+  /**
+   * The connected account this execution is attributed to (migration
+   * 020), filled at claim time from the campaign's sender account for
+   * the step's channel. Warm-up usage counters derive from this.
+   * Null for non-account steps (wait/condition) and pre-020 rows.
+   */
+  account_id: string | null;
   message_id: string | null;
   provider: string | null;
   provider_message_id: string | null;
@@ -78,6 +106,8 @@ export interface ClaimStepExecutionInput {
   step_order: number;
   step_type: StepType;
   channel: StepChannel;
+  /** Account attribution for the claim row (migration 020). */
+  account_id: string | null;
   idempotency_key: string;
   simulated: boolean;
 }
@@ -120,6 +150,41 @@ export interface ExecutorStore {
     campaignId: string,
     channel: "linkedin" | "email"
   ): Promise<SenderIdentity | null>;
+  /**
+   * Optional (warm-up gate): the sender account's warm-up program
+   * state. Stores that cannot resolve it return null and the gate
+   * stays inert — warm-up is an additional throttle, never a
+   * prerequisite for the pre-existing behaviour.
+   */
+  getAccountWarmupState?(
+    workspaceId: string,
+    accountId: string
+  ): Promise<AccountWarmupState | null>;
+  /**
+   * Optional (warm-up gate): today's counted LinkedIn usage for one
+   * account (UTC day from `dayStartIso`). Same counter the Accounts
+   * panel renders, so the two can never disagree. Called at most
+   * once per (account, scan) by the core.
+   */
+  countLinkedInActionsToday?(
+    workspaceId: string,
+    accountId: string,
+    dayStartIso: string
+  ): Promise<WarmupUsageCounts>;
+  /**
+   * Optional: persists a warm-up program transition computed by the
+   * engine — used by the gate for LAZY GRADUATION (a warming program
+   * whose schedule elapsed is recorded graduated, with its history
+   * entry, the first time the gate observes it). Best-effort:
+   * implementations swallow their own errors and the run continues.
+   */
+  persistWarmupTransition?(
+    workspaceId: string,
+    accountId: string,
+    patch: WarmupProgramPatch,
+    entryState: AccountWarmupState,
+    entry: WarmupHistoryEntry
+  ): Promise<void>;
   /**
    * Enrollments that may have a due step: status pending/active and
    * their campaign is active. Time-based due filtering happens in the
@@ -209,6 +274,12 @@ export interface ExecutorRunSummary {
   stoppedMissingLead: number;
   /** Sends deferred because the workspace hit its plan email limit. */
   overLimit: number;
+  /**
+   * LinkedIn steps deferred because the sender account's warm-up
+   * program hit today's effective cap for that action. Deferred —
+   * NOT claimed, NOT executed; the steps remain due.
+   */
+  warmupDeferred: number;
   /** Steps already claimed/executed by an earlier run (idempotency). */
   alreadyClaimed: number;
   /** Transient failures (provider error / not configured) — step stays due. */
@@ -231,6 +302,7 @@ export function emptyRunSummary(): ExecutorRunSummary {
     stoppedSuppression: 0,
     stoppedMissingLead: 0,
     overLimit: 0,
+    warmupDeferred: 0,
     alreadyClaimed: 0,
     errors: 0,
     completedEnrollments: 0,

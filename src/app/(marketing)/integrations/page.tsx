@@ -8,6 +8,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { IntegrationsExplorer } from "@/components/marketing/IntegrationsExplorer";
+import { BRAND_MARK_PNG_SRC } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: { absolute: "NxtSend Integrations – Connect Your Tech Stack for LinkedIn Outreach" },
@@ -29,7 +30,7 @@ const LOGOS = "/images/integrations/logos";
 const HERO_CONSTELLATION: (string | null)[] = [
   null, `${LOGOS}/openai.svg`, null, `${LOGOS}/make.svg`, null,
   `${LOGOS}/slack.svg`, null, `${LOGOS}/muse.svg`, null, `${LOGOS}/zapier.svg`,
-  null, `${LOGOS}/n8n.svg`, "/logo.png", `${LOGOS}/google.svg`, null,
+  null, `${LOGOS}/n8n.svg`, BRAND_MARK_PNG_SRC, `${LOGOS}/google.svg`, null,
   null, null, `${LOGOS}/resend.svg`, null, null,
 ];
 
@@ -74,7 +75,7 @@ export default function IntegrationsPage() {
                 <span
                   key={i}
                   className={`flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.16] via-white/[0.06] to-white/[0.02] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] sm:h-20 sm:w-20 sm:rounded-[1.4rem] sm:p-4 ${
-                    logo === "/logo.png"
+                    logo === BRAND_MARK_PNG_SRC
                       ? "ring-1 ring-white/25"
                       : ""
                   }`}

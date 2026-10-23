@@ -33,6 +33,15 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     ],
   },
   {
+    label: "Support",
+    items: [
+      { label: "Support Inbox", href: "/admin/support", icon: "MessagesSquare" },
+      { label: "Knowledge Base", href: "/admin/support/knowledge", icon: "BookOpen" },
+      { label: "Saved Replies", href: "/admin/support/replies", icon: "Reply" },
+      { label: "Chat Settings", href: "/admin/support/settings", icon: "Bot" },
+    ],
+  },
+  {
     label: "Analytics",
     items: [
       { label: "Website Visitors", href: "/admin/analytics/visitors", icon: "Globe" },

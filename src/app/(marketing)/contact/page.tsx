@@ -26,11 +26,29 @@ const LINKEDIN_URL = "https://www.linkedin.com/company/NxtSend";
 const FACEBOOK_URL = "https://web.facebook.com/NxtSend";
 
 const contactSchema = z.object({
-  firstName: z.string().min(2, "First name must be at least 2 characters"),
-  lastName: z.string().min(2, "Last name must be at least 2 characters"),
-  email: z.string().email("Please enter a valid email address"),
-  subject: z.string().min(3, "Subject must be at least 3 characters"),
-  message: z.string().min(10, "Message must be at least 10 characters"),
+  firstName: z
+    .string()
+    .min(2, "First name must be at least 2 characters")
+    .max(120, "First name must be at most 120 characters"),
+  lastName: z
+    .string()
+    .min(2, "Last name must be at least 2 characters")
+    .max(120, "Last name must be at most 120 characters"),
+  email: z
+    .string()
+    .email("Please enter a valid email address")
+    .max(254, "Email must be at most 254 characters"),
+  subject: z
+    .string()
+    .min(3, "Subject must be at least 3 characters")
+    .max(200, "Subject must be at most 200 characters"),
+  message: z
+    .string()
+    .min(10, "Message must be at least 10 characters")
+    .max(5000, "Message must be at most 5000 characters"),
+  // Honeypot (server-side trap, see /api/submissions): a hidden
+  // field humans never fill. Not a real form field — no validation.
+  website: z.string().optional(),
 });
 
 type ContactFormData = z.infer<typeof contactSchema>;
@@ -38,6 +56,8 @@ type ContactFormData = z.infer<typeof contactSchema>;
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [reference, setReference] = useState<string | null>(null);
+  const [demoCapture, setDemoCapture] = useState(false);
 
   const {
     register,
@@ -52,6 +72,7 @@ export default function ContactPage() {
       email: "",
       subject: "",
       message: "",
+      website: "",
     },
   });
 
@@ -71,12 +92,23 @@ export default function ContactPage() {
           email: data.email,
           subject: data.subject,
           message: data.message,
+          website: data.website ?? "",
         }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? `Request failed (${res.status})`);
       }
+      const body = (await res.json().catch(() => ({}))) as {
+        id?: string;
+        mode?: string;
+      };
+      // The submission reference the API returns — shown so the
+      // visitor can quote it if they follow up by email.
+      setReference(typeof body.id === "string" ? body.id.slice(0, 8) : null);
+      // Demo Mode honesty: the message was captured in the demo
+      // store only — no email notification leaves the app.
+      setDemoCapture(body.mode === "demo");
       setSubmitted(true);
       reset();
     } catch (err) {
@@ -195,6 +227,22 @@ export default function ContactPage() {
                   <p className="mt-3 text-14 text-black-300 max-w-md mx-auto">
                     We&apos;ve received your message and will reply to the email address you gave us.
                   </p>
+                  {reference && (
+                    <p className="mt-4 text-13 text-black-400">
+                      Your reference:{" "}
+                      <span className="font-mono font-semibold text-white">
+                        {reference}
+                      </span>{" "}
+                      — please quote this reference if you email us about
+                      this message.
+                    </p>
+                  )}
+                  {demoCapture && (
+                    <p className="mt-3 text-12 text-orange-300 max-w-md mx-auto">
+                      Demo Mode: this message was captured in the demo
+                      store only — no email notification was sent.
+                    </p>
+                  )}
                   <button
                     type="button"
                     onClick={() => setSubmitted(false)}
@@ -252,6 +300,7 @@ export default function ContactPage() {
                     </label>
                     <input
                       type="email"
+                      maxLength={254}
                       placeholder="alex@company.com"
                       {...register("email")}
                       className={`input-field ${errors.email ? "border-red-500" : ""}`}
@@ -267,6 +316,7 @@ export default function ContactPage() {
                     </label>
                     <input
                       type="text"
+                      maxLength={200}
                       placeholder="Partnership inquiry / Technical question"
                       {...register("subject")}
                       className={`input-field ${errors.subject ? "border-red-500" : ""}`}
@@ -282,6 +332,7 @@ export default function ContactPage() {
                     </label>
                     <textarea
                       rows={5}
+                      maxLength={5000}
                       placeholder="How can we help your team?"
                       {...register("message")}
                       className={`input-field resize-none ${errors.message ? "border-red-500" : ""}`}
@@ -289,6 +340,24 @@ export default function ContactPage() {
                     {errors.message && (
                       <p className="mt-1 text-12 text-red-400">{errors.message.message}</p>
                     )}
+                  </div>
+
+                  {/* Honeypot — hidden from humans (off-screen,
+                      removed from the tab order); bots that fill it
+                      are silently dropped server-side. */}
+                  <div
+                    aria-hidden="true"
+                    className="absolute -left-[9999px] top-auto h-px w-px overflow-hidden"
+                  >
+                    <label>
+                      Website
+                      <input
+                        type="text"
+                        tabIndex={-1}
+                        autoComplete="off"
+                        {...register("website")}
+                      />
+                    </label>
                   </div>
 
                   {submitError && (

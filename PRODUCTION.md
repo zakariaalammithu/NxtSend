@@ -55,6 +55,7 @@ values): **Admin → System → Diagnostics** (`GET
 | `EMAIL_FROM` | runtime | server | A sender on a Resend-verified domain, e.g. `NxtSend <hello@yourdomain>` | Test send arrives |
 | `RESEND_WEBHOOK_SECRET` | runtime | **server secret** | Resend webhook endpoint you register in §4 (`whsec_…`) | Resend dashboard shows successful deliveries to `/api/webhooks/resend` |
 | `EMAIL_REPLY_TO` | runtime | server | An address on your Resend receiving domain, e.g. `replies@reply.yourdomain` | Integration Center → Email / Resend → "Reply routing & unsubscribe" shows it; a reply to a test send lands in the Inbox |
+| `CONTACT_NOTIFICATION_EMAIL` | runtime | server | The internal inbox for contact-form notifications — set it to `nxtsendai@gmail.com`. Not a secret, but server-only by posture | Submit the contact form → the notification arrives at that inbox (visitor as Reply-To); Admin → Submissions shows "Notification sent". While unset, submissions record `not_configured` |
 | `UNSUBSCRIBE_SECRET` | runtime | **server secret** | You generate it (`openssl rand -base64 64`). Optional — while unset the signing key is derived from `SUPABASE_SERVICE_ROLE_KEY` | Same panel shows signing "Configured"; the footer link in a test email opens the confirmation page |
 | `STRIPE_SECRET_KEY` | runtime | **server secret** | Stripe → Developers → API keys (use **test** keys first) | Integration Center → Stripe → Test Connection |
 | `STRIPE_WEBHOOK_SECRET` | runtime | **server secret** | Stripe webhook endpoint you register in §4 (`whsec_…`) | Stripe dashboard → webhook attempts succeed |
@@ -90,6 +91,7 @@ In the Supabase SQL Editor, run the migrations **in numeric order**:
 → `012_notifications` → `013_connected_account_provider_health`
 → `014_oauth_connections` → `015_voice_notes`
 → `016_integration_hub` → `017_billing_webhook_failures`
+→ `018_submission_notifications` → `019_support_chat`
 
 Migration 015 in full: voice-note columns on `messages`
 (`voice_note_path`, `voice_note_duration_sec`, `voice_note_language`,
@@ -122,9 +124,27 @@ leave no admin-visible row (the 500/retry behaviour is unchanged).
 Surfaced in Admin → Billing → Transactions ("Webhook processing
 failures").
 
+Migration 018 in full: contact-form notification tracking columns on
+`submissions` (`notification_status` / `_provider_id` / `_error` /
+`_attempts` / `_sent_at` / `_recipient`) — the durable outcome of the
+Resend notification for each contact-form submission. RLS posture
+unchanged from 007 (enabled, no client policies).
+
+Migration 019 in full: the eight support-chat tables (`support_*`) —
+conversations, messages (monotonic `sequence_no` polling cursor,
+idempotent send retries), knowledge categories + entries (answerable
+only when published + enabled + indexed), saved replies, the
+settings singleton, support agents, and the append-only conversation
+event timeline. RLS enabled with **no** client policies on all eight;
+all access is service-role through `/api/support/*` and
+`/api/admin/support/*`. No SQL seed — content seeds idempotently
+from the app layer on first use (SETUP.md §17). The transport is
+short-interval API polling, **not** Realtime/WebSocket; admin-inbox
+Realtime is a documented optional phase 2.
+
 Post-migration checklist:
 
-- [ ] All 17 ran without errors (SQL Editor history). (014 creates
+- [ ] All 19 ran without errors (SQL Editor history). (014 creates
       `oauth_connections` — RLS enabled with **no** client policies by
       design; it must show "RLS enabled" with zero policies.)
 - [ ] RLS is enabled on every public table (Database → Tables — no
@@ -149,6 +169,15 @@ Post-migration checklist:
 - Authentication → Providers → Email: decide "Confirm email" on/off;
   the app handles both (workspace is created at first sign-in when
   confirmation is on).
+- **Google Sign-In**: the provider's client ID and secret live in
+  **Supabase → Authentication → Providers → Google** — they are NOT
+  Vercel environment variables and never appear in app env or client
+  code. They belong to a dedicated Google OAuth client whose only
+  Authorized redirect URI is
+  `https://<project-ref>.supabase.co/auth/v1/callback` — do not reuse
+  the Gmail mailbox client (`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`,
+  §2/SETUP.md §15). Full owner runbook: SETUP.md §3 ("Google Sign-In
+  setup").
 
 ### Resend
 

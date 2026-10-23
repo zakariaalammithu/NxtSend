@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Header } from "@/components/marketing/Header";
 import { Footer } from "@/components/marketing/Footer";
+import { SupportWidget } from "@/components/support/SupportWidget";
 
 export const metadata: Metadata = {
   title: {
@@ -57,6 +58,7 @@ export default function MarketingLayout({
         {children}
       </main>
       <Footer />
+      <SupportWidget />
     </>
   );
 }

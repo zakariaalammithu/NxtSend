@@ -1,5 +1,6 @@
 import * as React from "react";
 import Link from "next/link";
+import { Logo } from "@/components/brand/Logo";
 import { CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
 
 export default function AuthLayout({
@@ -18,16 +19,13 @@ export default function AuthLayout({
 
         {/* Brand Logo at top */}
         <div className="relative z-10">
-          <Link href="/" className="inline-flex items-center gap-2.5 group">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo.png"
-              alt="NxtSend"
-              className="h-10 w-10 object-contain group-hover:scale-105 transition-transform"
+          <Link href="/" className="inline-flex group">
+            <Logo
+              size={40}
+              wordmarkGradient
+              className="transition-transform group-hover:scale-105"
+              wordmarkClassName="text-22 font-extrabold font-sans"
             />
-            <span className="text-22 font-extrabold tracking-tight text-white font-sans">
-              Nxt<span className="text-gradient-brand">Send</span>
-            </span>
           </Link>
         </div>
 
@@ -98,16 +96,12 @@ export default function AuthLayout({
       <div className="flex-1 flex flex-col justify-center items-center px-4 py-8 sm:px-8 sm:py-12 relative overflow-y-auto">
         {/* Mobile Header Logo */}
         <div className="lg:hidden mb-8 text-center">
-          <Link href="/" className="inline-flex items-center gap-2 group">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo.png"
-              alt="NxtSend"
-              className="h-9 w-9 object-contain"
+          <Link href="/" className="inline-flex group">
+            <Logo
+              size={36}
+              wordmarkGradient
+              wordmarkClassName="text-20 font-sans"
             />
-            <span className="text-20 font-bold tracking-tight text-white font-sans">
-              Nxt<span className="text-gradient-brand">Send</span>
-            </span>
           </Link>
         </div>
 

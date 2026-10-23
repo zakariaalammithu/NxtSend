@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSubmissionRecord } from "@/lib/admin/platform-server";
+import {
+  createSubmissionRecord,
+  notifyContactSubmission,
+} from "@/lib/admin/platform-server";
 import {
   createRateLimiter,
+  isHoneypotTripped,
   validateSubmissionInput,
 } from "@/lib/admin/submissions-core";
+import { getDataMode } from "@/lib/data/mode";
+import { generateId } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -19,10 +25,21 @@ export const dynamic = "force-dynamic";
  * admins under Admin → Submissions.
  *
  * Defences: server-side validation mirroring the forms' own schemas
- * (the API never trusts the client), length caps, and a per-IP
- * in-memory rate limit (best-effort on serverless — see
- * submissions-core). No auth: this is a public contact endpoint by
- * design, and it can only CREATE unread submission rows.
+ * (the API never trusts the client), length caps enforced by
+ * REJECTION (over-limit → 400, never silent truncation), a honeypot
+ * field (tripped → generic success shape, nothing stored, nothing
+ * sent), and a per-IP in-memory rate limit (best-effort on
+ * serverless — see submissions-core). No auth: this is a public
+ * contact endpoint by design, and it can only CREATE unread
+ * submission rows.
+ *
+ * Contact submissions (source "contact" only) trigger an email
+ * notification to CONTACT_NOTIFICATION_EMAIL after persistence
+ * (P10 Stage C, migration 018). The notification outcome is recorded
+ * on the row; the visitor's response NEVER depends on it — a stored
+ * message with a failed/unconfigured notification is still a
+ * successful submission, and no response ever claims an email was
+ * sent.
  */
 
 const limiter = createRateLimiter({ maxAttempts: 5, windowMs: 10 * 60 * 1000 });
@@ -48,9 +65,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const validation = validateSubmissionInput(
-    (body ?? {}) as Record<string, unknown>
-  );
+  const rawBody = (body ?? {}) as Record<string, unknown>;
+
+  // Honeypot: a filled hidden field means a bot. Answer with the
+  // generic success shape — but store nothing and send nothing, so
+  // the trap is indistinguishable from a real success.
+  if (isHoneypotTripped(rawBody)) {
+    return NextResponse.json(
+      { ok: true, id: generateId(), mode: getDataMode() },
+      { status: 201 }
+    );
+  }
+
+  const validation = validateSubmissionInput(rawBody);
   if (!validation.ok) {
     return NextResponse.json(
       { error: "Validation failed", fields: validation.errors },
@@ -60,6 +87,31 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await createSubmissionRecord(validation.value);
+
+    // Notification step — contact enquiries only, AFTER the row is
+    // safely stored. Fully best-effort: any failure here is recorded
+    // on the row (or logged) and never changes the visitor's 201.
+    if (validation.value.source === "contact") {
+      try {
+        await notifyContactSubmission(result.mode, {
+          id: result.id,
+          source: "contact",
+          name: validation.value.name,
+          email: validation.value.email,
+          subject: validation.value.subject,
+          message: validation.value.message,
+          created_at: new Date().toISOString(),
+          notification_attempts: 0,
+          notification_sent_at: null,
+        });
+      } catch (err) {
+        console.error(
+          "[Submissions] Notification step failed (submission kept):",
+          err
+        );
+      }
+    }
+
     return NextResponse.json(
       { ok: true, id: result.id, mode: result.mode },
       { status: 201 }

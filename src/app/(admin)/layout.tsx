@@ -10,9 +10,11 @@ import {
   DollarSign, SlidersHorizontal, Mail, Table, Sparkles, Bot, Blocks,
   Wand2, ListOrdered, Radio, MonitorSmartphone, Settings2, HeartPulse,
   FlaskConical, Stethoscope, KeyRound, Siren, MailCheck, PlugZap,
+  MessagesSquare, BookOpen, Reply,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/brand/Logo";
 import { createClient } from "@/lib/supabase/client";
 import { ADMIN_NAV_GROUPS } from "@/lib/admin/nav";
 
@@ -28,6 +30,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   Table, Sparkles, Bot, Blocks, Wand2, ListOrdered, Radio,
   MonitorSmartphone, Settings2, HeartPulse, FlaskConical, Stethoscope,
   KeyRound, Siren, MailCheck, PlugZap,
+  MessagesSquare, BookOpen, Reply,
 };
 
 export default function AdminLayout({
@@ -69,18 +72,16 @@ export default function AdminLayout({
               isCollapsed && "justify-center w-full"
             )}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo.png"
-              alt="NxtSend"
-              className="h-8 w-8 shrink-0 object-contain"
-            />
-            {!isCollapsed && (
+            {isCollapsed ? (
+              <Logo variant="mark" size={32} />
+            ) : (
               <div className="flex flex-col">
-                <span className="text-16 font-bold tracking-tight text-white leading-tight">
-                  Nxt<span className="text-gradient-brand">Send</span>
-                </span>
-                <span className="text-10 font-bold uppercase tracking-wider text-rose-400">
+                <Logo
+                  size={32}
+                  wordmarkGradient
+                  wordmarkClassName="text-16 leading-tight"
+                />
+                <span className="pl-[42px] text-10 font-bold uppercase tracking-wider text-rose-400">
                   Admin Panel
                 </span>
               </div>

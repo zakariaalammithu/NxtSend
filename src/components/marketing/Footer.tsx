@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
+import { Logo } from "@/components/brand/Logo";
+import { BRAND_TAGLINE } from "@/lib/brand";
 import { Linkedin, Facebook } from "lucide-react";
 interface FooterLink {
   label: string;
@@ -13,7 +15,12 @@ interface FooterColumn {
   links: FooterLink[];
 }
 
-/* Footer columns — every link points at a route that exists. */
+/* Footer columns (P10) — every link points at a route that exists, and
+   every anchor at an id that exists on the target page. There is no
+   public Features, Campaigns or About route, so those labels are not
+   linked: campaign help lives under Resources as the /support#campaigns
+   guide. Legal links live in Company & Legal; the bottom row stays
+   slim (copyright + contact email only). */
 export const FOOTER_COLUMNS: FooterColumn[] = [
   {
     title: "Product",
@@ -22,20 +29,29 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
       { label: "Avatars", href: "/avatars" },
       { label: "Agency", href: "/agency" },
       { label: "Pricing", href: "/pricing" },
+      { label: "Developers", href: "/developers" },
+      { label: "Get Started", href: "/signup" },
     ],
   },
   {
     title: "Resources",
     links: [
-      { label: "Academy", href: "/academy" },
       { label: "Help & Support", href: "/support" },
-      { label: "Developers", href: "/developers" },
-      { label: "Contact", href: "/contact" },
+      { label: "Academy", href: "/academy" },
+      { label: "FAQ", href: "/support#faq" },
+      { label: "Getting Started", href: "/support#getting-started" },
+      { label: "Campaign Setup", href: "/support#campaigns" },
+      { label: "Contact Us", href: "/contact" },
     ],
   },
   {
-    title: "Company",
-    links: [{ label: "Book a Demo", href: "/demo" }],
+    title: "Company & Legal",
+    links: [
+      { label: "Book a Demo", href: "/demo" },
+      { label: "Terms & Conditions", href: "/terms" },
+      { label: "Privacy Policy", href: "/privacy" },
+      { label: "Cookie Policy", href: "/cookies" },
+    ],
   },
 ];
 
@@ -56,9 +72,10 @@ const SOCIAL_LINKS = [
   },
 ];
 
-export function Footer() {
-  const [logoError, setLogoError] = useState<boolean>(false);
+const LINK_FOCUS =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500";
 
+export function Footer() {
   return (
     <footer className="relative w-full bg-black-900 px-3 pb-3 pt-2 text-white sm:px-4 sm:pb-4">
       {/* Large dark navy rounded container */}
@@ -71,32 +88,23 @@ export function Footer() {
 
         <div className="relative grid gap-12 lg:grid-cols-12">
           {/* Brand block */}
-          <div className="lg:col-span-5">
+          <div className="lg:col-span-4">
             <Link
               href="/"
-              className="inline-flex items-center gap-3 rounded-lg transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+              className={`inline-flex rounded-lg transition-opacity hover:opacity-90 ${LINK_FOCUS}`}
               aria-label="NxtSend Home"
             >
-              {!logoError ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src="/logo.png"
-                  alt="NxtSend"
-                  className="h-10 w-10 object-contain"
-                  onError={() => setLogoError(true)}
-                />
-              ) : (
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-brand text-17 font-extrabold text-white shadow-sm">
-                  N
-                </span>
-              )}
-              <span className="text-28 font-bold tracking-tight text-white">
-                NxtSend
-              </span>
+              <Logo size={40} className="gap-3" wordmarkClassName="text-28" />
             </Link>
 
-            <p className="mt-5 max-w-xs text-15 leading-relaxed text-black-400">
-              Scale your outreach. Automate your growth.
+            <p className="mt-5 max-w-sm text-15 leading-relaxed text-black-400">
+              NxtSend brings LinkedIn and email outreach into one workspace —
+              campaigns, rented profiles and personalised messaging, with
+              every reply in a single inbox.
+            </p>
+
+            <p className="mt-4 text-15 font-semibold text-white">
+              {BRAND_TAGLINE}
             </p>
 
             <div className="mt-6 flex items-center gap-3">
@@ -107,7 +115,7 @@ export function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={label}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-black-300 transition-colors hover:border-purple-500/50 hover:text-white"
+                  className={`flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-black-300 transition-colors hover:border-purple-500/50 hover:text-white ${LINK_FOCUS}`}
                 >
                   <Icon className="h-[18px] w-[18px]" />
                 </a>
@@ -116,7 +124,7 @@ export function Footer() {
           </div>
 
           {/* Link columns */}
-          <div className="grid grid-cols-2 gap-10 sm:grid-cols-3 lg:col-span-7">
+          <div className="grid grid-cols-2 gap-10 sm:grid-cols-3 lg:col-span-8">
             {FOOTER_COLUMNS.map((column) => (
               <div key={column.title}>
                 <h3 className="text-13 font-bold uppercase tracking-[0.14em] text-white">
@@ -127,7 +135,7 @@ export function Footer() {
                     <li key={link.label}>
                       <Link
                         href={link.href}
-                        className="text-15 text-black-400 transition-colors duration-200 hover:text-white"
+                        className={`inline-block rounded text-15 text-black-400 transition-colors duration-200 hover:text-white ${LINK_FOCUS}`}
                       >
                         {link.label}
                       </Link>
@@ -139,20 +147,18 @@ export function Footer() {
           </div>
         </div>
 
-        {/* Bottom bar */}
+        {/* Bottom bar — slim: dynamic copyright + the public contact email.
+            Legal links live in the Company & Legal column above. */}
         <div className="relative mt-14 flex flex-col gap-3 border-t border-white/5 pt-7 text-13 text-black-500 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-5">
-            <Link href="/terms" className="transition-colors hover:text-white">
-              Terms Of Service
-            </Link>
-            <Link href="/privacy" className="transition-colors hover:text-white">
-              Privacy Policy
-            </Link>
-            <Link href="/cookies" className="transition-colors hover:text-white">
-              Cookie Policy
-            </Link>
-          </div>
-          <span>© 2025 NxtSend. All rights reserved.</span>
+          <span>
+            © {new Date().getFullYear()} NxtSend. All rights reserved.
+          </span>
+          <a
+            href="mailto:hello@nxtsend.com"
+            className={`rounded transition-colors hover:text-white ${LINK_FOCUS}`}
+          >
+            hello@nxtsend.com
+          </a>
         </div>
       </div>
     </footer>

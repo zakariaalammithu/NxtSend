@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Logo } from "@/components/brand/Logo";
 import { ArrowRight, LayoutDashboard, MessagesSquare } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -13,12 +14,8 @@ export default function NotFound() {
     <div className="flex min-h-screen w-full flex-col overflow-x-clip bg-black-900 text-white">
       {/* Brand bar */}
       <header className="mx-auto flex w-full max-w-7xl items-center px-6 py-6">
-        <Link href="/" className="inline-flex items-center gap-2.5" aria-label="NxtSend Home">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="NxtSend" className="h-9 w-9 object-contain" />
-          <span className="text-20 font-extrabold tracking-tight text-white">
-            Nxt<span className="text-gradient-brand">Send</span>
-          </span>
+        <Link href="/" className="inline-flex" aria-label="NxtSend Home">
+          <Logo size={36} wordmarkGradient wordmarkClassName="text-20 font-extrabold" />
         </Link>
       </header>
 

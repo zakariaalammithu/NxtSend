@@ -8,6 +8,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
 import { ensureDefaultWorkspace } from "@/lib/auth/workspace";
+import {
+  authErrorMessage,
+  sanitizeRedirectTarget,
+} from "@/lib/auth/oauth";
+import ContinueWithGoogleButton, {
+  AuthOrDivider,
+} from "@/components/auth/ContinueWithGoogleButton";
 import { recordPendingReferral } from "@/lib/referrals/capture";
 import { Eye, EyeOff, Loader2, AlertCircle, ArrowRight } from "lucide-react";
 
@@ -18,8 +25,19 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
-export default function LoginForm() {
+export default function LoginForm({
+  redirect,
+  errorCode,
+}: {
+  /** Post-login target from middleware's ?redirect= (sanitised here). */
+  redirect?: string;
+  /** Safe error code from /auth/callback's ?error=, if any. */
+  errorCode?: string;
+}) {
   const router = useRouter();
+  // One canonical post-login target: password login and Google
+  // Sign-In both land on the sanitised middleware-supplied target.
+  const target = sanitizeRedirectTarget(redirect);
 
   // Demo entry is offered ONLY when Supabase is not configured (demo mode).
   // When auth is live, the bypass button is not rendered at all — previously
@@ -40,7 +58,12 @@ export default function LoginForm() {
 
   const [showPassword, setShowPassword] = React.useState(false);
   const [demoNotice, setDemoNotice] = React.useState<string | null>(null);
-  const [serverError, setServerError] = React.useState<string | null>(null);
+  // A callback error code (Google cancelled/failed, suspended) is
+  // surfaced through the same rose alert as password errors. Unknown
+  // codes render nothing — raw provider text is never reflected.
+  const [serverError, setServerError] = React.useState<string | null>(() =>
+    authErrorMessage(errorCode)
+  );
 
   const {
     register,
@@ -118,7 +141,7 @@ export default function LoginForm() {
       // now that they are signed in (best-effort, never blocks login).
       await recordPendingReferral();
 
-      router.push("/dashboard");
+      router.push(target);
       router.refresh();
     } catch {
       setServerError("An unexpected error occurred. Please try again.");
@@ -161,6 +184,13 @@ export default function LoginForm() {
           <span>{serverError}</span>
         </div>
       )}
+
+      {/* Google Sign-In — outside the credential form; in Demo Mode
+          the button renders disabled with an explanatory note. */}
+      <div className="mb-2">
+        <ContinueWithGoogleButton redirect={target} />
+        <AuthOrDivider />
+      </div>
 
       {/* Form */}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>

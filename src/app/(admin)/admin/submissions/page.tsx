@@ -12,11 +12,39 @@ import {
   fmtDateTime,
   useAdminFetch,
 } from "@/components/admin/AdminBits";
-import type { Submission } from "@/lib/admin/submissions-core";
+import type {
+  Submission,
+  SubmissionNotificationStatus,
+} from "@/lib/admin/submissions-core";
 
 interface SubmissionsResponse {
   mode: string;
   submissions: Submission[];
+}
+
+const NOTIFICATION_BADGES: Record<
+  SubmissionNotificationStatus,
+  { label: string; variant: "green" | "red" | "yellow" | "gray" | "orange" }
+> = {
+  sent: { label: "Notification sent", variant: "green" },
+  failed: { label: "Notification failed", variant: "red" },
+  not_configured: { label: "Notification not configured", variant: "yellow" },
+  simulated: { label: "Notification simulated (demo)", variant: "orange" },
+  pending: { label: "Notification pending", variant: "gray" },
+};
+
+function NotificationBadge({
+  status,
+}: {
+  status: SubmissionNotificationStatus | null;
+}) {
+  if (!status) return null;
+  const badge = NOTIFICATION_BADGES[status];
+  return (
+    <Badge variant={badge.variant} size="sm">
+      {badge.label}
+    </Badge>
+  );
 }
 
 /**
@@ -56,6 +84,40 @@ export default function AdminSubmissionsPage() {
   const unreadCount = (data?.submissions ?? []).filter(
     (s) => s.status === "unread"
   ).length;
+
+  const [retryingId, setRetryingId] = React.useState<string | null>(null);
+
+  async function retryNotification(submission: Submission) {
+    setRetryingId(submission.id);
+    try {
+      const res = await fetch("/api/admin/submissions/retry-notification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: submission.id }),
+      });
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const body = (await res.json()) as {
+        notification_status?: SubmissionNotificationStatus | null;
+      };
+      if (selected?.id === submission.id && body.notification_status) {
+        setSelected({
+          ...submission,
+          notification_status: body.notification_status,
+          notification_attempts:
+            submission.notification_attempts +
+            (body.notification_status === "not_configured" ||
+            body.notification_status === "simulated"
+              ? 0
+              : 1),
+        });
+      }
+      reload();
+    } catch {
+      reload();
+    } finally {
+      setRetryingId(null);
+    }
+  }
 
   async function toggleStatus(submission: Submission) {
     const next = submission.status === "unread" ? "read" : "unread";
@@ -172,6 +234,11 @@ export default function AdminSubmissionsPage() {
                       {s.source === "demo" ? "Demo booking" : "Contact form"} ·{" "}
                       {fmtDateTime(s.created_at)}
                     </p>
+                    {s.source === "contact" && s.notification_status && (
+                      <span className="mt-2 inline-block">
+                        <NotificationBadge status={s.notification_status} />
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -224,6 +291,80 @@ export default function AdminSubmissionsPage() {
                         {selected.message}
                       </p>
                     </div>
+                    {selected.source === "contact" && (
+                      <div>
+                        <p className="text-11 font-bold uppercase tracking-wider text-black-500">
+                          Email notification
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <NotificationBadge status={selected.notification_status} />
+                          {selected.notification_status === null && (
+                            <span className="text-13 text-black-400">
+                              Not attempted
+                            </span>
+                          )}
+                          {(selected.notification_status === "failed" ||
+                            selected.notification_status === "not_configured") && (
+                            <button
+                              type="button"
+                              disabled={retryingId === selected.id}
+                              onClick={() => retryNotification(selected)}
+                              className="inline-flex items-center gap-2 rounded-xl border border-black-600 bg-black-800 px-3 py-1.5 text-12 font-semibold text-white hover:bg-black-700 disabled:opacity-50"
+                            >
+                              {retryingId === selected.id
+                                ? "Retrying…"
+                                : "Retry notification"}
+                            </button>
+                          )}
+                        </div>
+                        <dl className="mt-2 space-y-1 text-13">
+                          {selected.notification_recipient && (
+                            <div className="flex gap-2">
+                              <dt className="text-black-400 font-medium">Recipient:</dt>
+                              <dd className="text-black-200">
+                                {selected.notification_recipient}
+                              </dd>
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                            <dt className="text-black-400 font-medium">Attempts:</dt>
+                            <dd className="text-black-200">
+                              {selected.notification_attempts}
+                            </dd>
+                          </div>
+                          {selected.notification_sent_at && (
+                            <div className="flex gap-2">
+                              <dt className="text-black-400 font-medium">Sent:</dt>
+                              <dd className="text-black-200">
+                                {fmtDateTime(selected.notification_sent_at)}
+                              </dd>
+                            </div>
+                          )}
+                          {selected.notification_provider_id && (
+                            <div className="flex gap-2">
+                              <dt className="text-black-400 font-medium">Provider ID:</dt>
+                              <dd className="text-black-200 font-mono text-12">
+                                {selected.notification_provider_id}
+                              </dd>
+                            </div>
+                          )}
+                          {selected.notification_error && (
+                            <div className="flex gap-2">
+                              <dt className="text-black-400 font-medium">Error:</dt>
+                              <dd className="text-rose-300">
+                                {selected.notification_error}
+                              </dd>
+                            </div>
+                          )}
+                        </dl>
+                        {selected.notification_status === "simulated" && (
+                          <p className="mt-2 text-12 text-black-500">
+                            Demo Mode: the submission is stored in the demo
+                            store only — no email was sent.
+                          </p>
+                        )}
+                      </div>
+                    )}
                     {Object.keys(selected.meta ?? {}).length > 0 && (
                       <div>
                         <p className="text-11 font-bold uppercase tracking-wider text-black-500">

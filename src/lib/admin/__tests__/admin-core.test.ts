@@ -6,6 +6,7 @@ import {
 import {
   validateSubmissionInput,
   createRateLimiter,
+  isHoneypotTripped,
 } from "../submissions-core";
 import {
   DEFAULT_ADMIN_SETTINGS,
@@ -142,6 +143,48 @@ describe("validateSubmissionInput", () => {
     const result = validateSubmissionInput({ ...valid, meta: "evil" });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.meta).toEqual({});
+  });
+
+  // P10 Stage C: over-limit fields are REJECTED with a per-field 400,
+  // never silently truncated (a truncated message reads as delivered
+  // while part of it is gone).
+  it("rejects over-limit fields instead of truncating them", () => {
+    const cases: Array<[Record<string, unknown>, string, RegExp]> = [
+      [{ name: "n".repeat(121) }, "name", /at most 120/],
+      [{ email: `${"e".repeat(245)}@example.com` }, "email", /at most 254/],
+      [{ subject: "s".repeat(201) }, "subject", /at most 200/],
+      [{ company: "c".repeat(161) }, "company", /at most 160/],
+      [{ message: "m".repeat(5001) }, "message", /at most 5000/],
+    ];
+    for (const [patch, field, pattern] of cases) {
+      const result = validateSubmissionInput({ ...valid, ...patch });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.errors[field]).toMatch(pattern);
+    }
+  });
+
+  it("accepts fields exactly at the limit", () => {
+    const result = validateSubmissionInput({
+      ...valid,
+      name: "n".repeat(120),
+      subject: "s".repeat(200),
+      message: "m".repeat(5000),
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.name).toHaveLength(120);
+      expect(result.value.message).toHaveLength(5000);
+    }
+  });
+});
+
+describe("isHoneypotTripped", () => {
+  it("trips only on a non-empty honeypot value", () => {
+    expect(isHoneypotTripped({ website: "http://spam.example" })).toBe(true);
+    expect(isHoneypotTripped({ website: "" })).toBe(false);
+    expect(isHoneypotTripped({ website: "   " })).toBe(false);
+    expect(isHoneypotTripped({})).toBe(false);
+    expect(isHoneypotTripped({ website: 42 })).toBe(false);
   });
 });
 
@@ -418,9 +461,10 @@ describe("mergeNotifications", () => {
 describe("ADMIN_NAV_GROUPS", () => {
   const allItems = ADMIN_NAV_GROUPS.flatMap((g) => g.items);
 
-  it("has the six brief groups in order", () => {
+  it("has the brief groups in order, with Support after Admin", () => {
     expect(ADMIN_NAV_GROUPS.map((g) => g.label)).toEqual([
       "Admin",
+      "Support",
       "Analytics",
       "Billing",
       "Integrations",
@@ -440,6 +484,10 @@ describe("ADMIN_NAV_GROUPS", () => {
       "CRM",
       "Submissions",
       "Notifications",
+      "Support Inbox",
+      "Knowledge Base",
+      "Saved Replies",
+      "Chat Settings",
       "Website Visitors",
       "Traffic Sources",
       "User Growth",

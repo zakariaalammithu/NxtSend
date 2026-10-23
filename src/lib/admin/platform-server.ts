@@ -26,12 +26,14 @@ import {
   demoAddSubmission,
   demoAppendAuditEntry,
   demoGetSettings,
+  demoGetSubmission,
   demoListAuditEntries,
   demoListJobRuns,
   demoListJobs,
   demoListSubmissions,
   demoSetSubmissionStatus,
   demoUpdateSettings,
+  demoUpdateSubmissionNotification,
   demoUsageSeeds,
 } from "./demo-server-store";
 import {
@@ -48,7 +50,15 @@ import {
   type AdminSettings,
   type PublicSettings,
 } from "./settings-core";
-import type { Submission } from "./submissions-core";
+import {
+  SUBMISSION_NOTIFICATION_STATUSES,
+  type Submission,
+  type SubmissionNotificationStatus,
+} from "./submissions-core";
+import {
+  getContactNotificationRecipient,
+  sendContactNotification,
+} from "@/lib/email/contact-notification";
 import { buildUsageRow, type WorkspaceUsageRow } from "./usage-core";
 import {
   mergeNotifications,
@@ -209,7 +219,17 @@ export async function createSubmissionRecord(input: {
 }): Promise<{ id: string; mode: DataMode }> {
   const mode = getDataMode();
   if (mode === "demo") {
-    const record = demoAddSubmission(input);
+    const record = demoAddSubmission({
+      ...input,
+      // Notification fields start empty; the route's notification
+      // step records the Demo Mode outcome ("simulated") on the row.
+      notification_status: null,
+      notification_provider_id: null,
+      notification_error: null,
+      notification_attempts: 0,
+      notification_sent_at: null,
+      notification_recipient: null,
+    });
     return { id: record.id, mode };
   }
   const admin = createAdminClient();
@@ -224,6 +244,10 @@ export async function createSubmissionRecord(input: {
       subject: input.subject,
       message: input.message,
       meta: input.meta,
+      // Contact submissions enter the notification pipeline as
+      // "pending" (migration 018); the route records the outcome
+      // immediately after. Demo bookings are never notified.
+      notification_status: input.source === "contact" ? "pending" : null,
     })
     .select("id")
     .single();
@@ -231,6 +255,34 @@ export async function createSubmissionRecord(input: {
     throw new Error(`Failed to store submission: ${error?.message ?? "no row"}`);
   }
   return { id: String(data.id), mode };
+}
+
+/** Maps a raw `submissions` row (service-role read) to a Submission. */
+function mapSubmissionRow(row: Record<string, unknown>): Submission {
+  const r = row;
+  const notifStatus = r.notification_status;
+  return {
+    id: String(r.id),
+    source: r.source === "demo" ? "demo" : "contact",
+    name: String(r.name ?? ""),
+    email: String(r.email ?? ""),
+    company: (r.company as string | null) ?? null,
+    subject: (r.subject as string | null) ?? null,
+    message: String(r.message ?? ""),
+    meta: (r.meta as Record<string, unknown>) ?? {},
+    status: r.status === "read" ? "read" : "unread",
+    created_at: String(r.created_at),
+    notification_status:
+      typeof notifStatus === "string" &&
+      (SUBMISSION_NOTIFICATION_STATUSES as readonly string[]).includes(notifStatus)
+        ? (notifStatus as SubmissionNotificationStatus)
+        : null,
+    notification_provider_id: (r.notification_provider_id as string | null) ?? null,
+    notification_error: (r.notification_error as string | null) ?? null,
+    notification_attempts: Number(r.notification_attempts ?? 0) || 0,
+    notification_sent_at: (r.notification_sent_at as string | null) ?? null,
+    notification_recipient: (r.notification_recipient as string | null) ?? null,
+  } satisfies Submission;
 }
 
 export async function listSubmissions(mode: DataMode): Promise<Submission[]> {
@@ -243,21 +295,23 @@ export async function listSubmissions(mode: DataMode): Promise<Submission[]> {
     .order("created_at", { ascending: false })
     .limit(200);
   if (error) throw new Error(`Failed to load submissions: ${error.message}`);
-  return (data ?? []).map((row) => {
-    const r = row as Record<string, unknown>;
-    return {
-      id: String(r.id),
-      source: r.source === "demo" ? "demo" : "contact",
-      name: String(r.name ?? ""),
-      email: String(r.email ?? ""),
-      company: (r.company as string | null) ?? null,
-      subject: (r.subject as string | null) ?? null,
-      message: String(r.message ?? ""),
-      meta: (r.meta as Record<string, unknown>) ?? {},
-      status: r.status === "read" ? "read" : "unread",
-      created_at: String(r.created_at),
-    } satisfies Submission;
-  });
+  return (data ?? []).map((row) => mapSubmissionRow(row as Record<string, unknown>));
+}
+
+export async function getSubmissionById(
+  mode: DataMode,
+  id: string
+): Promise<Submission | null> {
+  if (mode === "demo") return demoGetSubmission(id);
+  const admin = adminClientOr503();
+  if (admin instanceof NextResponse) return null;
+  const { data, error } = await admin
+    .from("submissions")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error || !data) return null;
+  return mapSubmissionRow(data as Record<string, unknown>);
 }
 
 export async function setSubmissionStatus(
@@ -270,6 +324,106 @@ export async function setSubmissionStatus(
   if (admin instanceof NextResponse) return false;
   const { error } = await admin.from("submissions").update({ status }).eq("id", id);
   return !error;
+}
+
+// ── Contact notification (P10 Stage C) ──────────────────────────────────────
+
+export interface SubmissionNotificationPatch {
+  notification_status: SubmissionNotificationStatus;
+  notification_provider_id: string | null;
+  notification_error: string | null;
+  notification_attempts: number;
+  notification_sent_at: string | null;
+  notification_recipient: string | null;
+}
+
+/**
+ * Records a notification outcome on a submission row. Best-effort by
+ * contract: a failed bookkeeping write must never fail the visitor's
+ * submission or an admin retry — it returns false instead.
+ */
+export async function updateSubmissionNotification(
+  mode: DataMode,
+  id: string,
+  patch: SubmissionNotificationPatch
+): Promise<boolean> {
+  if (mode === "demo") {
+    return demoUpdateSubmissionNotification(id, patch) !== null;
+  }
+  const admin = adminClientOr503();
+  if (admin instanceof NextResponse) return false;
+  const { error } = await admin
+    .from("submissions")
+    .update(patch)
+    .eq("id", id);
+  return !error;
+}
+
+/**
+ * Runs the contact-notification step for an already-stored
+ * submission and records the outcome on the row (migration 018).
+ * Used by POST /api/submissions right after persistence and by the
+ * admin retry route. Returns the resulting status, or null when the
+ * submission is not a contact enquiry (demo bookings are never
+ * notified).
+ *
+ * Demo Mode records "simulated" — the submission lives in the demo
+ * store and NO email is sent or claimed. Live mode delegates to the
+ * dedicated sender: sent / failed / not_configured exactly as the
+ * provider and env dictate. Attempts count only real provider calls
+ * (not_configured/simulated record +0).
+ */
+export async function notifyContactSubmission(
+  mode: DataMode,
+  submission: Pick<
+    Submission,
+    | "id"
+    | "source"
+    | "name"
+    | "email"
+    | "subject"
+    | "message"
+    | "created_at"
+    | "notification_attempts"
+    | "notification_sent_at"
+  >
+): Promise<SubmissionNotificationStatus | null> {
+  if (submission.source !== "contact") return null;
+
+  if (mode === "demo") {
+    await updateSubmissionNotification(mode, submission.id, {
+      notification_status: "simulated",
+      notification_provider_id: null,
+      notification_error: null,
+      notification_attempts: submission.notification_attempts,
+      notification_sent_at: null,
+      notification_recipient: getContactNotificationRecipient(),
+    });
+    return "simulated";
+  }
+
+  const result = await sendContactNotification({
+    id: submission.id,
+    name: submission.name,
+    email: submission.email,
+    subject: submission.subject,
+    message: submission.message,
+    created_at: submission.created_at,
+  });
+
+  const attempted = result.status !== "not_configured";
+  await updateSubmissionNotification(mode, submission.id, {
+    notification_status: result.status,
+    notification_provider_id: result.providerId,
+    notification_error: result.error,
+    notification_attempts: submission.notification_attempts + (attempted ? 1 : 0),
+    notification_sent_at:
+      result.status === "sent"
+        ? new Date().toISOString()
+        : submission.notification_sent_at,
+    notification_recipient: result.recipient,
+  });
+  return result.status;
 }
 
 // ── Settings ────────────────────────────────────────────────────────────────

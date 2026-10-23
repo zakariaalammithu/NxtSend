@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/brand/Logo";
 import {
   MenuIcon,
   XIcon,
@@ -70,7 +71,6 @@ export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [mobileProductExpanded, setMobileProductExpanded] = useState<boolean>(true);
   const [productDropdownOpen, setProductDropdownOpen] = useState<boolean>(false);
-  const [logoError, setLogoError] = useState<boolean>(false);
 
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -151,34 +151,13 @@ export function Header() {
               : "max-w-7xl"
           )}
         >
-          {/* Logo: /logo.png with fallback to gradient text */}
+          {/* Logo: shared brand component (mark + wordmark, built-in fallbacks) */}
           <Link
             href="/"
-            className="flex items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 transition-opacity hover:opacity-90"
+            className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 transition-opacity hover:opacity-90"
             aria-label="NxtSend Home"
           >
-            {!logoError ? (
-              <span className="flex items-center gap-2.5">
-                <img
-                  src="/logo.png"
-                  alt="NxtSend"
-                  className="h-8 w-auto object-contain"
-                  onError={() => setLogoError(true)}
-                />
-                <span className="font-bold text-20 tracking-tight text-white">
-                  NxtSend
-                </span>
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-brand text-white font-extrabold text-13 shadow-sm">
-                  N
-                </span>
-                <span className="text-gradient-brand font-bold text-20 tracking-tight">
-                  NxtSend
-                </span>
-              </span>
-            )}
+            <Logo size={32} wordmarkClassName="text-20" />
           </Link>
 
           {/* Desktop Navigation (lg+ breakpoint) */}
@@ -374,31 +353,10 @@ export function Header() {
           <Link
             href="/"
             onClick={() => setMobileMenuOpen(false)}
-            className="flex items-center gap-2.5 focus:outline-none"
+            className="focus:outline-none"
             aria-label="NxtSend Home"
           >
-            {!logoError ? (
-              <span className="flex items-center gap-2.5">
-                <img
-                  src="/logo.png"
-                  alt="NxtSend"
-                  className="h-8 w-auto object-contain"
-                  onError={() => setLogoError(true)}
-                />
-                <span className="font-bold text-20 tracking-tight text-white">
-                  NxtSend
-                </span>
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-brand text-white font-extrabold text-13 shadow-sm">
-                  N
-                </span>
-                <span className="text-gradient-brand font-bold text-20 tracking-tight">
-                  NxtSend
-                </span>
-              </span>
-            )}
+            <Logo size={32} wordmarkClassName="text-20" />
           </Link>
 
           <button

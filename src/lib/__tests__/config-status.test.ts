@@ -88,9 +88,10 @@ describe("buildConfigStatus", () => {
     const email = matrix.groups.find((g) => g.group === "email");
     expect(email?.placeholder).toBe(1);
     // Only RESEND_API_KEY is set here (as a placeholder); the other
-    // five email vars (EMAIL_FROM, RESEND_WEBHOOK_SECRET,
-    // EMAIL_REPLY_TO, UNSUBSCRIBE_SECRET, INSTANTLY_API_KEY) are missing.
-    expect(email?.missing).toBe(5);
+    // six email vars (EMAIL_FROM, CONTACT_NOTIFICATION_EMAIL,
+    // RESEND_WEBHOOK_SECRET, EMAIL_REPLY_TO, UNSUBSCRIBE_SECRET,
+    // INSTANTLY_API_KEY) are missing.
+    expect(email?.missing).toBe(6);
   });
 
   it("never includes values in its output", () => {

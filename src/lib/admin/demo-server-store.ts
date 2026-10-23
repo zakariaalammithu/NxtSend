@@ -53,6 +53,28 @@ export function demoSetSubmissionStatus(
   return found;
 }
 
+export function demoGetSubmission(id: string): Submission | null {
+  return submissions.find((s) => s.id === id) ?? null;
+}
+
+export function demoUpdateSubmissionNotification(
+  id: string,
+  patch: Pick<
+    Submission,
+    | "notification_status"
+    | "notification_provider_id"
+    | "notification_error"
+    | "notification_attempts"
+    | "notification_sent_at"
+    | "notification_recipient"
+  >
+): Submission | null {
+  const found = submissions.find((s) => s.id === id);
+  if (!found) return null;
+  Object.assign(found, patch);
+  return found;
+}
+
 // ── Audit trail ─────────────────────────────────────────────────────────────
 
 function seedAuditEntries(): AuditEntry[] {

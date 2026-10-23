@@ -30,6 +30,7 @@ const CATALOG = [
   ["ADMIN_BOOTSTRAP_SECRET", "core", false],
   ["RESEND_API_KEY", "email", false],
   ["EMAIL_FROM", "email", false],
+  ["CONTACT_NOTIFICATION_EMAIL", "email", false],
   ["RESEND_WEBHOOK_SECRET", "email", false],
   ["EMAIL_REPLY_TO", "email", false],
   ["UNSUBSCRIBE_SECRET", "email", false],

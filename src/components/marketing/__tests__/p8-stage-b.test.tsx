@@ -3,8 +3,10 @@
  *
  * - Header nav carries "Developers" right after "Agency" (one data
  *   source feeds both the desktop nav and the mobile menu).
- * - Footer Resources column links /support + /developers, and the
- *   bottom legal row links /cookies (previously orphaned).
+ * - Footer links Help & Support at /support and the legal pages
+ *   (/terms, /privacy, /cookies — previously /cookies was orphaned).
+ *   (P10 later moved the legal links into the footer Company & Legal
+ *   column and Developers into Product; see p10-footer.test.tsx.)
  * - /developers documents ONLY what the code implements (outbound
  *   webhooks) and labels the public API "Coming Soon" / "API Access
  *   Required" — with no invented endpoints and no rate-limit numbers.
@@ -50,15 +52,15 @@ describe("P8 Stage B — navigation", () => {
     expect(developers?.href).toBe("/developers");
   });
 
-  it("footer Resources column links Help & Support and Developers", () => {
+  it("footer Resources column links Help & Support", () => {
     const resources = FOOTER_COLUMNS.find((col) => col.title === "Resources");
     expect(resources).toBeDefined();
     const byLabel = new Map(resources!.links.map((l) => [l.label, l.href]));
     expect(byLabel.get("Help & Support")).toBe("/support");
-    expect(byLabel.get("Developers")).toBe("/developers");
+    expect(byLabel.get("Contact Us")).toBe("/contact");
   });
 
-  it("footer bottom legal row links the Cookie Policy", () => {
+  it("footer links the legal pages (Company & Legal column since P10)", () => {
     const html = render(<Footer />);
     expect(html).toContain('href="/cookies"');
     expect(html).toContain("Cookie Policy");

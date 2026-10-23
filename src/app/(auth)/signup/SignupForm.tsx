@@ -8,6 +8,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
 import { ensureDefaultWorkspace } from "@/lib/auth/workspace";
+import {
+  authErrorMessage,
+  sanitizeRedirectTarget,
+} from "@/lib/auth/oauth";
+import ContinueWithGoogleButton, {
+  AuthOrDivider,
+} from "@/components/auth/ContinueWithGoogleButton";
 import { trackPixelEvent } from "@/components/analytics/MetaPixel";
 import {
   recordPendingReferral,
@@ -51,8 +58,17 @@ function getPasswordStrength(password: string): {
   return { score: 4, label: "Strong", color: "bg-emerald-400" };
 }
 
-export default function SignupForm() {
+export default function SignupForm({
+  redirect,
+  errorCode,
+}: {
+  /** Post-login target from ?redirect= (sanitised here). */
+  redirect?: string;
+  /** Safe error code from ?error=, if any. */
+  errorCode?: string;
+}) {
   const router = useRouter();
+  const target = sanitizeRedirectTarget(redirect);
   // Admin "Close signups" flag (System Settings / Emergency Controls).
   // Read from the public settings endpoint; while it loads, the form
   // renders as usual — when it reports closed, the form is replaced by
@@ -89,7 +105,9 @@ export default function SignupForm() {
   const [demoNotice, setDemoNotice] = React.useState<string | null>(null);
   const [confirmationNotice, setConfirmationNotice] =
     React.useState<string | null>(null);
-  const [serverError, setServerError] = React.useState<string | null>(null);
+  const [serverError, setServerError] = React.useState<string | null>(() =>
+    authErrorMessage(errorCode)
+  );
 
   const {
     register,
@@ -172,7 +190,7 @@ export default function SignupForm() {
       // exists (best-effort, never blocks the redirect).
       await recordPendingReferral();
 
-      router.push("/dashboard");
+      router.push(target);
       router.refresh();
     } catch {
       setServerError("An unexpected error occurred during signup.");
@@ -197,6 +215,20 @@ export default function SignupForm() {
           <Link href="/login" className="font-semibold text-purple-400 hover:text-purple-300">
             Go to sign in →
           </Link>
+        </div>
+        {/* Google sign-up is gated by the same flag. NOTE: this flag
+            is a UI/operational gate, NOT a hard server-side block —
+            Supabase creates the auth user during the OAuth round-trip
+            before the app callback runs, so a crafted direct OAuth
+            start cannot be stopped here. A hard stop lives in
+            Supabase (disable signups / the Google provider). See
+            SETUP.md §3. */}
+        <div className="mt-6">
+          <ContinueWithGoogleButton
+            redirect={target}
+            disabled
+            disabledNote="Google sign-up is unavailable while signups are closed."
+          />
         </div>
       </div>
     );
@@ -246,6 +278,26 @@ export default function SignupForm() {
           <span>{serverError}</span>
         </div>
       )}
+
+      {/* Google Sign-Up — outside the credential form (the password
+          form's terms checkbox cannot cover the OAuth path, so the
+          agreement copy sits directly under the button). In Demo
+          Mode the button renders disabled with an explanatory note. */}
+      <div className="mb-2">
+        <ContinueWithGoogleButton redirect={target} />
+        <p className="mt-2.5 text-12 text-black-400 text-center">
+          By continuing with Google you agree to the{" "}
+          <Link href="/terms" className="text-purple-400 hover:underline hover:text-purple-300">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="text-purple-400 hover:underline hover:text-purple-300">
+            Privacy Policy
+          </Link>
+          .
+        </p>
+        <AuthOrDivider />
+      </div>
 
       {/* Form */}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>

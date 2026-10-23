@@ -50,6 +50,8 @@ Open **SQL Editor** in the Supabase dashboard and run each file from
 | 15 | `015_voice_notes.sql` | Voice notes (P6 Stage C): `messages` gains `voice_note_path` / `voice_note_duration_sec` / `voice_note_language` / `transcript`, plus the **private** Supabase Storage bucket `voice-notes` (public = false, 10 MB cap, audio MIME allowlist) with storage RLS policies scoping objects to workspaces the caller belongs to (first path segment = workspace id). Audio bytes live in the bucket, never in the table; playback goes through a server route using short-lived signed URLs. A voice note is delivered as an **email attachment only** — there is no LinkedIn voice-note delivery |
 | 16 | `016_integration_hub.sql` | Integration Hub (P7): `hub_integrations`, `hub_credentials`, `hub_test_accounts`, `hub_checklist_items`, `hub_checklist_state`, `hub_documents`. Credential values exist ONLY as AES-256-GCM ciphertext (`value_enc`, keyed by `INTEGRATION_HUB_ENCRYPTION_KEY`) — no plaintext column exists. **RLS enabled with NO client policies on all six tables — service-role only**, behind the admin gate. Seeds the six BRR records (Muse connector `in_review`, the other five `configuring`), their checklists/documents and 8 Hub-global templates — all idempotent (`ON CONFLICT DO NOTHING`), and **no credentials and no test accounts**. See §16 |
 | 17 | `017_billing_webhook_failures.sql` | Billing webhook failure log (P9): `billing_webhook_failures` — one row per FAILED Stripe webhook processing attempt (event id + type, error summary truncated to 500 chars, `resolved` flag set when a redelivery of the same event later succeeds; rows are never deleted). **RLS enabled with NO client policies — service-role only.** Written best-effort by the webhook handler AFTER its exactly-once idempotency rollback, so until 017 is applied failed events leave no admin-visible row (the 500/retry behaviour is unchanged). Surfaced in Admin → Billing → Transactions ("Webhook processing failures") |
+| 18 | `018_submission_notifications.sql` | Contact-form notification tracking (P10): `submissions` gains `notification_status` (`pending`/`sent`/`failed`/`not_configured`/`simulated`, CHECK-constrained, NULL = not applicable), `notification_provider_id`, `notification_error` (sanitised, ≤500 chars), `notification_attempts`, `notification_sent_at`, `notification_recipient` — the durable outcome of the Resend notification sent to `CONTACT_NOTIFICATION_EMAIL` for each contact-form submission. RLS posture unchanged from 007 (enabled, no client policies — service-role only). Surfaced in Admin → Submissions with a retry action |
+| 19 | `019_support_chat.sql` | Website support chat (P10): `support_conversations`, `support_messages` (monotonic `sequence_no` polling cursor; partial-unique `client_message_id` for idempotent send retries), `support_knowledge_categories`, `support_knowledge` (app-maintained `search_text`/`content_hash`/`indexed_at` — an entry is answerable only when published + enabled + indexed, in an enabled category), `support_saved_replies`, `support_settings` (singleton), `support_agents`, `support_conversation_events` (append-only timeline). **RLS enabled with NO client policies on all eight tables — service-role only**, behind `/api/support/*` (session or guest-token-hash authorisation) and `/api/admin/support/*` (admin gate + support permission matrix). No content is seeded by SQL — the KB/settings/replies seed idempotently from the app layer on first use. See §17 |
 
 Do not skip or reorder — later migrations depend on earlier helpers
 (`is_workspace_member`, `is_workspace_admin`).
@@ -60,12 +62,82 @@ In Supabase **Authentication → URL Configuration**:
 
 - **Site URL**: your production URL (e.g. `https://nxtsend-seven.vercel.app`,
   later your custom domain).
-- **Redirect URLs**: add `https://<your-domain>/reset-password` and the
-  local dev equivalent `http://localhost:3000/reset-password`.
+- **Redirect URLs**: add `https://<your-domain>/reset-password` and
+  `https://<your-domain>/auth/callback` (the OAuth landing for Google
+  Sign-In, below), plus the local dev equivalents
+  `http://localhost:3000/reset-password` and
+  `http://localhost:3000/auth/callback`.
 
 In **Authentication → Providers → Email**: decide whether "Confirm
 email" is on. The app handles both (with confirmation on, the workspace
 is created at first sign-in instead of at signup).
+
+### Google Sign-In setup ("Continue with Google")
+
+The login and signup pages carry a "Continue with Google" button that
+runs Supabase Auth's Google provider (authorization code + PKCE; the
+app never handles Google tokens). **No app environment variables are
+involved**: the Google client secret lives in the Supabase dashboard,
+never in Vercel env or client code. Configuration is entirely
+owner-side, in two dashboards:
+
+> ⚠️ Use a **separate** Google OAuth client for sign-in. The
+> `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` env vars belong to the
+> *Gmail mailbox* integration (§15) with a different callback
+> (`/api/oauth/google/callback`) and Gmail scopes — do **not** reuse
+> that client here.
+
+**A. Google Cloud Console** (the same Cloud project as §15 is fine):
+
+1. **APIs & Services → OAuth consent screen**: user type *External*;
+   app name "NxtSend"; support + developer contact emails; homepage,
+   privacy and terms URLs on the production domain. Supabase's Google
+   provider needs only the identity scopes (`openid`, `email`,
+   `profile`) — not the Gmail scopes.
+2. If the consent screen stays in **Testing**, only listed test users
+   can sign in — **Publish** it for public sign-up (or add test users
+   while testing).
+3. **Credentials → Create credentials → OAuth client ID → Web
+   application**, name e.g. "NxtSend Supabase Auth".
+4. **Authorized redirect URI** — exactly one, the *Supabase* callback
+   (copy the exact value from Supabase → Authentication → Providers →
+   Google): `https://<project-ref>.supabase.co/auth/v1/callback`.
+   Do **not** put the app's `/auth/callback` here — Google talks to
+   Supabase; Supabase redirects to the app afterwards.
+5. Keep the new client's ID and secret for step B. The secret is
+   entered into Supabase only — never into Vercel, `.env.local`, or
+   chat.
+
+**B. Supabase Dashboard**:
+
+1. **Authentication → Providers → Google**: enable it and paste the
+   client ID + client secret from step A. Leave "Skip nonce check"
+   **off** for the web flow.
+2. **Authentication → URL Configuration**: **Site URL** = the deployed
+   production origin (same as `NEXT_PUBLIC_APP_URL`); **Redirect
+   URLs** must include `https://<your-domain>/auth/callback` and
+   `http://localhost:3000/auth/callback` (see above).
+3. Leave the Email provider enabled — password sign-in keeps working
+   alongside Google.
+
+**Verify** (after the steps above): sign in with a brand-new Google
+account → you land on the dashboard with a profile whose role is
+`user` (Google sign-up can never grant admin — roles come only from
+`profiles`, set by bootstrap/admin action) and one default workspace.
+Cancel at Google's consent screen → the login page shows "Google
+sign-in was cancelled" and password login still works. Visit
+`/dashboard/billing` while logged out → after Google sign-in you land
+back on `/dashboard/billing`, not `/dashboard`.
+
+Notes: whether a Google sign-in with the same email as an existing
+password account links to that account is **Supabase project
+behaviour**, not app code — the app never merges profiles by email.
+Exercise it once in a staging project before enabling in production
+and note the observed behaviour. The signup page's "signups closed"
+flag also disables its Google button, but that flag is a UI gate, not
+a hard server-side block (Supabase creates the auth user during the
+OAuth round-trip); for a hard stop, disable signups or the Google
+provider in Supabase.
 
 ## 4. Environment variables — full table
 
@@ -85,6 +157,7 @@ and treated as *not configured*.
 | `ADMIN_BOOTSTRAP_SECRET` | One-time only | Promoting the first super admin (§5). **Remove after use** |
 | `RESEND_API_KEY` | For email | Resend sending key (server-only) |
 | `EMAIL_FROM` | For email | Verified sender, e.g. `NxtSend <hello@yourdomain.com>` |
+| `CONTACT_NOTIFICATION_EMAIL` | For contact notifications | Internal inbox receiving contact-form notification email — the owner's is `nxtsendai@gmail.com`. Sent from `EMAIL_FROM` via Resend with the visitor as Reply-To; while unset, contact submissions are still stored but record notification `not_configured` |
 | `RESEND_WEBHOOK_SECRET` | For email events | Svix signing secret for `/api/webhooks/resend`; while unset the route rejects events with 503 |
 | `STRIPE_SECRET_KEY` | For billing | Stripe secret key (server-only) |
 | `STRIPE_WEBHOOK_SECRET` | For billing | Signing secret for `/api/webhooks/stripe`; while unset the route rejects events with 503 |
@@ -116,7 +189,7 @@ only selects an *existing* account, and the one-time
 `ADMIN_BOOTSTRAP_SECRET` is the actual capability. Run these steps in
 order, exactly once, at go-live:
 
-1. **Create the Supabase project and apply ALL migrations 001–016 in
+1. **Create the Supabase project and apply ALL migrations 001–019 in
    order** (§1–§2 above), and finish the auth URL configuration (§3).
    The bootstrap writes to `profiles` and `audit_logs`, which only
    exist after the migrations.
@@ -864,6 +937,141 @@ Nothing on the BRR side is changed by the Hub: BRR's production flags
 (`muse_mcp_enabled`, `oauth_authcode_enabled`, plus the
 `MUSE_CONNECTOR_PUBLIC_ORIGIN` env) stay exactly as they are until
 you change them in BRR under separate authorisation.
+
+## 17. Support Chat (website assistant + live support)
+
+The support chat is the floating **NxtSend Support** widget on the
+marketing site (visitor UI is P10 Stage F; this section covers the
+backend that ships in Stage E) plus the Admin → Support surfaces
+(inbox, knowledge base, saved replies, chat settings). It is a
+separate system from both the workspace Inbox (prospect
+conversations, migration 005) and Admin → Submissions (one-way form
+enquiries).
+
+### 17.1 Tables & activation
+
+Migration **019** creates eight tables — `support_conversations`,
+`support_messages`, `support_knowledge_categories`,
+`support_knowledge`, `support_saved_replies`, `support_settings`,
+`support_agents`, `support_conversation_events` — all with **RLS
+enabled and zero client policies**. Every read and write runs
+through the service role from gated API routes; nothing is reachable
+by direct PostgREST access. Activation at go-live is simply part of
+the normal migration sequence: apply 019 in order after 018 (§2).
+There is **no SQL seed**: on first use the app layer idempotently
+seeds the settings singleton, 8 knowledge categories, 30 knowledge
+entries (each traced to real site content — support guides,
+/developers, `marketing-prices.ts`, /contact, legal pages) and 6
+saved replies, using `ON CONFLICT (slug) DO NOTHING` semantics so
+re-runs and restarts never overwrite admin edits.
+
+Until a Supabase project exists, the same APIs run against the
+labelled in-process demo store (Demo Mode), with the same content as
+fixtures plus a few clearly-labelled demo conversations.
+
+### 17.2 Who can do what
+
+- **Visitors (guests)** — see §17.4 for the token model.
+- **Registered users** — authorised by their session; the thread is
+  bound to their profile. Suspended users cannot post.
+- **Support agents ("Sub-Admins")** — an `admin` profile ALSO needs
+  an **enabled row in `support_agents`**. An admin login alone does
+  not grant customer-chat access. Enabled agents can work the inbox,
+  reply, claim unassigned conversations, and manage the knowledge
+  base and saved replies.
+- **Super admin** — everything, plus the only role that can change
+  **Chat Settings** and assign conversations to *other* agents.
+  Agents claim unassigned conversations for themselves; replying to
+  an unassigned conversation claims it automatically (event-logged).
+- Admin mutations are mirrored into `audit_logs` (`SUPPORT_*`
+  actions) and appended to the per-conversation event timeline.
+
+### 17.3 Settings semantics (Admin → Support → Chat Settings)
+
+Every field of the `support_settings` singleton drives real
+behaviour — there are no decorative toggles:
+
+| Setting | Effect when changed |
+|---|---|
+| `ai_kb_enabled` | Off → the assistant never answers from the knowledge base; visitors get the fallback copy + escalation path |
+| `ai_enhancement_enabled` | Off (default) → answers are purely deterministic KB matches. On → a grounded AI layer may rephrase/select among the top KB candidates when the matcher is unsure. Requires a configured AI provider (below); the guard rejects any completion that invents a price, URL or policy claim not present in the KB sources |
+| `live_support_enabled` | Off → escalation is blocked and the widget shows the offline/contact path |
+| `allow_user_escalation` | Off → visitors cannot request a human; the fallback copy points at `support_email` |
+| `display_name`, `greeting`, `welcome_message`, `offline_message`, `closing_message` | The exact copy visitors see (assistant name, first message, no-agent-available text, message appended when a conversation is resolved) |
+| `support_email` | The public fallback address shown by the widget (default `hello@nxtsend.com`) |
+
+Matching bands (deterministic, test-pinned): score **≥ 75** answers
+directly; **55–74** answers only when there is a clear leader
+(margin ≥ 10 over the runner-up, or the runner-up scores < 40);
+below that the visitor gets the fallback message and an escalation
+offer. Questions about the asker's *own* account ("my invoice",
+"my campaign"…) are never answered from the KB or the AI layer —
+the assistant has no account-data tools and points to the dashboard
+or a person instead.
+
+The optional AI layer uses the **existing** AI provider keys
+(`OPENAI_API_KEY` / `ANTHROPIC_API_KEY`, §9) — no new variables. It
+never runs in Demo Mode, never runs when no key is configured, and
+nothing labels the widget "AI-powered" unless it is genuinely
+configured; the public config endpoint reports
+`ai_enhancement: "configured" | "not_configured"` truthfully. Note
+for the Privacy Policy: enabling the enhancement sends the visitor's
+question + KB snippets to the provider (never names, emails or
+account data).
+
+### 17.4 Guest-token security model
+
+Guests have no Supabase identity, so a guest conversation is
+authorised by a bearer token instead:
+
+- On creation the server generates a 256-bit random token, stores
+  **only its SHA-256 hash** on the conversation row, and returns the
+  raw token exactly once — as an **HttpOnly cookie scoped to
+  `/api/support`** (`SameSite=Lax`, `Secure` in production, 30-day
+  expiry, also stored as `guest_token_expires_at`).
+- The raw token never appears in a response body, a URL, a log line
+  or analytics. **A conversation ID alone never authorises** — every
+  visitor read/write re-checks the cookie hash (or session
+  ownership); unknown and unauthorised conversations are
+  indistinguishable (404).
+- There is **no silent merge** of a guest thread into a user account
+  by email: a typed guest email is display data, not identity proof.
+  Known limitation (by design for v1): a guest who loses the cookie
+  (new browser, cleared cookies) cannot recover the thread — the
+  escalation flow therefore encourages leaving an email address.
+
+### 17.5 Transport — honest description
+
+The widget and the admin inbox use **short-interval API polling**
+behind a transport interface, reconciled by the monotonic
+`support_messages.sequence_no`: near-real-time (visitor replies
+appear within one poll interval), but **not WebSocket and not
+Supabase Realtime**. Guests cannot be authorised for Realtime
+(they have no Supabase identity and this app issues no custom
+Realtime JWTs), and conversation IDs must never become bearer
+secrets for a public channel. **Optional phase 2:** enable Supabase
+Realtime for the *admin inbox only* (narrow admin SELECT policies +
+publication entries for `support_conversations`/`support_messages`,
+with the polling path as fallback). Presence and typing indicators
+are not implemented — the only availability signal is an agent's
+**declared** availability toggle in `support_agents`, and the
+widget claims "live support available" only when live support is
+enabled **and** at least one eligible agent has declared
+`available`.
+
+### 17.6 Content & privacy rules
+
+- All bodies are **plain text** end to end (validated, length-capped,
+  control characters stripped; nothing is stored or rendered as
+  HTML). Internal agent notes are a separate message kind and are
+  **never** included in visitor-side responses.
+- Send retries are safe: a client-supplied `client_message_id` is
+  idempotent per conversation (partial-unique index).
+- Logs record IDs, statuses and scores — never message bodies, guest
+  tokens or provider payloads.
+- Retention: no period is invented here. Set one with legal before
+  live launch; `pii_redacted_at` + `ON DELETE SET NULL` foreign keys
+  provide the future redaction path.
 
 ## Appendix — Muse.ai research note (2026-10-18)
 

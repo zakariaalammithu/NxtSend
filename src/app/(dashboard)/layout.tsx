@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, Target, Linkedin, Mail, MessageSquare, BarChart3, Puzzle, CreditCard, Settings, Bell, Search, LogOut, ChevronDown, ChevronLeft, ChevronRight, Zap, X, User, Users, Shield, Check, Sparkles, History, Gift, Coins, ShoppingCart, ContactRound } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/brand/Logo";
 import { createClient } from "@/lib/supabase/client";
 import {
   formatRelativeTime,
@@ -297,17 +298,12 @@ export default function DashboardLayout({
               isCollapsed && "justify-center w-full"
             )}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo.png"
-              alt="NxtSend"
-              className="h-8 w-8 shrink-0 object-contain"
+            <Logo
+              variant={isCollapsed ? "mark" : "lockup"}
+              size={32}
+              wordmarkGradient
+              wordmarkClassName="text-18 whitespace-nowrap"
             />
-            {!isCollapsed && (
-              <span className="text-18 font-bold tracking-tight text-white whitespace-nowrap">
-                Nxt<span className="text-gradient-brand">Send</span>
-              </span>
-            )}
           </Link>
 
           {/* Collapse Toggle (Desktop only) */}

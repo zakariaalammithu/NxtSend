@@ -22,7 +22,7 @@ covers getting them live on Vercel safely.
 |---|---|
 | Framework Preset | **Next.js** (auto-detected) |
 | Root Directory | The folder containing this file (`nxtsend-app` if the repo root is its parent; the repo root itself when the app is at the root) |
-| Node.js Version | **20.x** (Project → Settings → General → Node.js Version; the app targets Node 20 APIs; also pinned via `engines` in `package.json`) |
+| Node.js Version | **24.x** (Project → Settings → General → Node.js Version; pinned via `engines` in `package.json`. Vercel discontinued Node 20.x — builds fail instantly with "Node.js Version 20.x is discontinued" if this is set to 20.x) |
 | Build Command | `npm run build` (default) |
 | Install Command | `npm install` (default; a lockfile is committed) |
 | Output Directory | default (`.next`) |

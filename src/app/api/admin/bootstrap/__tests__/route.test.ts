@@ -34,6 +34,7 @@ const PLACEHOLDER_VALUE = [
 
 const db = vi.hoisted(() => ({
   users: [] as Array<{ id: string; email: string }>,
+  superAdmins: [] as Array<{ id: string }>,
   updates: [] as Array<{ table: string; payload: Record<string, unknown>; eq: [string, unknown] }>,
   inserts: [] as Array<{ table: string; payload: Record<string, unknown> }>,
   listUsersError: false,
@@ -50,6 +51,9 @@ vi.mock("@supabase/supabase-js", () => ({
       },
     },
     from: (table: string) => ({
+      select: () => ({
+        eq: async () => ({ data: db.superAdmins, error: null }),
+      }),
       update: (payload: Record<string, unknown>) => ({
         eq: async (column: string, value: unknown) => {
           db.updates.push({ table, payload, eq: [column, value] });
@@ -91,6 +95,7 @@ beforeEach(() => {
     { id: "user-owner", email: OWNER_EMAIL },
     { id: "user-other", email: "someone@example.com" },
   ];
+  db.superAdmins = [];
   db.updates = [];
   db.inserts = [];
   db.listUsersError = false;
@@ -194,9 +199,11 @@ describe("/api/admin/bootstrap — promotion", () => {
     expect(db.inserts).toHaveLength(1);
     expect(db.inserts[0].table).toBe("audit_logs");
     expect(db.inserts[0].payload.action).toBe("ADMIN_BOOTSTRAP");
-    expect(db.inserts[0].payload.actor_id).toBe("user-owner");
+    // The actor is the secret holder, not the promoted account.
+    expect(db.inserts[0].payload.actor_id).toBeNull();
     const metadata = db.inserts[0].payload.metadata as Record<string, unknown>;
     expect(metadata.email).toBe(OWNER_EMAIL);
+    expect(metadata.target_user_id).toBe("user-owner");
     expect(metadata.role_granted).toBe("super_admin");
   });
 
@@ -217,6 +224,21 @@ describe("/api/admin/bootstrap — promotion", () => {
   it("malformed email → 400 before any lookup", async () => {
     const res = await POST(req({ secret: GOOD_VALUE, email: "not-an-email" }));
     expect(res.status).toBe(400);
+    expect(db.updates).toEqual([]);
+  });
+
+  it("a super_admin already exists → 403, no second promotion", async () => {
+    db.superAdmins = [{ id: "user-owner" }];
+    const res = await POST(req({ secret: GOOD_VALUE, email: "someone@example.com" }));
+    expect(res.status).toBe(403);
+    expect(db.updates).toEqual([]);
+    expect(db.inserts).toEqual([]);
+  });
+
+  it("target already a super_admin → 200, idempotent, no re-promotion", async () => {
+    db.superAdmins = [{ id: "user-owner" }];
+    const res = await POST(req({ secret: GOOD_VALUE, email: OWNER_EMAIL }));
+    expect(res.status).toBe(200);
     expect(db.updates).toEqual([]);
   });
 });

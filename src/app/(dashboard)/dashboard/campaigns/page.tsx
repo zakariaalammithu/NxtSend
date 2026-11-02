@@ -546,7 +546,7 @@ export default function CampaignsListPage() {
             <div className="flex flex-wrap gap-x-6 gap-y-4">
               <FunnelMetric
                 icon={UserPlus}
-                label="Connection sent"
+                label="Connections sent"
                 value={String(funnel.linkedin.connectionRequestsSent)}
                 tooltip="Connection-request steps the executor actually sent. Steps are recorded as skipped while no LinkedIn provider is connected."
               />

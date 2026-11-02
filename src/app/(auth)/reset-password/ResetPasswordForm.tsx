@@ -45,11 +45,11 @@ export default function ResetPasswordForm() {
     const supabase = createClient();
 
     if (!supabase) {
-      // Demo mode success simulation
-      setIsSuccess(true);
-      setTimeout(() => {
-        router.push("/login");
-      }, 2000);
+      // Demo mode: authentication is not configured, so the password
+      // was not changed. Do not show a fake success state.
+      setServerError(
+        "Demo Mode: authentication is not configured, so your password was not changed. Configure Supabase and use a real reset link to change your password.",
+      );
       return;
     }
 

@@ -37,8 +37,11 @@ export default function ForgotPasswordForm() {
     const supabase = createClient();
 
     if (!supabase) {
-      // In demo mode, simulate success response
-      setIsSuccess(true);
+      // Demo mode: authentication is not configured, so no reset
+      // email can be sent. Do not show a fake success state.
+      setServerError(
+        "Demo Mode: authentication is not configured, so no password reset email was sent. Configure Supabase to enable password reset.",
+      );
       return;
     }
 

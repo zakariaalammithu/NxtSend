@@ -1267,6 +1267,8 @@ export default function NewCampaignWizardPage() {
                   <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                   Collection starts when an authorized LinkedIn provider is
                   connected — no people have been collected from this link yet.
+                  Until then, leads must be imported manually (CSV) from the
+                  Leads page.
                 </p>
               </div>
             )}

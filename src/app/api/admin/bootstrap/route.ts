@@ -124,17 +124,46 @@ export async function POST(request: NextRequest) {
       auth: { persistSession: false },
     });
 
-    // Check if user exists in auth
-    const { data: userList, error: userError } = await adminSupabase.auth.admin.listUsers();
-    if (userError) {
-      return NextResponse.json({ error: "Failed to query users" }, { status: 500 });
+    // Check if user exists in auth, paging through listUsers so a
+    // target beyond the first page is not wrongly reported missing.
+    let authUser: { id: string; email?: string | null } | null = null;
+    for (let page = 1; page <= 100 && !authUser; page++) {
+      const { data: userList, error: userError } =
+        await adminSupabase.auth.admin.listUsers({ page, perPage: 100 });
+      if (userError) {
+        return NextResponse.json({ error: "Failed to query users" }, { status: 500 });
+      }
+      const users = userList.users ?? [];
+      authUser = users.find((u) => u.email === targetEmail) ?? null;
+      if (users.length < 100) break;
     }
-
-    const authUser = userList.users.find((u) => u.email === targetEmail);
     if (!authUser) {
       return NextResponse.json(
         { error: `No user found with email ${targetEmail}. They must sign up first.` },
         { status: 404 }
+      );
+    }
+
+    // One-time guard: bootstrap may only create the FIRST super_admin.
+    // Once one exists, further promotions must go through the admin
+    // UI by an existing super_admin — leaving the env secret in place
+    // must not mint additional super_admins indefinitely.
+    const { data: existingAdmins, error: existingAdminError } =
+      await adminSupabase.from("profiles").select("id").eq("role", "super_admin");
+    if (existingAdminError) {
+      return NextResponse.json({ error: "Failed to check existing admins" }, { status: 500 });
+    }
+    const existingAdminIds = (existingAdmins ?? []).map((row) => row.id);
+    if (existingAdminIds.includes(authUser.id)) {
+      return NextResponse.json({
+        success: true,
+        message: `${targetEmail} is already a super_admin.`,
+      });
+    }
+    if (existingAdminIds.length > 0) {
+      return NextResponse.json(
+        { error: "Bootstrap already used: a super_admin already exists. Promote further admins from the admin panel." },
+        { status: 403 }
       );
     }
 
@@ -149,13 +178,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to update role" }, { status: 500 });
     }
 
-    // 6. Log audit entry
+    // 6. Log audit entry. The actor is the (unauthenticated) holder of
+    // the bootstrap secret, NOT the promoted account — recording the
+    // target as actor_id would make the audit trail misleading, so
+    // actor_id is left null and the target is recorded in metadata.
     await adminSupabase.from("audit_logs").insert({
-      actor_id: authUser.id,
+      actor_id: null,
       action: "ADMIN_BOOTSTRAP",
       resource: "profiles",
       metadata: {
         email: targetEmail,
+        target_user_id: authUser.id,
         role_granted: "super_admin",
         timestamp: new Date().toISOString(),
       },

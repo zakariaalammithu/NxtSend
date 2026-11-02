@@ -1,0 +1,1 @@
+Screenshot capture for this section was BLOCKED in the 2026-11-02 audit (see NxtSend_Full_Website_Audit_Report.md section 15). No mockups are included. Capture real screenshots from the deployed app and place the PNG files here.

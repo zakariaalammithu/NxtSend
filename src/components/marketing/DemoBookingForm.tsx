@@ -24,9 +24,18 @@ import { ArrowRight, CheckCircle2 } from "lucide-react";
  */
 
 const bookingSchema = z.object({
-  name: z.string().min(2, "Please enter your name"),
-  email: z.string().email("Please enter a valid work email address"),
-  company: z.string().min(2, "Company name is required"),
+  name: z
+    .string()
+    .min(2, "Please enter your name")
+    .max(120, "Name must be at most 120 characters"),
+  email: z
+    .string()
+    .email("Please enter a valid work email address")
+    .max(254, "Email must be at most 254 characters"),
+  company: z
+    .string()
+    .min(2, "Company name is required")
+    .max(160, "Company name must be at most 160 characters"),
   teamSize: z.string().min(1, "Please select your team size"),
   message: z.string().max(1000, "Please keep your message under 1000 characters").optional(),
 });
@@ -212,6 +221,12 @@ export function DemoBookingForm() {
             {errors.message && (
               <p className="mt-1 text-12 text-red-400">{errors.message.message}</p>
             )}
+            <p className="mt-1 text-12 text-black-400">
+              If you leave this blank or write fewer than 10 characters, a
+              standard demo-request line (company + team size) is sent
+              instead, so your request still meets the minimum message
+              length.
+            </p>
           </div>
 
           {submitError && (

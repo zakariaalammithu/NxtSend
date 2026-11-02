@@ -49,7 +49,15 @@ const contactSchema = z.object({
   // Honeypot (server-side trap, see /api/submissions): a hidden
   // field humans never fill. Not a real form field — no validation.
   website: z.string().optional(),
-});
+}).refine(
+  (data) =>
+    `${data.firstName} ${data.lastName}`.trim().length <= 120,
+  {
+    message:
+      "Full name must be at most 120 characters (the server limit applies to the combined first and last name)",
+    path: ["lastName"],
+  },
+);
 
 type ContactFormData = z.infer<typeof contactSchema>;
 

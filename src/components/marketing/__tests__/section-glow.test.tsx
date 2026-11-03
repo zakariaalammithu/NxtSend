@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { SectionGlow } from "../SectionGlow";
 import { Footer } from "../Footer";
+import { TrustedBy } from "../TrustedBy";
 
 (globalThis as { React?: typeof React }).React = React;
 
@@ -48,6 +49,36 @@ describe("Footer bookend", () => {
     const html = render(<Footer />);
     expect(html).toContain("radial-gradient");
     expect(html).toContain("64px 64px");
+  });
+});
+
+describe("TrustedBy logo wall", () => {
+  it("has no white tiles and uses the dark-background logo files", () => {
+    const html = render(<TrustedBy />);
+    expect(html).not.toContain("bg-white");
+    // Next Image URL-encodes the src in srcSet, so match the encoded path.
+    expect(html).toContain("logos%2Fdark%2Fhubspot.png");
+    expect(html).toContain("logos%2Fdark%2Fclay.png");
+    expect(html).toContain("logos%2Fdark%2Fflip-electronics.png");
+    for (const name of [
+      "HubSpot",
+      "Clay",
+      "Pavilion",
+      "Flip Electronics",
+      "McKinsey",
+      "Indoorcare",
+      "XBag",
+      "LinkedIn",
+      "Sandler Training",
+      "Spacebar Studios",
+      "ContactReachout",
+      "BizReviewRadar",
+      "nsave",
+      "Acquisition Systems",
+      "Exter Media",
+    ]) {
+      expect(html).toContain(name);
+    }
   });
 });
 

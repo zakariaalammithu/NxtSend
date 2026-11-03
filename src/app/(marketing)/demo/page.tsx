@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SectionGlow } from "@/components/marketing/SectionGlow";
 import type { Metadata } from "next";
 import {
   ArrowRight,
@@ -35,8 +36,11 @@ export default function DemoPage() {
       {/* ──────────────────────────────────────────────────────────────────── */}
       {/* HERO — headline + static product visual                             */}
       {/* ──────────────────────────────────────────────────────────────────── */}
-      <section className="relative bg-black-900 px-2.5 pt-24 sm:pt-28">
-        <div className="relative overflow-hidden rounded-5xl bg-white px-4 pt-12 pb-16 md:px-6 md:py-20 xl:rounded-8xl 2xl:px-40 2xl:py-28">
+      <section className="relative overflow-hidden bg-black-900 px-2.5 pt-24 sm:pt-28">
+
+      <SectionGlow variant="emerald" />
+
+      <div className="relative overflow-hidden rounded-5xl bg-white px-4 pt-12 pb-16 md:px-6 md:py-20 xl:rounded-8xl 2xl:px-40 2xl:py-28">
           <div
             aria-hidden="true"
             className="absolute inset-0"
@@ -68,8 +72,11 @@ export default function DemoPage() {
       {/* ──────────────────────────────────────────────────────────────────── */}
       {/* EVERY CONVERSATION, ONE INBOX — webinar / book-a-call cards         */}
       {/* ──────────────────────────────────────────────────────────────────── */}
-      <section className="relative bg-black-900 py-24 lg:py-28">
-        <div className="section-container">
+      <section className="relative overflow-hidden bg-black-900 py-24 lg:py-28">
+
+      <SectionGlow variant="blue" />
+
+      <div className="section-container relative z-10">
           <div className="mx-auto mb-12 flex max-w-2xl flex-col items-center text-center">
             <h2 className="text-36 font-bold tracking-tight text-white sm:text-48">
               Every conversation, one inbox
@@ -140,9 +147,12 @@ export default function DemoPage() {
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section
         id="book-a-demo"
-        className="relative border-t border-black-700/80 bg-black-900 py-24 lg:py-32"
+        className="relative overflow-hidden border-t border-black-700/80 bg-black-900 py-24 lg:py-32"
       >
-        <div className="pointer-events-none absolute top-0 left-1/2 h-[400px] w-[700px] -translate-x-1/2 rounded-full bg-purple-600/15 blur-[140px]" />
+
+      <SectionGlow variant="violet" />
+
+      <div className="pointer-events-none absolute top-0 left-1/2 h-[400px] w-[700px] -translate-x-1/2 rounded-full bg-purple-600/15 blur-[140px]" />
         <div className="section-container relative z-10">
           <DemoBookingForm />
         </div>
@@ -152,7 +162,8 @@ export default function DemoPage() {
       {/* START SCALING YOUR OUTREACH TODAY                                  */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-t border-black-700/80 bg-gradient-hero py-24 lg:py-32">
-        <div className="pointer-events-none absolute inset-0 bg-radial-glow opacity-30" />
+      <SectionGlow variant="teal" />
+      <div className="pointer-events-none absolute inset-0 bg-radial-glow opacity-30" />
         <div className="section-container relative z-10 text-center">
           <div className="mx-auto max-w-3xl rounded-3xl border border-purple-500/30 bg-black-800/80 p-8 shadow-glow-purple/20 backdrop-blur-2xl sm:p-14">
             <h2 className="text-36 sm:text-48 font-extrabold text-white tracking-tight">

@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { SectionGlow } from "@/components/marketing/SectionGlow";
 import {
   ArrowRight,
   Heart,
@@ -348,7 +349,10 @@ function MessageThreadVisual() {
 
 export function BentoFeatures() {
   return (
-    <section className="relative border-t border-black-700/80 bg-black-800/30 py-12 lg:py-20">
+    <section className="relative overflow-hidden border-t border-black-700/80 bg-black-800/30 py-12 lg:py-20">
+
+      <SectionGlow variant="violet" />
+
       <div className="pointer-events-none absolute top-1/2 left-0 h-[400px] w-[400px] -translate-y-1/2 rounded-full bg-purple-600/10 blur-[130px]" />
       <div className="section-container relative z-10">
         <div className="text-center">

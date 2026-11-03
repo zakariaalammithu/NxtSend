@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { SectionGlow } from "@/components/marketing/SectionGlow";
 import Link from "next/link";
 import type { Metadata } from "next";
 import {
@@ -246,8 +247,11 @@ export default function PricingPage() {
       {/* ──────────────────────────────────────────────────────────────────── */}
       {/* HERO + PLAN CARDS */}
       {/* ──────────────────────────────────────────────────────────────────── */}
-      <section className="relative pt-12 pb-24 lg:pt-20">
-        <div className="pointer-events-none absolute -top-40 left-1/2 h-[500px] w-[800px] -translate-x-1/2 rounded-full bg-purple-600/20 blur-[130px]" />
+      <section className="relative overflow-hidden pt-12 pb-24 lg:pt-20">
+
+      <SectionGlow variant="emerald" />
+
+      <div className="pointer-events-none absolute -top-40 left-1/2 h-[500px] w-[800px] -translate-x-1/2 rounded-full bg-purple-600/20 blur-[130px]" />
         <div className="section-container relative z-10">
           <div className="mx-auto max-w-3xl text-center">
             <h1 className="text-40 sm:text-54 font-extrabold tracking-tight text-white">
@@ -283,8 +287,11 @@ export default function PricingPage() {
       {/* ──────────────────────────────────────────────────────────────────── */}
       {/* FEATURE COMPARISON TABLE */}
       {/* ──────────────────────────────────────────────────────────────────── */}
-      <section className="relative border-t border-black-700/80 py-24">
-        <div className="section-container">
+      <section className="relative overflow-hidden border-t border-black-700/80 py-24">
+
+      <SectionGlow variant="blue" />
+
+      <div className="section-container relative z-10">
           <div className="overflow-x-auto rounded-2xl border border-black-700 bg-black-800/40 backdrop-blur-md">
             <table className="w-full min-w-[720px] border-collapse text-left text-13">
               <CompareTableHead />
@@ -328,8 +335,11 @@ export default function PricingPage() {
       {/* ──────────────────────────────────────────────────────────────────── */}
       {/* FREQUENTLY ASKED QUESTIONS */}
       {/* ──────────────────────────────────────────────────────────────────── */}
-      <section className="relative border-t border-black-700/80 bg-black-800/40 py-24">
-        <div className="section-container">
+      <section className="relative overflow-hidden border-t border-black-700/80 bg-black-800/40 py-24">
+
+      <SectionGlow variant="violet" />
+
+      <div className="section-container relative z-10">
           <div className="mx-auto max-w-4xl">
             <div className="mb-12 text-center">
               <h2 className="text-36 sm:text-48 font-bold tracking-tight text-white">
@@ -345,7 +355,8 @@ export default function PricingPage() {
       {/* START SCALING YOUR OUTREACH TODAY */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-t border-black-700/80 bg-gradient-hero py-24">
-        <div className="pointer-events-none absolute inset-0 bg-radial-glow opacity-30" />
+      <SectionGlow variant="teal" />
+      <div className="pointer-events-none absolute inset-0 bg-radial-glow opacity-30" />
         <div className="section-container relative z-10 text-center">
           <div className="mx-auto max-w-3xl rounded-3xl border border-purple-500/30 bg-black-800/80 p-8 shadow-glow-purple/20 backdrop-blur-2xl sm:p-14">
             <h2 className="text-36 sm:text-48 font-extrabold tracking-tight text-white">

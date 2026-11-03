@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SectionGlow } from "@/components/marketing/SectionGlow";
 import type { Metadata } from "next";
 import {
   ArrowRight,
@@ -58,14 +59,16 @@ function LinkIcon({ className }: { className?: string }) {
 export default function AcademyPage() {
   return (
     <div className="relative overflow-hidden bg-black-900">
+      <SectionGlow variant="emerald" />
       {/* Hero + course series (client component) */}
       <AcademySeries />
 
       {/* ──────────────────────────────────────────────────────────────────── */}
       {/* MORE RESOURCES (3 cards under a centred heading)                    */}
       {/* ──────────────────────────────────────────────────────────────────── */}
-      <section>
-        <div className="mx-auto flex w-full max-w-[1492px] flex-col px-4 py-8 md:px-6 md:py-10 xl:px-24">
+      <section className="relative overflow-hidden">
+      <SectionGlow variant="blue" />
+      <div className="mx-auto flex w-full max-w-[1492px] flex-col px-4 py-8 md:px-6 md:py-10 xl:px-24">
           <div className="mx-auto mt-16 mb-12 flex w-full max-w-[648px] flex-col items-center md:mt-20 xl:mt-28 xl:mb-20">
             <h2 className="mb-6 text-center text-30 font-semibold text-white last:mb-0 md:text-36 xl:text-54">
               More resources
@@ -102,7 +105,8 @@ export default function AcademyPage() {
       {/* FINAL CTA                                                           */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-t border-black-700/80 bg-gradient-hero py-24">
-        <div className="pointer-events-none absolute inset-0 bg-radial-glow opacity-30" />
+      <SectionGlow variant="teal" />
+      <div className="pointer-events-none absolute inset-0 bg-radial-glow opacity-30" />
         <div className="section-container relative z-10 text-center">
           <div className="mx-auto max-w-3xl rounded-3xl border border-purple-500/30 bg-black-800/80 p-8 shadow-glow-purple/20 backdrop-blur-2xl sm:p-14">
             <h2 className="text-36 sm:text-48 font-extrabold tracking-tight text-white">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SectionGlow } from "@/components/marketing/SectionGlow";
 import Link from "next/link";
 import { Check, Linkedin, Zap, Briefcase, Gem } from "lucide-react";
 import { AuroraBg } from "./AuroraBg";
@@ -32,8 +33,11 @@ export function HomePricing() {
   const yearly = billing === "yearly";
 
   return (
-    <section className="relative border-t border-black-700/80 bg-black-800/40 py-24 lg:py-32">
-      <div className="section-container">
+    <section className="relative overflow-hidden border-t border-black-700/80 bg-black-800/40 py-24 lg:py-32">
+
+      <SectionGlow variant="violet" />
+
+      <div className="section-container relative z-10">
         <div className="text-center">
           <h2 className="text-36 sm:text-48 font-bold text-white tracking-tight">
             Straightforward pricing that grows with your team

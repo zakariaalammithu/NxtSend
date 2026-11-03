@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SectionGlow } from "@/components/marketing/SectionGlow";
 import Link from "next/link";
 import { Scale, Mail } from "lucide-react";
 
@@ -24,6 +25,7 @@ export default function TermsPage() {
 
   return (
     <div className="relative min-h-screen overflow-x-clip bg-black-900 pt-12 pb-24 text-white">
+      <SectionGlow variant="blue" />
       {/* Background glow */}
       <div className="pointer-events-none absolute top-0 left-1/2 h-[400px] w-[750px] -translate-x-1/2 rounded-full bg-purple-600/10 blur-[140px]" />
 

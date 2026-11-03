@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SectionGlow } from "@/components/marketing/SectionGlow";
 import Image from "next/image";
 import type { Metadata } from "next";
 import {
@@ -40,8 +41,11 @@ export default function IntegrationsPage() {
       {/* ──────────────────────────────────────────────────────────────────── */}
       {/* HERO — native tile constellation with the H1 at its bottom         */}
       {/* ──────────────────────────────────────────────────────────────────── */}
-      <section className="px-2.5 pt-24 sm:pt-28">
-        <div className="relative flex h-[34.5rem] flex-col items-center overflow-hidden rounded-5xl bg-[#05070f] px-6 md:h-[32.5rem] xl:h-[34rem] xl:rounded-8xl">
+      <section className="relative overflow-hidden px-2.5 pt-24 sm:pt-28">
+
+      <SectionGlow variant="emerald" />
+
+      <div className="relative flex h-[34.5rem] flex-col items-center overflow-hidden rounded-5xl bg-[#05070f] px-6 md:h-[32.5rem] xl:h-[34rem] xl:rounded-8xl">
           {/* Deep-blue glow + fine grid (home integrations shell) */}
           <div
             aria-hidden="true"
@@ -111,7 +115,8 @@ export default function IntegrationsPage() {
       {/* START SCALING YOUR OUTREACH TODAY (final CTA)                       */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-t border-black-700/80 bg-gradient-hero py-24">
-        <div className="pointer-events-none absolute inset-0 bg-radial-glow opacity-30" />
+      <SectionGlow variant="blue" />
+      <div className="pointer-events-none absolute inset-0 bg-radial-glow opacity-30" />
         <div className="section-container relative z-10 text-center">
           <div className="mx-auto max-w-3xl rounded-3xl border border-purple-500/30 bg-black-800/80 p-8 shadow-glow-purple/20 backdrop-blur-2xl sm:p-14">
             <h2 className="text-36 sm:text-48 font-extrabold tracking-tight text-white">

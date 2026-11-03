@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SectionGlow } from "@/components/marketing/SectionGlow";
 import Image from "next/image";
 import type { Metadata } from "next";
 import {
@@ -202,8 +203,11 @@ export default function MarketingHomePage() {
       {/* ──────────────────────────────────────────────────────────────────── */}
       {/* 1. OUTREACH WITH RENTED ACCOUNTS */}
       {/* ──────────────────────────────────────────────────────────────────── */}
-      <section className="relative py-24 lg:py-32">
-        <div className="section-container">
+      <section className="relative overflow-hidden py-24 lg:py-32">
+
+      <SectionGlow variant="emerald" />
+
+      <div className="section-container relative z-10">
           <div className="text-center">
             <h2 className="text-36 sm:text-48 font-bold text-white tracking-tight">
               Grow your sending capacity with rented profiles
@@ -327,8 +331,11 @@ export default function MarketingHomePage() {
 
       {/* 5. HOW IT WORKS — original section (replaces the removed testimonial wall) */}
       {/* ──────────────────────────────────────────────────────────────────── */}
-      <section id="how-it-works" className="relative border-t border-black-700/80 bg-black-900 py-24 lg:py-32">
-        <div className="pointer-events-none absolute right-10 top-1/2 h-[350px] w-[350px] -translate-y-1/2 rounded-full bg-purple-600/15 blur-[140px]" />
+      <section id="how-it-works" className="relative overflow-hidden border-t border-black-700/80 bg-black-900 py-24 lg:py-32">
+
+      <SectionGlow variant="blue" />
+
+      <div className="pointer-events-none absolute right-10 top-1/2 h-[350px] w-[350px] -translate-y-1/2 rounded-full bg-purple-600/15 blur-[140px]" />
         <div className="section-container relative z-10">
           <div className="text-center">
             <h2 className="text-36 sm:text-48 font-bold text-white tracking-tight">
@@ -368,8 +375,11 @@ export default function MarketingHomePage() {
       {/* ──────────────────────────────────────────────────────────────────── */}
       {/* 7. FREQUENTLY ASKED QUESTIONS */}
       {/* ──────────────────────────────────────────────────────────────────── */}
-      <section className="relative border-t border-black-700/80 py-24 lg:py-32">
-        <div className="section-container">
+      <section className="relative overflow-hidden border-t border-black-700/80 py-24 lg:py-32">
+
+      <SectionGlow variant="violet" />
+
+      <div className="section-container relative z-10">
           <div className="mx-auto max-w-4xl">
             <div className="mb-12 text-center">
               <h2 className="text-36 sm:text-48 font-bold text-white tracking-tight">
@@ -385,7 +395,8 @@ export default function MarketingHomePage() {
       {/* 8. FINAL CTA */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-t border-black-700/80 bg-gradient-hero py-24 lg:py-32">
-        <div className="pointer-events-none absolute inset-0 bg-radial-glow opacity-30" />
+      <SectionGlow variant="teal" />
+      <div className="pointer-events-none absolute inset-0 bg-radial-glow opacity-30" />
         <div className="section-container relative z-10 text-center">
           <div className="mx-auto max-w-3xl rounded-3xl border border-purple-500/30 bg-black-800/80 p-8 shadow-glow-purple/20 backdrop-blur-2xl sm:p-14">
             <h2 className="text-36 sm:text-48 font-extrabold text-white tracking-tight">

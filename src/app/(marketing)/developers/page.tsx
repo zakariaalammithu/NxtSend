@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SectionGlow } from "@/components/marketing/SectionGlow";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -166,8 +167,11 @@ export default function DevelopersPage() {
   return (
     <div className="relative overflow-hidden bg-black-900">
       {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <section className="relative pt-32 pb-16 sm:pt-36">
-        <div
+      <section className="relative overflow-hidden pt-32 pb-16 sm:pt-36">
+
+      <SectionGlow variant="emerald" />
+
+      <div
           aria-hidden="true"
           className="pointer-events-none absolute -top-32 left-1/2 h-[420px] w-[820px] -translate-x-1/2 rounded-full bg-purple-600/10 blur-[140px]"
         />
@@ -245,8 +249,11 @@ export default function DevelopersPage() {
       </section>
 
       {/* ── Outbound webhooks ──────────────────────────────────────── */}
-      <section className="relative border-t border-white/10 py-20">
-        <div className="section-container">
+      <section className="relative overflow-hidden border-t border-white/10 py-20">
+
+      <SectionGlow variant="blue" />
+
+      <div className="section-container relative z-10">
           <div className="mx-auto max-w-3xl">
             <h2 className="text-28 font-bold tracking-tight text-white sm:text-36">
               Outbound webhooks
@@ -385,8 +392,11 @@ export default function DevelopersPage() {
       </section>
 
       {/* ── Public API — access required ───────────────────────────── */}
-      <section className="relative border-t border-white/10 py-20">
-        <div className="section-container">
+      <section className="relative overflow-hidden border-t border-white/10 py-20">
+
+      <SectionGlow variant="blue" />
+
+      <div className="section-container relative z-10">
           <div className="mx-auto max-w-5xl rounded-3xl border border-amber-300/25 bg-amber-400/[0.04] p-8 sm:p-10">
             <div className="flex flex-wrap items-center gap-3">
               <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-200">
@@ -443,8 +453,11 @@ export default function DevelopersPage() {
       </section>
 
       {/* ── Errors & troubleshooting ───────────────────────────────── */}
-      <section className="relative border-t border-white/10 py-20">
-        <div className="section-container">
+      <section className="relative overflow-hidden border-t border-white/10 py-20">
+
+      <SectionGlow variant="violet" />
+
+      <div className="section-container relative z-10">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-28 font-bold tracking-tight text-white sm:text-36">
               Errors &amp; troubleshooting

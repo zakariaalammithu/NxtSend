@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SectionGlow } from "@/components/marketing/SectionGlow";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -130,6 +131,7 @@ export default function ContactPage() {
 
   return (
     <div className="relative min-h-screen overflow-x-clip bg-black-900 pt-12 pb-24">
+      <SectionGlow variant="teal" />
       {/* Glow Effects */}
       <div className="pointer-events-none absolute top-0 left-1/2 h-[450px] w-[800px] -translate-x-1/2 rounded-full bg-purple-600/15 blur-[140px]" />
 

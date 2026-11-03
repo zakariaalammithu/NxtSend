@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { SectionGlow } from "@/components/marketing/SectionGlow";
 
 /**
  * Trusted-by logo wall (P6, owner-directed).
@@ -47,9 +48,12 @@ export function TrustedBy() {
   return (
     <section
       aria-label="Trusted by outreach experts"
-      className="relative border-t border-black-700/80 py-16 lg:py-20"
+      className="relative overflow-hidden border-t border-black-700/80 py-16 lg:py-20"
     >
-      <div className="section-container">
+
+      <SectionGlow variant="emerald" />
+
+      <div className="section-container relative z-10">
         <h2 className="text-center text-24 sm:text-30 font-bold tracking-tight text-white">
           Trusted by more than 3,000 outreach experts
         </h2>

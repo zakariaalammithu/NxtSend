@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SectionGlow } from "@/components/marketing/SectionGlow";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -200,8 +201,11 @@ export default function SupportPage() {
   return (
     <div className="relative overflow-hidden bg-black-900">
       {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <section className="relative pt-32 pb-14 sm:pt-36">
-        <div
+      <section className="relative overflow-hidden pt-32 pb-14 sm:pt-36">
+
+      <SectionGlow variant="emerald" />
+
+      <div
           aria-hidden="true"
           className="pointer-events-none absolute -top-32 left-1/2 h-[420px] w-[820px] -translate-x-1/2 rounded-full bg-purple-600/10 blur-[140px]"
         />
@@ -261,8 +265,11 @@ export default function SupportPage() {
       </section>
 
       {/* ── Guides ───────────────────────────────────────────────────── */}
-      <section className="relative border-t border-white/10 py-16">
-        <div className="section-container">
+      <section className="relative overflow-hidden border-t border-white/10 py-16">
+
+      <SectionGlow variant="blue" />
+
+      <div className="section-container relative z-10">
           <div className="mx-auto max-w-4xl space-y-6">
             {GUIDES.map((guide) => (
               <article
@@ -330,8 +337,11 @@ export default function SupportPage() {
       </section>
 
       {/* ── FAQ ──────────────────────────────────────────────────────── */}
-      <section id="faq" className="relative scroll-mt-28 border-t border-white/10 py-16">
-        <div className="section-container">
+      <section id="faq" className="relative overflow-hidden scroll-mt-28 border-t border-white/10 py-16">
+
+      <SectionGlow variant="violet" />
+
+      <div className="section-container relative z-10">
           <div className="mx-auto max-w-4xl">
             <div className="flex items-center gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-purple-600/20 text-purple-300">
@@ -349,8 +359,11 @@ export default function SupportPage() {
       </section>
 
       {/* ── Contact ──────────────────────────────────────────────────── */}
-      <section className="relative border-t border-white/10 py-16">
-        <div className="section-container">
+      <section className="relative overflow-hidden border-t border-white/10 py-16">
+
+      <SectionGlow variant="violet" />
+
+      <div className="section-container relative z-10">
           <div className="mx-auto max-w-4xl rounded-3xl border border-white/10 bg-gradient-to-br from-[#2a1650] via-[#170b33] to-black-900 p-8 text-center sm:p-10">
             <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-white">
               <Inbox className="h-5 w-5" />

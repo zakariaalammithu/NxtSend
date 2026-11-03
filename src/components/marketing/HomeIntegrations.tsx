@@ -186,7 +186,26 @@ export function HomeIntegrations() {
         }}
       />
       <div className="section-container relative py-24 lg:py-32">
-        {/* Decorative tile constellation above the heading — the
+        {/* Heading first, then the decorative constellation: the
+            section must open with its heading and subtitle (the
+            owner-supplied copy, pinned by test), not with a grid of
+            mostly-empty decorative tiles. */}
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="text-12 font-semibold uppercase tracking-widest text-emerald-400">
+            Integrations
+          </p>
+          <h2 className="mt-4 text-36 font-semibold leading-[1.08] tracking-tight text-white sm:text-48">
+            Integrates with your favorite tools
+          </h2>
+          <p className="mx-auto mt-5 max-w-2xl text-16 leading-relaxed text-white/60">
+            Every card below shows the integration&rsquo;s real state in
+            NxtSend today — what works, what needs your key or plan, and
+            what is not built yet. Nothing is presented as connected
+            until it is configured in the Integration Center.
+          </p>
+        </div>
+
+        {/* Decorative tile constellation below the heading — the
             bizreviewradar.com header treatment the owner asked for
             (P6 follow-up): a 5×4 grid of rounded tiles, most of them
             EMPTY outline boxes (part of the design), the rest filled
@@ -194,7 +213,7 @@ export function HomeIntegrations() {
             links, no status claims. */}
         <div
           aria-hidden="true"
-          className="mx-auto mb-12 grid w-fit grid-cols-5 gap-3 sm:mb-16 sm:gap-5"
+          className="mx-auto mt-12 grid w-fit grid-cols-5 gap-3 sm:mt-16 sm:gap-5"
         >
           {CONSTELLATION.map((logo, i) =>
             logo ? (
@@ -217,21 +236,6 @@ export function HomeIntegrations() {
               />
             ),
           )}
-        </div>
-
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="text-12 font-semibold uppercase tracking-widest text-emerald-400">
-            Integrations
-          </p>
-          <h2 className="mt-4 text-36 font-semibold leading-[1.08] tracking-tight text-white sm:text-48">
-            Integrates with your favorite tools
-          </h2>
-          <p className="mx-auto mt-5 max-w-2xl text-16 leading-relaxed text-white/60">
-            Every card below shows the integration&rsquo;s real state in
-            NxtSend today — what works, what needs your key or plan, and
-            what is not built yet. Nothing is presented as connected
-            until it is configured in the Integration Center.
-          </p>
         </div>
 
         <ul className="mx-auto mt-14 grid max-w-6xl grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">

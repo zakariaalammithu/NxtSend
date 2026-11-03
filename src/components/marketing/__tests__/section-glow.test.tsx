@@ -19,6 +19,7 @@ import { describe, expect, it } from "vitest";
 import { SectionGlow } from "../SectionGlow";
 import { Footer } from "../Footer";
 import { TrustedBy } from "../TrustedBy";
+import { HomeIntegrations } from "../HomeIntegrations";
 
 (globalThis as { React?: typeof React }).React = React;
 
@@ -79,6 +80,23 @@ describe("TrustedBy logo wall", () => {
     ]) {
       expect(html).toContain(name);
     }
+  });
+});
+
+describe("HomeIntegrations heading copy", () => {
+  it("opens with the owner-supplied heading and subtitle, exactly once", () => {
+    const html = render(<HomeIntegrations />);
+    const heading = "Integrates with your favorite tools";
+    expect(html).toContain(heading);
+    expect(html.indexOf(heading)).toBe(html.lastIndexOf(heading));
+    expect(html).toContain(
+      "Every card below shows the integration’s real state in NxtSend today",
+    );
+    expect(html).toContain(
+      "Nothing is presented as connected until it is configured in the Integration Center.",
+    );
+    // Heading block comes before the decorative constellation tiles.
+    expect(html.indexOf(heading)).toBeLessThan(html.indexOf("grid-cols-5"));
   });
 });
 

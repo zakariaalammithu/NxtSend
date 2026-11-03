@@ -139,6 +139,11 @@ export default function MarketingHomePage() {
       {/* HERO */}
       {/* ──────────────────────────────────────────────────────────────────── */}
       <section className="relative flex flex-col justify-center bg-gradient-hero pt-12 pb-20 lg:pt-20 lg:pb-24">
+        {/* Same SectionGlow treatment as the rest of the site (emerald =
+            the screenshot hero's teal-green top light + faint grid).
+            overflow-hidden is deliberately NOT added here: the hero's
+            existing -top-40 / -right-40 blurs are meant to bleed out. */}
+        <SectionGlow variant="emerald" />
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.15]"
           style={{

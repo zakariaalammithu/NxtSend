@@ -17,6 +17,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { SectionGlow } from "../SectionGlow";
+import { Footer } from "../Footer";
 
 (globalThis as { React?: typeof React }).React = React;
 
@@ -39,6 +40,14 @@ describe("SectionGlow", () => {
     const html = render(<SectionGlow variant="blue" grid={false} />);
     expect(html).toContain("radial-gradient");
     expect(html).not.toContain("64px 64px");
+  });
+});
+
+describe("Footer bookend", () => {
+  it("the shared footer carries the same emerald glow as the home hero", () => {
+    const html = render(<Footer />);
+    expect(html).toContain("radial-gradient");
+    expect(html).toContain("64px 64px");
   });
 });
 

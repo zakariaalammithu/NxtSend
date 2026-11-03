@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { Logo } from "@/components/brand/Logo";
+import { SectionGlow } from "@/components/marketing/SectionGlow";
 import { BRAND_TAGLINE } from "@/lib/brand";
 import { Linkedin, Facebook } from "lucide-react";
 interface FooterLink {
@@ -80,6 +81,11 @@ export function Footer() {
     <footer className="relative w-full bg-black-900 px-3 pb-3 pt-2 text-white sm:px-4 sm:pb-4">
       {/* Large dark navy rounded container */}
       <div className="relative mx-auto max-w-[1400px] overflow-hidden rounded-[2.5rem] border border-white/5 bg-black-800 px-6 py-14 sm:px-10 lg:px-14">
+        {/* Bookend to the home hero: the same emerald SectionGlow, so the
+            site ends the way it begins. The card is already
+            overflow-hidden and its content grid is relative, so the
+            glow sits behind the copy. */}
+        <SectionGlow variant="emerald" />
         {/* Subtle ambient glow */}
         <div
           className="pointer-events-none absolute -top-24 left-1/3 h-64 w-[560px] rounded-full bg-purple-600/10 blur-[110px]"

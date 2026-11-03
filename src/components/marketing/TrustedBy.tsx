@@ -20,9 +20,14 @@ import { SectionGlow } from "@/components/marketing/SectionGlow";
  *   exactly as supplied, shown as rounded app-style icons.
  * - Dark wordmarks that would vanish on a dark background (HubSpot's
  *   navy, Clay's black text, Flip's black text, Acquisition's black
- *   triangle, BizReviewRadar's dark navy) were knocked out to white.
- *   Saturated brand colours — HubSpot orange, Clay's rainbow, Flip
- *   green, Indoorcare green, Sandler/Spacebar blue — are untouched.
+ *   triangle) were knocked out to white. Saturated brand colours —
+ *   HubSpot orange, Clay's rainbow, Flip green, Indoorcare green,
+ *   Sandler/Spacebar blue — are untouched.
+ * - BizReviewRadar: the owner-attached logo file (2026-11-03) was
+ *   verified byte-identical to the repo's public/images/logos/
+ *   bizreviewradar.png, so the dark version is that exact real logo
+ *   with only its white background stripped; its navy outline and
+ *   teal bars are untouched.
  * - McKinsey: no logo file was ever supplied (the supplied file was
  *   abstract artwork, not a logo), so the brand is still rendered as
  *   a typographic wordmark — now in white serif on dark, not faked

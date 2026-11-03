@@ -61,6 +61,8 @@ describe("TrustedBy logo wall", () => {
     expect(html).toContain("logos%2Fdark%2Fhubspot.png");
     expect(html).toContain("logos%2Fdark%2Fclay.png");
     expect(html).toContain("logos%2Fdark%2Fflip-electronics.png");
+    // BizReviewRadar: the owner-attached real logo, dark version.
+    expect(html).toContain("logos%2Fdark%2Fbizreviewradar.png");
     for (const name of [
       "HubSpot",
       "Clay",

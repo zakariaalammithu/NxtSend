@@ -59,7 +59,7 @@ export function AvatarsPricing() {
               alongside your existing accounts
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-x-2.5 gap-y-2">
-              <span className="text-48 font-medium leading-none text-white xl:text-54">
+              <span className="text-36 font-medium leading-none text-white sm:text-48 xl:text-54">
                 {formatPrice(priceFor(AVATAR_PRICES, billing))}
               </span>
               <span className="self-end pb-1 text-15 font-semibold text-white/70">

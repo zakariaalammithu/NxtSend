@@ -61,7 +61,7 @@ export function HomePricing() {
                 your workspace
               </p>
               <div className="mt-7 flex flex-wrap items-end gap-x-2.5 gap-y-2">
-                <span className="text-54 font-semibold leading-none text-white">
+                <span className="text-36 font-semibold leading-none text-white sm:text-54">
                   {formatPrice(priceFor(SEAT_PRICES, billing))}
                 </span>
                 <span className="pb-1 text-15 text-white/60">/mo</span>
@@ -135,7 +135,7 @@ export function HomePricing() {
               <div className="mt-7">
                 <div className="text-13 text-white/60">From:</div>
                 <div className="mt-1 flex flex-wrap items-end gap-x-2.5 gap-y-2">
-                  <span className="text-54 font-semibold leading-none text-white">
+                  <span className="text-36 font-semibold leading-none text-white sm:text-54">
                     {formatPrice(priceFor(AGENCY_PRICES, billing))}
                   </span>
                   <span className="pb-1 text-15 text-white/60">/20 seats</span>
@@ -199,7 +199,7 @@ export function HomePricing() {
                   shape them around your offer
                 </p>
                 <div className="mt-7 flex flex-wrap items-end gap-x-2.5 gap-y-2">
-                  <span className="text-54 font-semibold leading-none text-white">
+                  <span className="text-36 font-semibold leading-none text-white sm:text-54">
                     {formatPrice(priceFor(AVATAR_PRICES, billing))}
                   </span>
                   <span className="pb-1 text-15 text-white/60">/month</span>

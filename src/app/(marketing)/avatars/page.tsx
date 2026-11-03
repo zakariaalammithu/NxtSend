@@ -382,7 +382,7 @@ export default function AvatarsPage() {
 
       <div className="section-container flex flex-col items-center">
           <div className="mx-auto mb-12 flex max-w-2xl flex-col items-center text-center">
-            <h2 className="text-48 font-semibold text-white xl:text-54">
+            <h2 className="text-36 font-semibold text-white sm:text-48 xl:text-54">
               Simple pricing that grows with you
             </h2>
           </div>

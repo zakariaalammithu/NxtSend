@@ -65,7 +65,7 @@ export function AgencyPricing() {
             <div className="mt-8">
               <span className="text-15 font-medium text-white/70">From:</span>
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
-                <span className="text-48 font-medium leading-none text-white xl:text-54">
+                <span className="text-36 font-medium leading-none text-white sm:text-48 xl:text-54">
                   {formatPrice(priceFor(AGENCY_PRICES, billing))}
                 </span>
                 <span className="flex flex-col items-start gap-1.5">

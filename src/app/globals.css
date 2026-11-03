@@ -122,7 +122,12 @@
 
   /* Input field */
   .input-field {
-    @apply w-full rounded-xl border border-black-600 bg-black-800 px-4 py-3 text-14 text-white placeholder-black-400 transition-all duration-200 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500/50;
+    /* text-16 on phones: iOS Safari auto-zooms the page when a text
+       field below 16px receives focus, which breaks the layout on
+       every form (login, signup, contact, demo, dashboard). Desktop
+       keeps the previous 14px size. This one class feeds Input,
+       Select and Textarea, so the fix is site-wide. */
+    @apply w-full rounded-xl border border-black-600 bg-black-800 px-4 py-3 text-16 text-white placeholder-black-400 transition-all duration-200 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500/50 sm:text-14;
   }
 
   /* Table row hover */

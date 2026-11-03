@@ -104,7 +104,8 @@ export default function AdminTransactionsPage() {
                 : "No webhook processing failures recorded."}
             </p>
           ) : (
-            <table className="w-full text-13 mt-4">
+            <div className="overflow-x-auto mt-4">
+            <table className="w-full min-w-[640px] text-13">
               <thead>
                 <tr className="text-left text-11 uppercase tracking-wider text-black-500 border-b border-black-700/60">
                   <th className="py-2 pr-4 font-semibold">Received</th>
@@ -144,6 +145,7 @@ export default function AdminTransactionsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       )}

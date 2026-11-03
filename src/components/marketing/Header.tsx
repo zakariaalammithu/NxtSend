@@ -201,7 +201,7 @@ export function Header() {
                     {/* Product Dropdown Flyout */}
                     {productDropdownOpen && (
                       <div
-                        className="absolute top-full left-1/2 -translate-x-1/2 pt-3 z-50 w-[380px]"
+                        className="absolute top-full left-1/2 -translate-x-1/2 pt-3 z-50 w-[380px] max-w-[calc(100vw-2rem)]"
                         onMouseEnter={handleDropdownEnter}
                         onMouseLeave={handleDropdownLeave}
                       >

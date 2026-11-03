@@ -99,6 +99,9 @@ describe("HomeIntegrations heading copy", () => {
     );
     // Heading block comes before the decorative constellation tiles.
     expect(html.indexOf(heading)).toBeLessThan(html.indexOf("grid-cols-5"));
+    // Heading sits higher: smaller top padding than the usual
+    // py-24 / lg:py-32 marketing section, bottom padding unchanged.
+    expect(html).toContain("pt-16 pb-24 lg:pt-20 lg:pb-32");
   });
 });
 

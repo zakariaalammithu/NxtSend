@@ -185,7 +185,11 @@ export function HomeIntegrations() {
             "radial-gradient(60% 45% at 50% 18%, #000, transparent)",
         }}
       />
-      <div className="section-container relative py-24 lg:py-32">
+      {/* Top padding deliberately smaller than the other marketing
+          sections (owner request 2026-11-03): the heading block sits
+          higher, with less empty space above it; bottom padding
+          stays full so the cards and CTA keep their breathing room. */}
+      <div className="section-container relative pt-16 pb-24 lg:pt-20 lg:pb-32">
         {/* Heading first, then the decorative constellation: the
             section must open with its heading and subtitle (the
             owner-supplied copy, pinned by test), not with a grid of

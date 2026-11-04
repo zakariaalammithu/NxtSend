@@ -300,7 +300,7 @@ export default function SignupForm({
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
         {/* Full Name */}
         <div>
           <label
@@ -319,13 +319,11 @@ export default function SignupForm({
               errors.fullName ? "border-rose-500 focus:border-rose-500" : ""
             }`}
           />
-          <div className="min-h-[22px]">
-            {errors.fullName?.message && (
-              <p className="mt-1.5 text-12 text-rose-400">
-                {errors.fullName.message}
-              </p>
-            )}
-          </div>
+          {errors.fullName?.message && (
+            <p className="mt-1.5 text-12 text-rose-400">
+              {errors.fullName.message}
+            </p>
+          )}
         </div>
 
         {/* Work Email */}
@@ -346,13 +344,11 @@ export default function SignupForm({
               errors.email ? "border-rose-500 focus:border-rose-500" : ""
             }`}
           />
-          <div className="min-h-[22px]">
-            {errors.email?.message && (
-              <p className="mt-1.5 text-12 text-rose-400">
-                {errors.email.message}
-              </p>
-            )}
-          </div>
+          {errors.email?.message && (
+            <p className="mt-1.5 text-12 text-rose-400">
+              {errors.email.message}
+            </p>
+          )}
         </div>
 
         {/* Password */}
@@ -410,13 +406,11 @@ export default function SignupForm({
             </div>
           )}
 
-          <div className="min-h-[22px]">
-            {errors.password?.message && (
-              <p className="mt-1.5 text-12 text-rose-400">
-                {errors.password.message}
-              </p>
-            )}
-          </div>
+          {errors.password?.message && (
+            <p className="mt-1.5 text-12 text-rose-400">
+              {errors.password.message}
+            </p>
+          )}
         </div>
 
         {/* Confirm Password */}
@@ -455,13 +449,11 @@ export default function SignupForm({
               )}
             </button>
           </div>
-          <div className="min-h-[22px]">
-            {errors.confirmPassword?.message && (
-              <p className="mt-1.5 text-12 text-rose-400">
-                {errors.confirmPassword.message}
-              </p>
-            )}
-          </div>
+          {errors.confirmPassword?.message && (
+            <p className="mt-1.5 text-12 text-rose-400">
+              {errors.confirmPassword.message}
+            </p>
+          )}
         </div>
 
         {/* Terms Checkbox */}
@@ -489,20 +481,18 @@ export default function SignupForm({
               </Link>
             </span>
           </label>
-          <div className="min-h-[22px]">
-            {errors.terms?.message && (
-              <p className="mt-1.5 text-12 text-rose-400">
-                {errors.terms.message}
-              </p>
-            )}
-          </div>
+          {errors.terms?.message && (
+            <p className="mt-1.5 text-12 text-rose-400">
+              {errors.terms.message}
+            </p>
+          )}
         </div>
 
         {/* Submit Button */}
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold py-3 px-4 text-14 transition-all duration-200 shadow-glow-purple disabled:opacity-50 disabled:pointer-events-none mt-3"
+          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold py-3 px-4 text-14 transition-all duration-200 shadow-glow-purple disabled:opacity-50 disabled:pointer-events-none mt-1"
         >
           {isSubmitting ? (
             <>
@@ -515,7 +505,7 @@ export default function SignupForm({
         </button>
 
         {/* Log in link */}
-        <div className="text-center pt-3">
+        <div className="text-center pt-2">
           <p className="text-13 text-black-400">
             Already have an account?{" "}
             <Link

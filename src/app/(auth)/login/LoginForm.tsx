@@ -151,7 +151,7 @@ export default function LoginForm({
   return (
     <div className="w-full">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-5">
         <h2 className="text-24 sm:text-28 font-bold tracking-tight text-white">
           Welcome back
         </h2>
@@ -193,7 +193,7 @@ export default function LoginForm({
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
         {/* Email */}
         <div>
           <label

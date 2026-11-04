@@ -1,6 +1,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { Logo } from "@/components/brand/Logo";
+import { SectionGlow } from "@/components/marketing/SectionGlow";
 import { CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
 
 export default function AuthLayout({
@@ -94,8 +95,13 @@ export default function AuthLayout({
 
       {/* Right 60% Form Container (Full width on mobile) */}
       <div className="flex-1 flex flex-col justify-center items-center px-4 py-8 sm:px-8 sm:py-12 relative overflow-y-auto">
+        {/* Home-page background treatment (owner request 2026-11-04):
+            the same emerald top glow + faint grid the home hero
+            uses, so login and signup share the site's look instead
+            of a flat dark panel. Decorative only. */}
+        <SectionGlow variant="emerald" />
         {/* Mobile Header Logo */}
-        <div className="lg:hidden mb-8 text-center">
+        <div className="lg:hidden mb-8 text-center relative z-10">
           <Link href="/" className="inline-flex group">
             <Logo
               size={36}
@@ -105,13 +111,15 @@ export default function AuthLayout({
           </Link>
         </div>
 
-        {/* Centered Auth Card */}
-        <div className="w-full max-w-[460px] bg-black-800 border border-black-600/70 rounded-2xl sm:rounded-3xl p-6 sm:p-9 shadow-2xl backdrop-blur-xl relative">
+        {/* Centered Auth Card — same card on login and signup
+            (same max width, same padding), with the shared compact
+            density from .auth-compact so both pages match. */}
+        <div className="auth-compact w-full max-w-[460px] bg-black-800 border border-black-600/70 rounded-2xl sm:rounded-3xl p-6 sm:p-9 shadow-2xl backdrop-blur-xl relative z-10">
           {children}
         </div>
 
         {/* Footer legal links */}
-        <div className="mt-8 text-center text-12 text-black-400">
+        <div className="mt-8 text-center text-12 text-black-400 relative z-10">
           <span>&copy; {new Date().getFullYear()} NxtSend Inc. All rights reserved.</span>
         </div>
       </div>

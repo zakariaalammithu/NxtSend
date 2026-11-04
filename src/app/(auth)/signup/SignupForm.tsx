@@ -237,7 +237,7 @@ export default function SignupForm({
   return (
     <div className="w-full">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-5">
         <h2 className="text-24 sm:text-28 font-bold tracking-tight text-white">
           Create your account
         </h2>
@@ -300,7 +300,7 @@ export default function SignupForm({
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-2" noValidate>
         {/* Full Name */}
         <div>
           <label
@@ -457,7 +457,7 @@ export default function SignupForm({
         </div>
 
         {/* Terms Checkbox */}
-        <div className="pt-1">
+        <div>
           <label className="flex items-start gap-2.5 cursor-pointer">
             <input
               type="checkbox"
@@ -492,7 +492,7 @@ export default function SignupForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold py-3 px-4 text-14 transition-all duration-200 shadow-glow-purple disabled:opacity-50 disabled:pointer-events-none mt-1"
+          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold py-3 px-4 text-14 transition-all duration-200 shadow-glow-purple disabled:opacity-50 disabled:pointer-events-none"
         >
           {isSubmitting ? (
             <>
@@ -505,7 +505,7 @@ export default function SignupForm({
         </button>
 
         {/* Log in link */}
-        <div className="text-center pt-2">
+        <div className="text-center pt-1">
           <p className="text-13 text-black-400">
             Already have an account?{" "}
             <Link

@@ -130,6 +130,14 @@
     @apply w-full rounded-xl border border-black-600 bg-black-800 px-4 py-3 text-16 text-white placeholder-black-400 transition-all duration-200 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500/50 sm:text-14;
   }
 
+  /* Compact auth density (login + signup only): slightly shorter
+     text fields so both cards share one footprint and the taller
+     signup card fits a laptop viewport like the login card does.
+     Dashboard and marketing forms keep the roomier py-3 fields. */
+  .auth-compact .input-field {
+    @apply py-2.5;
+  }
+
   /* Table row hover */
   .table-row-hover {
     @apply transition-colors duration-150 hover:bg-black-800/50;

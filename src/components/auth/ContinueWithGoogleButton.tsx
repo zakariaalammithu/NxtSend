@@ -56,7 +56,7 @@ export function GoogleMark({ className }: { className?: string }) {
  *  form — same markup pattern the auth forms already use. */
 export function AuthOrDivider() {
   return (
-    <div className="relative my-6 text-center" aria-hidden="true">
+    <div className="relative my-4 text-center" aria-hidden="true">
       <div className="absolute inset-0 flex items-center">
         <div className="w-full border-t border-black-600/70" />
       </div>

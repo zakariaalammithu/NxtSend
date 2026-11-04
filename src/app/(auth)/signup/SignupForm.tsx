@@ -301,8 +301,13 @@ export default function SignupForm({
 
       {/* Form */}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-2" noValidate>
+        {/* Full Name + Work Email share one row on desktop (stacked
+            on phones): this is what finally brings the signup card
+            to the login card's height — one field row saved, no
+            field, validation or copy removed. */}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
         {/* Full Name */}
-        <div>
+        <div className="min-w-0">
           <label
             htmlFor="fullName"
             className="block text-13 font-medium text-black-200 mb-1.5"
@@ -327,7 +332,7 @@ export default function SignupForm({
         </div>
 
         {/* Work Email */}
-        <div>
+        <div className="min-w-0">
           <label
             htmlFor="email"
             className="block text-13 font-medium text-black-200 mb-1.5"
@@ -349,6 +354,8 @@ export default function SignupForm({
               {errors.email.message}
             </p>
           )}
+        </div>
+
         </div>
 
         {/* Password */}

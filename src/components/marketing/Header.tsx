@@ -147,7 +147,7 @@ export function Header() {
           className={cn(
             "mx-auto flex items-center justify-between transition-all duration-300",
             isScrolled
-              ? "pointer-events-auto max-w-6xl rounded-full bg-black-900/90 backdrop-blur-md border border-black-700 shadow-[0_12px_40px_rgba(0,0,0,0.6)] px-5 sm:px-6 py-2.5"
+              ? "pointer-events-auto max-w-6xl rounded-full bg-black-900/90 backdrop-blur-md border border-black-700 shadow-[0_12px_40px_rgba(0,0,0,0.6)] px-4 sm:px-5 py-2"
               : "max-w-7xl"
           )}
         >
@@ -157,7 +157,7 @@ export function Header() {
             className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 transition-opacity hover:opacity-90"
             aria-label="NxtSend Home"
           >
-            <Logo size={32} wordmarkClassName="text-20" />
+            <Logo size={28} wordmarkClassName="text-18" />
           </Link>
 
           {/* Desktop Navigation (lg+ breakpoint) */}
@@ -179,7 +179,7 @@ export function Header() {
                       type="button"
                       onClick={() => setProductDropdownOpen((prev) => !prev)}
                       className={cn(
-                        "inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-14 font-medium transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500",
+                        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-14 font-medium transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500",
                         isProductActive || productDropdownOpen
                           ? "text-white font-semibold"
                           : "text-black-400 hover:text-white"
@@ -266,7 +266,7 @@ export function Header() {
                   key={item.label}
                   href={item.href!}
                   className={cn(
-                    "px-3.5 py-2 rounded-full text-14 font-medium transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500",
+                    "px-3 py-1.5 rounded-full text-14 font-medium transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500",
                     isActive
                       ? "text-white font-semibold"
                       : "text-black-400 hover:text-white"
@@ -283,7 +283,7 @@ export function Header() {
             <Link
               href="/demo"
               className={cn(
-                "text-14 font-medium transition-colors duration-200 px-3.5 py-1.5 rounded-full hover:bg-black-800/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500",
+                "text-14 font-medium transition-colors duration-200 px-3 py-1.5 rounded-full hover:bg-black-800/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500",
                 pathname === "/demo"
                   ? "text-white font-semibold"
                   : "text-black-400 hover:text-white"
@@ -302,7 +302,7 @@ export function Header() {
             <Link
               href="/login"
               className={cn(
-                "text-14 font-medium transition-colors duration-200 px-3.5 py-1.5 rounded-full hover:bg-black-800/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500",
+                "text-14 font-medium transition-colors duration-200 px-3 py-1.5 rounded-full hover:bg-black-800/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500",
                 pathname === "/login"
                   ? "text-white font-semibold"
                   : "text-black-400 hover:text-white"
@@ -313,7 +313,7 @@ export function Header() {
 
             <Link
               href="/signup"
-              className="rounded-full bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-600 text-white font-semibold text-14 px-5 py-2 shadow-lg shadow-purple-900/30 hover:shadow-glow-purple transition-all duration-200 transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 active:translate-y-0"
+              className="rounded-full bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-600 text-white font-semibold text-14 px-4 py-1.5 shadow-lg shadow-purple-900/30 hover:shadow-glow-purple transition-all duration-200 transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 active:translate-y-0"
             >
               Start for Free
             </Link>

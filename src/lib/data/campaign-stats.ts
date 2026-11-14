@@ -30,6 +30,7 @@
  */
 
 import type { Campaign } from "@/types";
+import type { Lead } from "@/types";
 import { createClient } from "@/lib/supabase/client";
 import { DemoExecutorStore } from "@/lib/executor/demo-store";
 import {
@@ -130,6 +131,12 @@ export interface CampaignStats {
   email: EmailStats;
   /** Inbound replies across both channels. */
   repliesTotal: number;
+  /**
+   * Meetings booked, manually marked on a lead (status `converted` +
+   * `custom_fields.meeting_booked_at`). No calendar integration
+   * exists — this counts only what an owner recorded by hand.
+   */
+  meetingsBooked: number;
   executions: ExecutionOutcomeStats;
 }
 
@@ -137,6 +144,13 @@ export interface CampaignStatsSource {
   enrollments: EnrollmentRecord[];
   messages: HistoryMessage[];
   executions: StepExecutionRecord[];
+  /**
+   * Workspace leads, for the meetings-booked count: an enrollment
+   * counts when its lead carries a non-empty
+   * `custom_fields.meeting_booked_at`. Optional so older callers
+   * keep working — absent leads simply count as zero meetings.
+   */
+  leads?: Lead[];
   /**
    * Provider event counts PRE-SCOPED to the campaign being computed
    * (or to the workspace when campaignId is null), or null when no
@@ -188,6 +202,27 @@ export function countEmailEvents(
     else if (evt.event_type === "email.clicked") clicked++;
   }
   return { opened, clicked };
+}
+
+/**
+ * Counts meetings booked among the given enrollments: an enrollment
+ * counts when its lead carries a non-empty string
+ * `custom_fields.meeting_booked_at` — the timestamp an owner records
+ * by marking the meeting booked by hand (no calendar integration
+ * exists, so nothing here is auto-detected). Enrollments whose lead
+ * is absent from `leads` count as not booked, never as booked.
+ */
+export function countMeetingsBooked(
+  enrollments: EnrollmentRecord[],
+  leads: Array<Pick<Lead, "id" | "custom_fields">>
+): number {
+  const byId = new Map(leads.map((l) => [l.id, l]));
+  let count = 0;
+  for (const e of enrollments) {
+    const bookedAt = byId.get(e.lead_id)?.custom_fields?.meeting_booked_at;
+    if (typeof bookedAt === "string" && bookedAt) count++;
+  }
+  return count;
 }
 
 /**
@@ -319,6 +354,7 @@ export function computeCampaignStats(
       replied: emailReplied,
     },
     repliesTotal: emailReplied + linkedinReplied,
+    meetingsBooked: countMeetingsBooked(enrollments, source.leads ?? []),
     executions: outcomes,
   };
 }
@@ -373,6 +409,7 @@ export function aggregateCampaignStats(
       replied: sum((s) => s.email.replied),
     },
     repliesTotal: sum((s) => s.repliesTotal),
+    meetingsBooked: sum((s) => s.meetingsBooked),
     executions: {
       total: sum((s) => s.executions.total),
       sent: sum((s) => s.executions.sent),
@@ -558,10 +595,13 @@ export async function loadCampaignStats(
   workspaceId: string,
   campaigns: Campaign[]
 ): Promise<{ byCampaign: Map<string, CampaignStats>; aggregate: CampaignStats }> {
-  const [messages, executions, enrollmentLists] = await Promise.all([
+  const [messages, executions, enrollmentLists, leads] = await Promise.all([
     listMessageHistory(deps.inboxRepo, workspaceId, 1000),
     loadExecutions(deps, workspaceId, campaigns),
     Promise.all(campaigns.map((c) => deps.campaignsRepo.listEnrollments(c.id))),
+    // Leads feed the meetings-booked count only; a failed read
+    // degrades to zero meetings rather than failing the whole page.
+    deps.leadsRepo.listLeads(workspaceId).catch(() => []),
   ]);
   const eventCounts = await loadEmailEventCounts(
     deps,
@@ -574,6 +614,7 @@ export async function loadCampaignStats(
     enrollments: enrollmentLists.flat(),
     messages,
     executions,
+    leads,
   };
 
   const byCampaign = new Map<string, CampaignStats>();

@@ -19,6 +19,8 @@ const TEMPLATES: Record<string, string> = {
     "Hi {{first_name}},\n\nNoticed {{company}} is growing its sales motion — most people in {{job_title}} roles I speak with say LinkedIn outreach is hard to run consistently alongside everything else.\n\nWe help teams automate the repetitive parts while keeping messages personal. Open to a 15-minute look this week?\n\nBest regards",
   follow_up:
     "Hi {{first_name}}, floating this back to the top of your inbox — I know things get busy in {{job_title}} roles. If LinkedIn outreach consistency is still a pain at {{company}}, I'm happy to share the short playbook I mentioned. Either way, no hard feelings if the timing isn't right.",
+  inbox_reply:
+    "Hi {{first_name}}, thanks for getting back to me — happy to help with that. Let me check the details on our side and I'll follow up shortly with the next steps.",
 };
 
 export function demoDraft(input: DraftRequest): DraftResult {

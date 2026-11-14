@@ -7,6 +7,7 @@ import { runDueJobs } from "@/lib/jobs/runner";
 import { createJobHandlers } from "@/lib/jobs/handlers";
 import { createSupabaseJobStore, InMemoryJobStore } from "@/lib/jobs/store";
 import { createSupabaseJobsContext } from "@/lib/jobs/context";
+import { processDueScheduledRepliesLive } from "@/lib/scheduled-replies/process";
 import type { JobsContext } from "@/lib/jobs/types";
 
 /**
@@ -72,7 +73,21 @@ async function handle(req: Request) {
     ctx: createSupabaseJobsContext(admin),
     handlers: createJobHandlers(),
   });
-  return NextResponse.json({ mode: "live", ...summary });
+  // Due scheduled inbox replies ride the same daily tick: the worker
+  // sends them through the existing sendInboxReply path (stable
+  // idempotency key per row — a repeated tick can never double-send).
+  // A failure here is reported, never fatal to the jobs summary; for
+  // sub-daily delivery use the guarded /api/cron/scheduled-replies
+  // route with its own cron entry instead.
+  let scheduledReplies: Record<string, unknown>;
+  try {
+    scheduledReplies = { ...(await processDueScheduledRepliesLive(admin)) };
+  } catch (err) {
+    scheduledReplies = {
+      error: err instanceof Error ? err.message : "scheduled-replies run failed",
+    };
+  }
+  return NextResponse.json({ mode: "live", ...summary, scheduledReplies });
 }
 
 function emptyContext(): JobsContext {

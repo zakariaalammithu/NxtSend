@@ -51,6 +51,36 @@ export function normalizeTag(tag: string): string {
   return tag.trim();
 }
 
+/**
+ * Meetings booked — manual outcome tracking (no calendar integration
+ * exists and nothing auto-detects meetings). An owner marks a meeting
+ * booked by hand; the record is the ISO timestamp in
+ * `custom_fields.meeting_booked_at`, or null when no meeting was
+ * marked. A non-string / empty value never counts as booked.
+ */
+export function meetingBookedAt(lead: Lead): string | null {
+  const value = lead.custom_fields?.meeting_booked_at;
+  return typeof value === "string" && value ? value : null;
+}
+
+/**
+ * The patch that marks a meeting booked: status `converted` plus the
+ * timestamp. Pure — the caller passes `nowIso` (tests) or lets it
+ * default to the current time. Existing custom fields are kept.
+ */
+export function meetingBookedPatch(
+  lead: Lead,
+  nowIso: string = new Date().toISOString()
+): Partial<Lead> {
+  return {
+    status: "converted",
+    custom_fields: {
+      ...lead.custom_fields,
+      meeting_booked_at: nowIso,
+    },
+  };
+}
+
 function cloneMockLeads(): Lead[] {
   return MOCK_LEADS.map((l) => ({
     ...l,

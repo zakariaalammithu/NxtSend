@@ -31,6 +31,15 @@ import {
   warmupPatchToAccountPatch,
   warmupStateOf,
 } from "@/lib/data/accounts";
+import {
+  createSafetySettingsRepository,
+  type SafetySettings,
+} from "@/lib/data/safety-settings";
+import {
+  countDemoLinkedInConnections,
+  loadDemoExecutions,
+  saveDemoExecutions,
+} from "./demo-executions";
 import { DEMO_WORKSPACE_ID } from "@/lib/data/workspace";
 import { DEMO_WORKSPACE_PLAN } from "@/lib/data/usage";
 import { generateId } from "@/lib/utils";
@@ -39,7 +48,6 @@ import type {
   WarmupProgramPatch,
   WarmupUsageCounts,
 } from "@/lib/linkedin/warmup";
-import { loadDemoExecutions, saveDemoExecutions } from "./demo-executions";
 import type {
   ClaimStepExecutionInput,
   ExecutorCampaign,
@@ -229,6 +237,27 @@ export class DemoExecutorStore implements ExecutorStore {
       // Best-effort by contract: a failed graduation write must not
       // fail the executor run; the next scan re-derives it.
     }
+  }
+
+  /**
+   * Safety gate: the workspace's safe-sending limits from the demo
+   * safety repository (defaults when no row exists). A failed read
+   * degrades to null — the gate then applies the built-in defaults.
+   */
+  async getSafetySettings(workspaceId: string): Promise<SafetySettings | null> {
+    try {
+      return await createSafetySettingsRepository("demo").get(workspaceId);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Safety gate: today's workspace connection requests, DEMO counting rule. */
+  async countLinkedInConnectionsToday(
+    workspaceId: string,
+    dayStartIso: string
+  ): Promise<number> {
+    return countDemoLinkedInConnections(workspaceId, dayStartIso);
   }
 
   async getLead(workspaceId: string, leadId: string): Promise<Lead | null> {

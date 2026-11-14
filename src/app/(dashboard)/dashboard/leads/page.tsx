@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Upload, Download, Trash2, Search, Linkedin, Target, Check, AlertTriangle, Tags, Copy, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Plus, Upload, Download, Trash2, Search, Linkedin, Target, Check, AlertTriangle, Tags, Copy, ChevronLeft, ChevronRight, X, CalendarCheck } from "lucide-react";
 import { DemoBanner, Badge, Modal } from "@/components/ui";
 import { CsvImport } from "@/components/dashboard/CsvImport";
 import { formatDate } from "@/lib/utils";
@@ -16,6 +16,7 @@ import {
   type DuplicateGroup,
 } from "@/lib/data/duplicates";
 import { leadsToCsv } from "@/lib/data/csv";
+import { meetingBookedAt, meetingBookedPatch } from "@/lib/data/leads";
 import type { Campaign, Lead } from "@/types";
 
 export default function LeadsPage() {
@@ -225,6 +226,34 @@ export default function LeadsPage() {
     } catch (err) {
       setActionError(
         err instanceof Error ? err.message : "Failed to delete the lead."
+      );
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Meeting booked — manual outcome tracking (no calendar integration
+  // exists and nothing auto-detects meetings). Marks the lead
+  // `converted` and records when the meeting was booked. One-shot:
+  // a lead with a meeting already booked shows its booked date
+  // instead of this action.
+  // ---------------------------------------------------------------------------
+  const handleMarkMeetingBooked = async (lead: Lead) => {
+    if (meetingBookedAt(lead)) return;
+    setActionError(null);
+    setActionNotice(null);
+    try {
+      const updated = await leadsRepo.updateLead(
+        lead.id,
+        meetingBookedPatch(lead)
+      );
+      setLeads((prev) => prev.map((l) => (l.id === lead.id ? updated : l)));
+      setActionNotice(
+        `Meeting booked for ${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim() +
+          ` — marked as converted${isDemo ? " (demo store)." : "."}`
+      );
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "Failed to mark the meeting booked."
       );
     }
   };
@@ -765,6 +794,7 @@ export default function LeadsPage() {
               {pagedLeads.map((lead) => {
                 const isSelected = selectedIds.includes(lead.id);
                 const initials = `${lead.first_name?.[0] || ""}${lead.last_name?.[0] || ""}`.toUpperCase();
+                const bookedAt = meetingBookedAt(lead);
 
                 return (
                   <tr
@@ -872,6 +902,27 @@ export default function LeadsPage() {
                     {/* Actions */}
                     <td className="py-4 px-5 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1">
+                        {bookedAt ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600/15 border border-emerald-500/30 px-2 py-1 text-11 font-medium text-emerald-300"
+                            title={`Meeting booked ${formatDate(bookedAt, "short")}`}
+                          >
+                            <CalendarCheck className="h-3.5 w-3.5" />
+                            <span>
+                              Meeting {formatDate(bookedAt, "short")}
+                            </span>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleMarkMeetingBooked(lead)}
+                            className="h-7 w-7 flex items-center justify-center rounded-lg text-emerald-400 hover:bg-emerald-600/20"
+                            title="Mark meeting booked"
+                          >
+                            <CalendarCheck className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+
                         <button
                           type="button"
                           onClick={() => {

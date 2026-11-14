@@ -24,6 +24,10 @@ import {
   warmupStateOf,
 } from "@/lib/data/accounts";
 import {
+  normalizeSafetySettings,
+  type SafetySettings,
+} from "@/lib/data/safety-settings";
+import {
   emptyWarmupUsage,
   stepTypeToWarmupAction,
   type AccountWarmupState,
@@ -240,6 +244,50 @@ export class SupabaseExecutorStore implements ExecutorStore {
       return counts;
     }
     return counts;
+  }
+
+  /**
+   * Safety gate: the workspace's safe-sending limits (migration
+   * 022). Null when there is no stored row or the row cannot be
+   * read — the gate then applies the built-in defaults.
+   */
+  async getSafetySettings(workspaceId: string): Promise<SafetySettings | null> {
+    try {
+      const { data, error } = await this.admin
+        .from("workspace_safety_settings")
+        .select("*")
+        .eq("workspace_id", workspaceId)
+        .maybeSingle();
+      if (error || !data) return null;
+      return normalizeSafetySettings(data as Row, workspaceId);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Safety gate: today's workspace connection requests. Live counts
+   * status='sent' only (real sends), matching the warm-up counter
+   * above; demo counts dispatch attempts instead.
+   */
+  async countLinkedInConnectionsToday(
+    workspaceId: string,
+    dayStartIso: string
+  ): Promise<number> {
+    try {
+      const { data, error } = await this.admin
+        .from("campaign_step_executions")
+        .select("id")
+        .eq("workspace_id", workspaceId)
+        .eq("channel", "linkedin")
+        .eq("step_type", "connection_request")
+        .eq("status", "sent")
+        .gte("created_at", dayStartIso);
+      if (error || !data) return 0;
+      return data.length;
+    } catch {
+      return 0;
+    }
   }
 
   /**

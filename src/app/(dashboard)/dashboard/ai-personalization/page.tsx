@@ -10,12 +10,17 @@ import {
   Loader2,
   RefreshCw,
   ShieldAlert,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { DemoBanner, Badge } from "@/components/ui";
 import {
   getCampaignsRepository,
   getLeadsRepository,
+  getPromptSnippetsRepository,
   resolveWorkspaceId,
+  SNIPPET_CATEGORIES,
+  type PromptSnippet,
 } from "@/lib/data";
 import type { Campaign, Lead } from "@/types";
 import type { IntegrationStatusEntry } from "@/lib/integrations-center/types";
@@ -68,6 +73,7 @@ interface DraftResponse {
 export default function AiPersonalizationPage() {
   const leadsRepo = React.useMemo(() => getLeadsRepository(), []);
   const campaignsRepo = React.useMemo(() => getCampaignsRepository(), []);
+  const snippetsRepo = React.useMemo(() => getPromptSnippetsRepository(), []);
   const isDemo = leadsRepo.mode === "demo";
 
   const [providers, setProviders] = React.useState<ProviderPanelEntry[]>([]);
@@ -86,6 +92,83 @@ export default function AiPersonalizationPage() {
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [loadError, setLoadError] = React.useState<string | null>(null);
+
+  // Reply snippet library (co-pilot): managed here, inserted from the
+  // Inbox composer. No separate settings page.
+  const [snippets, setSnippets] = React.useState<PromptSnippet[]>([]);
+  const [snippetWorkspaceId, setSnippetWorkspaceId] = React.useState<string | null>(null);
+  const [newSnippetTitle, setNewSnippetTitle] = React.useState("");
+  const [newSnippetBody, setNewSnippetBody] = React.useState("");
+  const [newSnippetCategory, setNewSnippetCategory] = React.useState<string>("general");
+  const [snippetNote, setSnippetNote] = React.useState<{
+    tone: "error" | "info";
+    text: string;
+  } | null>(null);
+  const [savingSnippet, setSavingSnippet] = React.useState(false);
+  const [deletingSnippetId, setDeletingSnippetId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const ws = await resolveWorkspaceId();
+        if (!ws || cancelled) return;
+        setSnippetWorkspaceId(ws);
+        setSnippets(await snippetsRepo.listSnippets(ws));
+      } catch (err) {
+        if (!cancelled) {
+          setSnippetNote({
+            tone: "error",
+            text: err instanceof Error ? err.message : "Could not load snippets.",
+          });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [snippetsRepo]);
+
+  const handleAddSnippet = async () => {
+    if (!snippetWorkspaceId || savingSnippet) return;
+    setSavingSnippet(true);
+    setSnippetNote(null);
+    try {
+      const created = await snippetsRepo.createSnippet(snippetWorkspaceId, {
+        title: newSnippetTitle,
+        body: newSnippetBody,
+        category: newSnippetCategory,
+      });
+      setSnippets((prev) => [created, ...prev]);
+      setNewSnippetTitle("");
+      setNewSnippetBody("");
+      setNewSnippetCategory("general");
+      setSnippetNote({ tone: "info", text: "Snippet added — it is now available in the Inbox composer." });
+    } catch (err) {
+      setSnippetNote({
+        tone: "error",
+        text: err instanceof Error ? err.message : "Could not add the snippet.",
+      });
+    } finally {
+      setSavingSnippet(false);
+    }
+  };
+
+  const handleDeleteSnippet = async (id: string) => {
+    if (deletingSnippetId) return;
+    setDeletingSnippetId(id);
+    try {
+      await snippetsRepo.deleteSnippet(id);
+      setSnippets((prev) => prev.filter((s) => s.id !== id));
+    } catch (err) {
+      setSnippetNote({
+        tone: "error",
+        text: err instanceof Error ? err.message : "Could not delete the snippet.",
+      });
+    } finally {
+      setDeletingSnippetId(null);
+    }
+  };
 
   // Provider status — from the Integration Center status API (the
   // same source the Integration Center renders; no second truth).
@@ -530,6 +613,131 @@ export default function AiPersonalizationPage() {
             endpoint itself — this page shows them verbatim.
           </p>
         </div>
+      </div>
+
+      {/* Reply snippet library — inserted from the Inbox composer */}
+      <div className="glass-card p-6 sm:p-8 space-y-5">
+        <div>
+          <h2 className="text-16 font-semibold text-white">
+            Reply snippet library
+          </h2>
+          <p className="text-13 text-black-300 mt-0.5">
+            Short reusable reply texts for the Inbox composer. Pick one from
+            the Snippets button next to a reply, edit it in the composer,
+            then send or schedule it as usual.
+            {isDemo &&
+              " Demo Mode: snippets are stored in your browser only."}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-13 font-medium text-black-200 mb-1.5">
+              Title
+            </label>
+            <input
+              type="text"
+              value={newSnippetTitle}
+              onChange={(e) => setNewSnippetTitle(e.target.value)}
+              placeholder="e.g. Thanks for reaching out"
+              className="w-full rounded-xl border border-black-600 bg-black-800 px-3 py-2.5 text-13 text-white focus:outline-none focus:border-purple-500"
+            />
+          </div>
+          <div>
+            <label className="block text-13 font-medium text-black-200 mb-1.5">
+              Category
+            </label>
+            <select
+              value={newSnippetCategory}
+              onChange={(e) => setNewSnippetCategory(e.target.value)}
+              className="w-full rounded-xl border border-black-600 bg-black-800 px-3 py-2.5 text-13 text-white focus:outline-none focus:border-purple-500"
+            >
+              {SNIPPET_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button
+              type="button"
+              onClick={handleAddSnippet}
+              disabled={
+                savingSnippet || !newSnippetTitle.trim() || !newSnippetBody.trim()
+              }
+              className="inline-flex items-center gap-2 rounded-xl bg-purple-600 hover:bg-purple-500 px-5 py-2.5 text-14 font-semibold text-white shadow-glow-purple transition-all disabled:opacity-50"
+            >
+              {savingSnippet ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
+              <span>{savingSnippet ? "Adding…" : "Add snippet"}</span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-13 font-medium text-black-200 mb-1.5">
+            Snippet text
+          </label>
+          <textarea
+            value={newSnippetBody}
+            onChange={(e) => setNewSnippetBody(e.target.value)}
+            rows={3}
+            placeholder="Write the reusable reply text…"
+            className="input-field resize-y w-full"
+          />
+        </div>
+
+        {snippetNote && (
+          <p
+            className={`text-13 ${
+              snippetNote.tone === "error" ? "text-rose-300" : "text-emerald-300"
+            }`}
+            role="status"
+          >
+            {snippetNote.text}
+          </p>
+        )}
+
+        {snippets.length === 0 ? (
+          <p className="text-13 text-black-400">
+            No snippets yet. Add your first one above — it will appear in the
+            Inbox composer&apos;s Snippets picker.
+          </p>
+        ) : (
+          <ul className="divide-y divide-black-700/60">
+            {snippets.map((s) => (
+              <li key={s.id} className="py-3 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-13 font-medium text-white flex items-center gap-2">
+                    {s.title}
+                    <Badge variant="gray">{s.category}</Badge>
+                  </p>
+                  <p className="text-13 text-black-300 mt-1 whitespace-pre-wrap">
+                    {s.body}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteSnippet(s.id)}
+                  disabled={deletingSnippetId === s.id}
+                  className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-black-800 px-2.5 py-1.5 text-12 text-rose-300 hover:bg-rose-950/60 disabled:opacity-50"
+                  aria-label={`Delete snippet ${s.title}`}
+                >
+                  {deletingSnippetId === s.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                  Delete
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

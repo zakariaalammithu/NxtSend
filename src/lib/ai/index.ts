@@ -46,3 +46,16 @@ export async function draftOutreachMessage(
         : new MetaModelAdapter();
   return adapter.draftOutreach(input);
 }
+
+/**
+ * Co-pilot reply draft for the Inbox composer (stepType "inbox_reply").
+ *
+ * Same orchestration as draftOutreachMessage — demo returns the
+ * labelled local template, unconfigured returns not_configured, a
+ * configured provider drafts from the inbound message + thread
+ * context. The result is text for the composer, never a send: the
+ * Inbox page fills the textarea and the human reviews/sends it.
+ */
+export async function draftReply(input: DraftRequest): Promise<DraftResult> {
+  return draftOutreachMessage(input);
+}

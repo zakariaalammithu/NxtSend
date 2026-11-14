@@ -114,3 +114,25 @@ export function countDemoLinkedInActions(
   }
   return counts;
 }
+
+/**
+ * Today's workspace-wide connection-request count for the safety
+ * gate (UTC day from `dayStartIso`), under the same DEMO counting
+ * rule: dispatch attempts (sent / simulated / skipped). Live counts
+ * status='sent' only — see SupabaseExecutorStore.
+ */
+export function countDemoLinkedInConnections(
+  workspaceId: string,
+  dayStartIso: string
+): number {
+  let count = 0;
+  for (const record of loadDemoExecutions()) {
+    if (record.workspace_id !== workspaceId) continue;
+    if (record.channel !== "linkedin") continue;
+    if (record.step_type !== "connection_request") continue;
+    if (record.created_at < dayStartIso) continue;
+    if (!DEMO_COUNTED_STATUSES.has(record.status)) continue;
+    count++;
+  }
+  return count;
+}

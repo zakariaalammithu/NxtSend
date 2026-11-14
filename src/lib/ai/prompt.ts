@@ -21,6 +21,19 @@ export function buildDraftUserPrompt(input: DraftRequest): string {
   );
   if (input.campaignName) parts.push(`Campaign: "${input.campaignName}".`);
   if (input.campaignGoal) parts.push(`Campaign goal: ${input.campaignGoal}.`);
+  if (input.conversationContext) {
+    parts.push(`Conversation context: ${input.conversationContext}.`);
+  }
+  if (input.stepType === "inbox_reply") {
+    parts.push(
+      "Write a concise, helpful reply to the inbound message below — not a cold outreach note."
+    );
+  }
+  if (input.inboundMessage?.trim()) {
+    parts.push(
+      `Latest inbound message to reply to:\n---\n${input.inboundMessage.trim()}\n---`
+    );
+  }
   if (input.lead?.company || input.lead?.jobTitle) {
     parts.push(
       `Typical recipient: ${input.lead?.jobTitle ?? "a decision-maker"} at {{company}}.`

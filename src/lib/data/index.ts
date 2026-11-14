@@ -25,12 +25,35 @@ import {
 } from "./accounts";
 import { createInboxRepository, type InboxRepository } from "./inbox";
 import { createUsageRepository, type UsageRepository } from "./usage";
+import {
+  createPromptSnippetsRepository,
+  type PromptSnippetsRepository,
+} from "./prompt-snippets";
+import {
+  createScheduledRepliesRepository,
+  type ScheduledRepliesRepository,
+} from "./scheduled-replies";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export { getDataMode, isSupabaseConfigured } from "./mode";
 export type { DataMode } from "./mode";
 export { resolveWorkspaceId, DEMO_WORKSPACE_ID, DEMO_USER_ID } from "./workspace";
 export type { LeadsRepository, CreateLeadInput } from "./leads";
+export {
+  meetingBookedAt,
+  meetingBookedPatch,
+} from "./leads";
+export {
+  getSafetySettingsRepository,
+  createSafetySettingsRepository,
+  defaultSafetySettings,
+  normalizeSafetySettings,
+  DEMO_SAFETY_SETTINGS_KEY,
+  DEFAULT_SAFETY_SETTINGS,
+  type SafetySettings,
+  type SafetySettingsPatch,
+  type SafetySettingsRepository,
+} from "./safety-settings";
 export type {
   CampaignsRepository,
   CampaignStepDraft,
@@ -80,6 +103,18 @@ export type {
   InsertMessageInput,
 } from "./inbox";
 export type { UsageRepository, WorkspaceUsage, UsageSource } from "./usage";
+export { SNIPPET_CATEGORIES } from "./prompt-snippets";
+export type {
+  PromptSnippet,
+  PromptSnippetsRepository,
+  CreateSnippetInput,
+} from "./prompt-snippets";
+export type {
+  ScheduledReply,
+  ScheduledReplyStatus,
+  ScheduledRepliesRepository,
+  ScheduleReplyInput,
+} from "./scheduled-replies";
 export {
   listMessageHistory,
   classifyMessage,
@@ -105,6 +140,20 @@ let integrationsRepo: IntegrationsRepository | null = null;
 let adminRepo: AdminRepository | null = null;
 let demoInboxRepo: InboxRepository | null = null;
 let usageRepo: UsageRepository | null = null;
+let snippetsRepo: PromptSnippetsRepository | null = null;
+let scheduledRepliesRepo: ScheduledRepliesRepository | null = null;
+
+export function getPromptSnippetsRepository(): PromptSnippetsRepository {
+  if (!snippetsRepo) snippetsRepo = createPromptSnippetsRepository(getDataMode());
+  return snippetsRepo;
+}
+
+export function getScheduledRepliesRepository(): ScheduledRepliesRepository {
+  if (!scheduledRepliesRepo) {
+    scheduledRepliesRepo = createScheduledRepliesRepository(getDataMode());
+  }
+  return scheduledRepliesRepo;
+}
 
 export function getUsageRepository(): UsageRepository {
   if (!usageRepo) usageRepo = createUsageRepository(getDataMode());

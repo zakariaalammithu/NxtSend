@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { TrendingUp, Zap, MessageSquare, CheckCircle2 } from "lucide-react";
+import { TrendingUp, Zap, MessageSquare, CheckCircle2, CalendarCheck } from "lucide-react";
 import { DemoBanner, Badge } from "@/components/ui";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import {
@@ -158,12 +158,19 @@ export default function AnalyticsPage() {
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4.5">
             <StatsCard
               label="Total Outreach"
               value={totalSent}
               icon={Zap}
               sublabel="recorded sends (email + LinkedIn)"
+              isDemo={isDemo}
+            />
+            <StatsCard
+              label="Meetings booked"
+              value={aggregate.meetingsBooked}
+              icon={CalendarCheck}
+              sublabel="manually marked on leads"
               isDemo={isDemo}
             />
             <StatsCard

@@ -25,6 +25,14 @@ export interface DraftRequest {
     company?: string;
     jobTitle?: string;
   };
+  /**
+   * Co-pilot reply draft (stepType "inbox_reply"): the latest inbound
+   * message being answered. Sent to the provider as context only;
+   * the result is still a draft for mandatory human review.
+   */
+  inboundMessage?: string;
+  /** Short thread context, e.g. "Priya Patel at Finpulse" (optional). */
+  conversationContext?: string;
 }
 
 export type DraftResult =

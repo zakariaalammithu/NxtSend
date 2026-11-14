@@ -44,6 +44,16 @@ import {
 } from "@/lib/linkedin/warmup";
 import type { WarmupLimits } from "@/types";
 import {
+  defaultSafetySettings,
+  type SafetySettings,
+} from "@/lib/data/safety-settings";
+import {
+  describeWorkingWindow,
+  effectiveConnectionCap,
+  evaluateSafetyGate,
+  type SafetyGateReason,
+} from "./safety";
+import {
   stepExecutionKey,
   emptyRunSummary,
   type ExecutorCampaign,
@@ -215,6 +225,31 @@ export async function executeDueSteps(
       deferred: number;
     }
   >();
+  // Safety gate state (migration 022): settings resolved once per
+  // workspace per scan (a missing row reads as the built-in
+  // defaults); today's workspace connection count resolved once per
+  // workspace and incremented locally per dispatch — the same
+  // once-per-scan discipline as the warm-up counters. The gate
+  // engages only when the store implements both safety methods;
+  // stores without them leave LinkedIn behaviour untouched.
+  const safetyCapable = Boolean(
+    store.getSafetySettings && store.countLinkedInConnectionsToday
+  );
+  const safetySettingsByWorkspace = new Map<string, SafetySettings | null>();
+  const safetyUsageByWorkspace = new Map<string, number>();
+  const safetyDeferredCampaigns = new Map<
+    string,
+    {
+      workspaceId: string;
+      campaignId: string;
+      name: string;
+      reason: SafetyGateReason;
+      windowLabel: string;
+      cap: number;
+      used: number;
+      deferred: number;
+    }
+  >();
 
   for (const enrollment of enrollments) {
     summary.scanned++;
@@ -362,6 +397,25 @@ export async function executeDueSteps(
       const senderAccountId = campaign.sender_account_id ?? null;
       const warmupAction = stepTypeToWarmupAction(step.step_type);
 
+      // ── Safety settings (migration 022) ─────────────────────────
+      // Resolved once per workspace per scan; a missing row reads as
+      // the built-in defaults (cap 15, 09:00–18:00, Mon–Fri,
+      // ramp-up on). When the store has no safety surface the gate
+      // below stays inert and `safetySettings` is null.
+      let safetySettings: SafetySettings | null = null;
+      if (safetyCapable) {
+        const cached = safetySettingsByWorkspace.get(workspaceId);
+        if (cached === undefined) {
+          safetySettings = await store
+            .getSafetySettings!(workspaceId)
+            .catch(() => null);
+          safetySettingsByWorkspace.set(workspaceId, safetySettings);
+        } else {
+          safetySettings = cached;
+        }
+      }
+      const effectiveSafety = safetySettings ?? defaultSafetySettings(workspaceId);
+
       // ── Warm-up gate ──────────────────────────────────────────────
       // Runs BEFORE the claim: when the sender account's program is
       // warming and today's counted usage for this action reached
@@ -369,7 +423,10 @@ export async function executeDueSteps(
       // execution row, the step stays due (the plan-limit deferral
       // pattern, one level down: per account + action instead of per
       // workspace). Paused / not_started / graduated programs and
-      // accounts with warm-up switched off are never gated.
+      // accounts with warm-up switched off are never gated. The
+      // workspace ramp-up toggle is the master switch: when the
+      // owner turned ramp-up off, warm-up gating is skipped (the
+      // safety cap + window below still apply).
       if (
         senderAccountId &&
         warmupAction &&
@@ -408,7 +465,12 @@ export async function executeDueSteps(
           }
           warmupStateByAccount.set(senderAccountId, wState);
         }
-        if (wState && wState.enabled && deriveStatus(wState, now) === "warming") {
+        if (
+          wState &&
+          wState.enabled &&
+          safetySettings?.ramp_up_enabled !== false &&
+          deriveStatus(wState, now) === "warming"
+        ) {
           const cap = effectiveCaps(wState, now)[warmupAction];
           const usageKey = `${senderAccountId}:${warmupAction}`;
           let used = warmupUsageByAccountAction.get(usageKey);
@@ -443,6 +505,61 @@ export async function executeDueSteps(
         }
       }
 
+      // ── Safe-sending gate (migration 022) ────────────────────────
+      // Runs BEFORE the claim, after the warm-up gate: a LinkedIn
+      // step outside the workspace working-hours window, or a
+      // connection request over the effective daily cap
+      // (min(workspace cap, sender account's connection limit)), is
+      // DEFERRED — no claim, no execution row, the step stays due.
+      // The gate never sends anything: a step it allows is still
+      // recorded `skipped` below while no provider is integrated.
+      if (safetyCapable) {
+        const isConnectionRequest = step.step_type === "connection_request";
+        let connectionsUsedToday = 0;
+        if (isConnectionRequest) {
+          const seeded = safetyUsageByWorkspace.get(workspaceId);
+          if (seeded === undefined) {
+            connectionsUsedToday = await store
+              .countLinkedInConnectionsToday!(workspaceId, dayPeriodStartIso(now))
+              .catch(() => 0);
+            safetyUsageByWorkspace.set(workspaceId, connectionsUsedToday);
+          } else {
+            connectionsUsedToday = seeded;
+          }
+        }
+        const accountCap = senderAccountId
+          ? (warmupStateByAccount.get(senderAccountId)?.dailyLimits
+              .connection_requests ?? null)
+          : null;
+        const cap = effectiveConnectionCap(
+          effectiveSafety.daily_connection_cap,
+          accountCap
+        );
+        const decision = evaluateSafetyGate(now, effectiveSafety, {
+          isConnectionRequest,
+          connectionsUsedToday,
+          effectiveCap: cap,
+        });
+        if (!decision.allowed) {
+          summary.safetyDeferred++;
+          const aggKey = `${campaign.id}:${decision.reason}`;
+          const agg = safetyDeferredCampaigns.get(aggKey) ?? {
+            workspaceId,
+            campaignId: campaign.id,
+            name: campaign.name,
+            reason: decision.reason,
+            windowLabel: describeWorkingWindow(effectiveSafety),
+            cap,
+            used: connectionsUsedToday,
+            deferred: 0,
+          };
+          agg.deferred++;
+          agg.used = connectionsUsedToday;
+          safetyDeferredCampaigns.set(aggKey, agg);
+          continue;
+        }
+      }
+
       const claim = await store.claimStepExecution({
         workspace_id: workspaceId,
         campaign_id: campaign.id,
@@ -466,6 +583,15 @@ export async function executeDueSteps(
         const counted = warmupUsageByAccountAction.get(usageKey);
         if (counted !== undefined) {
           warmupUsageByAccountAction.set(usageKey, counted + 1);
+        }
+      }
+      // …and against today's safety budget (when the safety gate
+      // seeded a counter for this workspace this scan and the step
+      // is a connection request).
+      if (step.step_type === "connection_request") {
+        const counted = safetyUsageByWorkspace.get(workspaceId);
+        if (counted !== undefined) {
+          safetyUsageByWorkspace.set(workspaceId, counted + 1);
         }
       }
       await store.completeStepExecution(claim.id, {
@@ -767,8 +893,27 @@ export async function executeDueSteps(
     );
   }
 
+  // One aggregated activity entry per (campaign, reason) for
+  // safe-sending deferrals — same discipline as above.
+  for (const entry of Array.from(safetyDeferredCampaigns.values())) {
+    const details =
+      entry.reason === "outside_working_hours"
+        ? `${entry.deferred} due LinkedIn step(s) deferred: outside the workspace working hours (${entry.windowLabel}). Nothing was sent; the steps remain due.`
+        : `${entry.deferred} due LinkedIn connection request(s) deferred: the workspace reached its daily connection cap (${entry.used} / ${entry.cap} today). Nothing was sent; the steps remain due.`;
+    await store.appendActivity(entry.workspaceId, {
+      campaign_id: entry.campaignId,
+      action: "step_deferred_safety",
+      details,
+    });
+    summary.log.push(
+      entry.reason === "outside_working_hours"
+        ? `Campaign "${entry.name}": ${entry.deferred} LinkedIn step(s) deferred — outside working hours (${entry.windowLabel}).`
+        : `Campaign "${entry.name}": ${entry.deferred} LinkedIn connection request(s) deferred — daily connection cap reached (${entry.used} / ${entry.cap} today).`
+    );
+  }
+
   summary.log.push(
-    `Scanned ${summary.scanned} enrollment(s): ${summary.sent} sent, ${summary.simulated} simulated, ${summary.skippedLinkedIn} LinkedIn skipped, ${summary.waitsExecuted} wait/condition executed, ${summary.stoppedReply + summary.stoppedSuppression + summary.stoppedMissingLead} stopped, ${summary.overLimit} over-limit deferred, ${summary.warmupDeferred} warm-up deferred, ${summary.errors} transient error(s).`
+    `Scanned ${summary.scanned} enrollment(s): ${summary.sent} sent, ${summary.simulated} simulated, ${summary.skippedLinkedIn} LinkedIn skipped, ${summary.waitsExecuted} wait/condition executed, ${summary.stoppedReply + summary.stoppedSuppression + summary.stoppedMissingLead} stopped, ${summary.overLimit} over-limit deferred, ${summary.warmupDeferred} warm-up deferred, ${summary.safetyDeferred} safety deferred, ${summary.errors} transient error(s).`
   );
   return summary;
 }

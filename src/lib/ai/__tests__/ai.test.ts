@@ -4,7 +4,7 @@ import { handleDraftRequest, parseDraftRequest } from "../handler";
 import { OpenAIAdapter } from "../openai";
 import { AnthropicAdapter } from "../anthropic";
 import { demoDraft } from "../demo";
-import { renderTemplate } from "../prompt";
+import { renderTemplate, buildDraftUserPrompt } from "../prompt";
 import type { DraftResult } from "../types";
 
 // ── State derivation ────────────────────────────────────────────────────────
@@ -104,6 +104,20 @@ describe("parseDraftRequest", () => {
     expect(parseDraftRequest({ stepType: "email" })?.channel).toBe("email");
     expect(parseDraftRequest({ stepType: "linkedin_message" })?.channel).toBe("linkedin");
   });
+  it("parses an inbox_reply co-pilot request with its context", () => {
+    const parsed = parseDraftRequest({
+      channel: "email",
+      stepType: "inbox_reply",
+      inboundMessage: "Hi — is the pricing still $49?",
+      conversationContext: "Priya Patel at Finpulse",
+      lead: { firstName: "Priya", company: "Finpulse" },
+    });
+    expect(parsed?.channel).toBe("email");
+    expect(parsed?.stepType).toBe("inbox_reply");
+    expect(parsed?.inboundMessage).toBe("Hi — is the pricing still $49?");
+    expect(parsed?.conversationContext).toBe("Priya Patel at Finpulse");
+    expect(parsed?.lead?.firstName).toBe("Priya");
+  });
   it("caps oversized fields", () => {
     const parsed = parseDraftRequest({
       stepType: "email",
@@ -191,6 +205,24 @@ describe("demoDraft / renderTemplate", () => {
     expect(result.message).toContain("NOT AI-generated");
   });
 
+  it("demo-drafts an inbox reply from the inbound context", async () => {
+    const result = await handleDraftRequest({
+      mode: "demo",
+      user: null,
+      body: {
+        channel: "email",
+        stepType: "inbox_reply",
+        inboundMessage: "Can you send the pricing?",
+        lead: { firstName: "Priya" },
+      },
+    });
+    expect(result.status).toBe(200);
+    expect(result.body.state).toBe("demo");
+    expect(result.body.aiGenerated).toBe(false);
+    expect(result.body.reviewRequired).toBe(true);
+    expect(String(result.body.draft)).toContain("Priya");
+  });
+
   it("renders placeholders with sample lead values", () => {
     expect(
       renderTemplate("Hi {{first_name}} at {{company}}", {
@@ -248,5 +280,17 @@ describe("demoDraft / renderTemplate", () => {
 
   it("leaves unknown variables untouched so typos stay visible", () => {
     expect(renderTemplate("Hi {{frist_name}}", {})).toBe("Hi {{frist_name}}");
+  });
+
+  it("includes the inbound message in an inbox_reply prompt", () => {
+    const prompt = buildDraftUserPrompt({
+      channel: "email",
+      stepType: "inbox_reply",
+      inboundMessage: "Can you send the pricing?",
+      conversationContext: "Priya Patel at Finpulse",
+    });
+    expect(prompt).toContain("Can you send the pricing?");
+    expect(prompt).toContain("Priya Patel at Finpulse");
+    expect(prompt).toContain("reply to the inbound message");
   });
 });

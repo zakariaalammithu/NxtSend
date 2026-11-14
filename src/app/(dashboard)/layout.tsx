@@ -54,6 +54,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       // The Leads area IS the CRM (contacts, lists/tags, CSV, dedupe).
       { label: "CRM", href: "/dashboard/leads", icon: ContactRound },
+      { label: "Lead Finder", href: "/dashboard/leads/finder", icon: Search },
       { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
       {
         label: "Usage & History",

@@ -2,12 +2,18 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { User, Lock, Bell, Users, AlertTriangle, Check, Plus, Trash2, Loader2 } from "lucide-react";
+import { User, Lock, Bell, Users, AlertTriangle, Check, Plus, Trash2, Loader2, ShieldCheck } from "lucide-react";
 import { DemoBanner, Badge, Modal } from "@/components/ui";
 import {
   getUserSettingsRepository,
   type UserSettingsData,
 } from "@/lib/data/user-settings";
+import {
+  getSafetySettingsRepository,
+  type SafetySettings,
+} from "@/lib/data/safety-settings";
+import { resolveWorkspaceId } from "@/lib/data";
+import { describeLinkedInProvider } from "@/lib/linkedin/state";
 import { validatePasswordChange } from "@/lib/user-settings/core";
 
 interface Member {
@@ -20,10 +26,13 @@ interface Member {
 
 export default function SettingsPage() {
   const settingsRepo = React.useMemo(() => getUserSettingsRepository(), []);
+  const safetyRepo = React.useMemo(() => getSafetySettingsRepository(), []);
   const isDemo = settingsRepo.mode === "demo";
+  const linkedinProvider = React.useMemo(() => describeLinkedInProvider(), []);
+  const linkedinConnected = linkedinProvider.state === "connected";
 
   const [activeTab, setActiveTab] = React.useState<
-    "profile" | "password" | "notifications" | "team" | "danger"
+    "profile" | "password" | "notifications" | "team" | "danger" | "safe"
   >("profile");
 
   // Profile Form State — loaded from (and saved through) the
@@ -55,6 +64,30 @@ export default function SettingsPage() {
   const [prefsError, setPrefsError] = React.useState<string | null>(null);
   const [isSavingPrefs, setIsSavingPrefs] = React.useState(false);
 
+  // Safe sending limits — workspace-level (migration 022), loaded
+  // from the safety repository: the stored row, or the defaults when
+  // no row exists yet. These limits bind LinkedIn sending only once
+  // a provider is connected; until then they are stored settings.
+  const [workspaceId, setWorkspaceId] = React.useState<string | null>(null);
+  const [safetyLoaded, setSafetyLoaded] = React.useState(false);
+  const [safetyError, setSafetyError] = React.useState<string | null>(null);
+  const [capDraft, setCapDraft] = React.useState(15);
+  const [startDraft, setStartDraft] = React.useState("09:00");
+  const [endDraft, setEndDraft] = React.useState("18:00");
+  const [daysDraft, setDaysDraft] = React.useState<number[]>([1, 2, 3, 4, 5]);
+  const [rampUpDraft, setRampUpDraft] = React.useState(true);
+  const [safetySaved, setSafetySaved] = React.useState(false);
+  const [safetySaveError, setSafetySaveError] = React.useState<string | null>(null);
+  const [isSavingSafety, setIsSavingSafety] = React.useState(false);
+
+  const applySafety = (s: SafetySettings) => {
+    setCapDraft(s.daily_connection_cap);
+    setStartDraft(s.working_hours_start);
+    setEndDraft(s.working_hours_end);
+    setDaysDraft(s.working_days);
+    setRampUpDraft(s.ramp_up_enabled);
+  };
+
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -76,11 +109,29 @@ export default function SettingsPage() {
           );
         }
       }
+      try {
+        const ws = await resolveWorkspaceId();
+        if (cancelled) return;
+        setWorkspaceId(ws);
+        if (ws) {
+          const safety = await safetyRepo.get(ws);
+          if (cancelled) return;
+          applySafety(safety);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setSafetyError(
+            err instanceof Error ? err.message : "Failed to load safe-sending limits."
+          );
+        }
+      } finally {
+        if (!cancelled) setSafetyLoaded(true);
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [settingsRepo]);
+  }, [settingsRepo, safetyRepo]);
 
   // Team Members
   const [members, setMembers] = React.useState<Member[]>([
@@ -185,6 +236,42 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSaveSafety = async () => {
+    if (!workspaceId) {
+      setSafetySaveError("No workspace loaded yet — please try again.");
+      return;
+    }
+    setSafetySaveError(null);
+    setSafetySaved(false);
+    setIsSavingSafety(true);
+    try {
+      const saved = await safetyRepo.save(workspaceId, {
+        daily_connection_cap: Math.min(100, Math.max(1, Math.floor(capDraft) || 15)),
+        working_hours_start: startDraft,
+        working_hours_end: endDraft,
+        working_days: daysDraft,
+        ramp_up_enabled: rampUpDraft,
+      });
+      applySafety(saved);
+      setSafetySaved(true);
+      setTimeout(() => setSafetySaved(false), 2500);
+    } catch (err) {
+      setSafetySaveError(
+        err instanceof Error ? err.message : "Failed to save safe-sending limits."
+      );
+    } finally {
+      setIsSavingSafety(false);
+    }
+  };
+
+  const toggleSafetyDay = (day: number) => {
+    setDaysDraft((prev) =>
+      prev.includes(day)
+        ? prev.filter((d) => d !== day)
+        : [...prev, day].sort((a, b) => a - b)
+    );
+  };
+
   const handleInviteSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteEmail) return;
@@ -238,6 +325,7 @@ export default function SettingsPage() {
           { key: "profile", label: "Profile", icon: User },
           { key: "password", label: "Password", icon: Lock },
           { key: "notifications", label: "Notifications", icon: Bell },
+          { key: "safe", label: "Safe Sending", icon: ShieldCheck },
           { key: "team", label: "Team Members", icon: Users },
           { key: "danger", label: "Danger Zone", icon: AlertTriangle },
         ].map((tab) => {
@@ -250,7 +338,7 @@ export default function SettingsPage() {
               type="button"
               onClick={() =>
                 setActiveTab(
-                  tab.key as "profile" | "password" | "notifications" | "team" | "danger"
+                  tab.key as "profile" | "password" | "notifications" | "team" | "danger" | "safe"
                 )
               }
               className={`flex items-center gap-2 rounded-t-xl px-4 py-2.5 text-13 font-medium transition-colors border-b-2 whitespace-nowrap ${
@@ -567,6 +655,178 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* TAB: Safe sending limits */}
+      {activeTab === "safe" && (
+        <div className="glass-card p-6 sm:p-8 space-y-6">
+          <div>
+            <h3 className="text-16 font-semibold text-white">
+              Safe sending limits
+            </h3>
+            <p className="text-13 text-black-300 mt-0.5">
+              Workspace limits the executor enforces on LinkedIn sending:
+              connection requests stay inside the working-hours window and
+              under the daily cap. Hours are UTC — there is no
+              workspace-timezone setting. An end time at or before the
+              start time means an empty window (nothing sends), never an
+              overnight window.
+              {isDemo ? " Saved in this browser's demo store." : ""}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-black-700 bg-black-800/60 p-4 text-13 text-black-300 flex items-start gap-2.5">
+            <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-purple-400" />
+            <span>
+              {linkedinConnected ? (
+                <>LinkedIn provider connected — these limits apply to sending now.</>
+              ) : (
+                <>No LinkedIn provider connected — limits apply automatically once a provider is connected.</>
+              )}
+            </span>
+          </div>
+
+          {safetyError && (
+            <div className="rounded-2xl border border-rose-500/40 bg-rose-950/20 px-5 py-3 text-13 text-rose-200 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>{safetyError}</span>
+            </div>
+          )}
+
+          {!safetyLoaded ? (
+            <p className="text-13 text-black-400">Loading safe-sending limits…</p>
+          ) : (
+            <>
+              <div className="divide-y divide-black-700/60">
+                <div className="py-4 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-14 font-medium text-white">Daily connection cap</p>
+                    <p className="text-12 text-black-400">
+                      Max LinkedIn connection requests per workspace per day (1–100).
+                      The sender account&apos;s own daily limit also applies — the
+                      lower of the two binds.
+                    </p>
+                  </div>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={capDraft}
+                    onChange={(e) => setCapDraft(Number(e.target.value))}
+                    className="input-field w-24 text-center py-2 text-13"
+                    aria-label="Daily connection cap"
+                  />
+                </div>
+
+                <div className="py-4 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-14 font-medium text-white">Working hours</p>
+                    <p className="text-12 text-black-400">
+                      LinkedIn steps outside this window are deferred, not dropped —
+                      they stay due for a later scan.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <input
+                      type="time"
+                      value={startDraft}
+                      onChange={(e) => setStartDraft(e.target.value)}
+                      className="input-field w-32 py-2 text-13"
+                      aria-label="Working hours start"
+                    />
+                    <span className="text-12 text-black-400">to</span>
+                    <input
+                      type="time"
+                      value={endDraft}
+                      onChange={(e) => setEndDraft(e.target.value)}
+                      className="input-field w-32 py-2 text-13"
+                      aria-label="Working hours end"
+                    />
+                  </div>
+                </div>
+
+                <div className="py-4">
+                  <p className="text-14 font-medium text-white">Working days</p>
+                  <p className="text-12 text-black-400">
+                    LinkedIn steps on other days are deferred until a working day.
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {[
+                      { day: 1, label: "Mon" },
+                      { day: 2, label: "Tue" },
+                      { day: 3, label: "Wed" },
+                      { day: 4, label: "Thu" },
+                      { day: 5, label: "Fri" },
+                      { day: 6, label: "Sat" },
+                      { day: 7, label: "Sun" },
+                    ].map(({ day, label }) => (
+                      <label
+                        key={day}
+                        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-12 font-medium cursor-pointer transition-colors ${
+                          daysDraft.includes(day)
+                            ? "bg-purple-600 text-white border-purple-500"
+                            : "bg-black-800 text-black-300 border-black-600 hover:bg-black-700"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={daysDraft.includes(day)}
+                          onChange={() => toggleSafetyDay(day)}
+                          className="sr-only"
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="py-4 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-14 font-medium text-white">Ramp-up enabled</p>
+                    <p className="text-12 text-black-400">
+                      When on, accounts on a warm-up program ramp up within
+                      their phase caps. When off, warm-up gating is skipped
+                      (the cap and working-hours limits above still apply).
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={rampUpDraft}
+                    onChange={(e) => setRampUpDraft(e.target.checked)}
+                    className="h-5 w-5 shrink-0 rounded border-black-600 bg-black-800 text-purple-600"
+                    aria-label="Ramp-up enabled"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t border-black-700">
+                {safetySaved && (
+                  <span className="flex items-center gap-1.5 text-13 text-emerald-400 font-medium">
+                    <Check className="h-4 w-4" />
+                    <span>Safe-sending limits saved!</span>
+                  </span>
+                )}
+                {safetySaveError && (
+                  <span className="flex items-center gap-1.5 text-13 text-rose-400 font-medium">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span>{safetySaveError}</span>
+                  </span>
+                )}
+                <div className="ml-auto">
+                  <button
+                    type="button"
+                    onClick={handleSaveSafety}
+                    disabled={isSavingSafety || !workspaceId}
+                    className="rounded-xl bg-purple-600 hover:bg-purple-500 px-6 py-2.5 text-14 font-semibold text-white shadow-glow-purple transition-all disabled:opacity-50 inline-flex items-center gap-2"
+                  >
+                    {isSavingSafety && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Save Limits
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 

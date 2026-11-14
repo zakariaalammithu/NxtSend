@@ -26,6 +26,7 @@ import type {
   WarmupHistoryEntry,
 } from "@/types";
 import type { InboxMessage, InsertMessageInput } from "@/lib/data/inbox";
+import type { SafetySettings } from "@/lib/data/safety-settings";
 import type {
   AccountWarmupState,
   WarmupProgramPatch,
@@ -186,6 +187,32 @@ export interface ExecutorStore {
     entry: WarmupHistoryEntry
   ): Promise<void>;
   /**
+   * Optional (safety gate): the workspace's safe-sending limits
+   * (migration 022). Returns null when there is no stored row or
+   * the row cannot be read — the gate then applies the built-in
+   * defaults (cap 15, 09:00–18:00, Mon–Fri, ramp-up on). Stores
+   * without this method (and without
+   * `countLinkedInConnectionsToday`) leave the safety gate inert —
+   * the gate is an additional throttle, never a prerequisite for
+   * the pre-existing behaviour.
+   */
+  getSafetySettings?(
+    workspaceId: string
+  ): Promise<SafetySettings | null>;
+  /**
+   * Optional (safety gate): the workspace's counted LinkedIn
+   * connection requests for the UTC day from `dayStartIso` — the
+   * counter the daily connection cap binds against. Live counts
+   * status='sent' only (real sends); demo counts dispatch attempts
+   * (sent / simulated / skipped), the same split as the warm-up
+   * counters. Called at most once per (workspace, scan) by the
+   * core.
+   */
+  countLinkedInConnectionsToday?(
+    workspaceId: string,
+    dayStartIso: string
+  ): Promise<number>;
+  /**
    * Enrollments that may have a due step: status pending/active and
    * their campaign is active. Time-based due filtering happens in the
    * executor core (pure, tested), not here.
@@ -280,6 +307,13 @@ export interface ExecutorRunSummary {
    * NOT claimed, NOT executed; the steps remain due.
    */
   warmupDeferred: number;
+  /**
+   * LinkedIn steps deferred by the safe-sending gate: outside the
+   * workspace working-hours window, or over the effective daily
+   * connection cap. Deferred — NOT claimed, NOT executed; the steps
+   * remain due.
+   */
+  safetyDeferred: number;
   /** Steps already claimed/executed by an earlier run (idempotency). */
   alreadyClaimed: number;
   /** Transient failures (provider error / not configured) — step stays due. */
@@ -303,6 +337,7 @@ export function emptyRunSummary(): ExecutorRunSummary {
     stoppedMissingLead: 0,
     overLimit: 0,
     warmupDeferred: 0,
+    safetyDeferred: 0,
     alreadyClaimed: 0,
     errors: 0,
     completedEnrollments: 0,

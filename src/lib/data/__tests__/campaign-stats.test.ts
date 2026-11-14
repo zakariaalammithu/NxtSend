@@ -15,13 +15,29 @@ import {
   aggregateCampaignStats,
   computeCampaignStats,
   countEmailEvents,
+  countMeetingsBooked,
   type CampaignStatsSource,
 } from "../campaign-stats";
 import { campaignsToCsv } from "../csv";
 import type { EnrollmentRecord } from "../campaigns";
 import type { HistoryMessage } from "../message-history";
 import type { StepExecutionRecord } from "@/lib/executor/types";
-import type { Campaign } from "@/types";
+import type { Campaign, Lead } from "@/types";
+
+function lead(partial: Partial<Lead>): Lead {
+  return {
+    id: "lead_1",
+    workspace_id: "ws_1",
+    first_name: "Pat",
+    last_name: "Doe",
+    email: "pat@example.com",
+    status: "new",
+    tags: [],
+    custom_fields: {},
+    created_at: "2026-01-01T00:00:00.000Z",
+    ...partial,
+  };
+}
 
 function enrollment(partial: Partial<EnrollmentRecord>): EnrollmentRecord {
   return {
@@ -247,6 +263,53 @@ describe("computeCampaignStats — LinkedIn honesty", () => {
     );
     expect(stats.linkedin.messagesSent).toBe(0);
     expect(stats.linkedin.connectionRequestsSent).toBe(0);
+  });
+});
+
+describe("countMeetingsBooked", () => {
+  it("counts only enrollments whose lead has a non-empty meeting_booked_at", () => {
+    const enrollments = [
+      enrollment({ id: "e1", lead_id: "lead_1" }),
+      enrollment({ id: "e2", lead_id: "lead_2" }),
+      enrollment({ id: "e3", lead_id: "lead_3" }),
+      enrollment({ id: "e4", lead_id: "lead_missing" }),
+      enrollment({ id: "e5", lead_id: "lead_4" }),
+    ];
+    const leads = [
+      lead({ id: "lead_1", custom_fields: { meeting_booked_at: "2026-01-05T10:00:00.000Z" } }),
+      lead({ id: "lead_2", custom_fields: {} }),
+      lead({ id: "lead_3", custom_fields: { meeting_booked_at: "" } }),
+      // A non-string value is not a booked meeting.
+      lead({ id: "lead_4", custom_fields: { meeting_booked_at: 12345 } }),
+    ];
+    expect(countMeetingsBooked(enrollments, leads)).toBe(1);
+  });
+
+  it("computeCampaignStats scopes meetings to the campaign and aggregates them", () => {
+    const stats = computeCampaignStats(
+      "cmp_1",
+      source({
+        enrollments: [
+          enrollment({ id: "e1", lead_id: "lead_1" }),
+          enrollment({ id: "e2", lead_id: "lead_2" }),
+          enrollment({ id: "e3", campaign_id: "cmp_2", lead_id: "lead_1" }),
+        ],
+        leads: [
+          lead({ id: "lead_1", custom_fields: { meeting_booked_at: "2026-01-05T10:00:00.000Z" } }),
+          lead({ id: "lead_2", custom_fields: {} }),
+        ],
+      })
+    );
+    expect(stats.meetingsBooked).toBe(1);
+
+    const withoutLeads = computeCampaignStats(
+      "cmp_1",
+      source({ enrollments: [enrollment({ id: "e1" })] })
+    );
+    expect(withoutLeads.meetingsBooked).toBe(0);
+
+    const agg = aggregateCampaignStats([stats, withoutLeads]);
+    expect(agg.meetingsBooked).toBe(1);
   });
 });
 

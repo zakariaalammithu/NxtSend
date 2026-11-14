@@ -14,6 +14,11 @@ import {
   ArrowLeft,
   Loader2,
   RotateCcw,
+  Sparkles,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  CalendarClock,
 } from "lucide-react";
 import { DemoBanner, Badge } from "@/components/ui";
 import { formatDate, generateId } from "@/lib/utils";
@@ -23,6 +28,13 @@ import {
   type InboxConversation,
   type InboxMessage,
 } from "@/lib/data/inbox";
+import {
+  getPromptSnippetsRepository,
+  getScheduledRepliesRepository,
+  resolveWorkspaceId,
+  type PromptSnippet,
+  type ScheduledReply,
+} from "@/lib/data";
 import type { ProviderState } from "@/lib/env";
 import EmailContentHints from "@/components/dashboard/EmailContentHints";
 import {
@@ -52,6 +64,17 @@ interface ThreadResponse {
   messages: InboxMessage[];
   unreadCount: number;
 }
+
+interface DraftResponse {
+  state?: string;
+  provider?: string | null;
+  draft?: string | null;
+  aiGenerated?: boolean;
+  message?: string;
+  error?: string;
+}
+
+type ComposerNoteTone = "simulated" | "ai" | "error" | "info";
 
 function announceUnreadChanged() {
   window.dispatchEvent(new Event("nxtsend:inbox-unread-changed"));
@@ -97,6 +120,29 @@ export default function InboxPage() {
   const [sending, setSending] = React.useState(false);
   const [retryingId, setRetryingId] = React.useState<string | null>(null);
   const [sendError, setSendError] = React.useState<string | null>(null);
+
+  // Co-pilot (b) + scheduled replies (c): snippet library, AI reply
+  // drafts and the workspace's queued replies, all workspace-scoped.
+  const snippetsRepo = React.useMemo(() => getPromptSnippetsRepository(), []);
+  const scheduledRepo = React.useMemo(() => getScheduledRepliesRepository(), []);
+  const [workspaceId, setWorkspaceId] = React.useState<string | null>(null);
+  const [snippets, setSnippets] = React.useState<PromptSnippet[]>([]);
+  const [snippetPickerOpen, setSnippetPickerOpen] = React.useState(false);
+  const [drafting, setDrafting] = React.useState(false);
+  const [draftNote, setDraftNote] = React.useState<{
+    tone: ComposerNoteTone;
+    text: string;
+  } | null>(null);
+  const [scheduleAt, setScheduleAt] = React.useState("");
+  const [scheduling, setScheduling] = React.useState(false);
+  const [scheduleNote, setScheduleNote] = React.useState<{
+    tone: ComposerNoteTone;
+    text: string;
+  } | null>(null);
+  const [scheduled, setScheduled] = React.useState<ScheduledReply[]>([]);
+  const [showScheduled, setShowScheduled] = React.useState(false);
+  const [cancellingId, setCancellingId] = React.useState<string | null>(null);
+  const isDemoMode = snippetsRepo.mode === "demo";
   // One idempotency key per unsent draft, per conversation: a retry of
   // the same draft re-uses the key, so the server can never send twice.
   const draftKeys = React.useRef<Record<string, string>>({});
@@ -239,6 +285,206 @@ export default function InboxPage() {
     },
     [selectedId]
   );
+
+  /**
+   * Snippets + upcoming scheduled replies for the workspace. In Demo
+   * Mode, due rows are marked `simulated` here when the page loads:
+   * demo data lives in the browser store, which the server worker
+   * cannot read, so the app itself records the honest outcome —
+   * simulated when due, never actually sent.
+   */
+  const loadComposerData = React.useCallback(async () => {
+    const ws = await resolveWorkspaceId();
+    if (!ws) return;
+    setWorkspaceId(ws);
+    try {
+      const [snip, sched] = await Promise.all([
+        snippetsRepo.listSnippets(ws),
+        scheduledRepo.listUpcoming(ws),
+      ]);
+      setSnippets(snip);
+      if (isDemoMode) {
+        const nowIso = new Date().toISOString();
+        const due = sched.filter((r) => r.scheduled_at <= nowIso);
+        if (due.length > 0) {
+          for (const row of due) {
+            await scheduledRepo.markSimulated(row.id);
+          }
+          setScheduled(await scheduledRepo.listUpcoming(ws));
+          setScheduleNote({
+            tone: "simulated",
+            text: `${due.length} scheduled ${
+              due.length === 1 ? "reply" : "replies"
+            } reached ${due.length === 1 ? "its" : "their"} time in Demo Mode and ${
+              due.length === 1 ? "was" : "were"
+            } marked simulated — nothing was actually sent.`,
+          });
+          return;
+        }
+      }
+      setScheduled(sched);
+    } catch {
+      // Snippets / scheduled list are enhancements: a load failure
+      // must not break the composer.
+    }
+  }, [snippetsRepo, scheduledRepo, isDemoMode]);
+
+  React.useEffect(() => {
+    loadComposerData();
+  }, [loadComposerData]);
+
+  /** Co-pilot reply draft: fills the textarea for human review — never auto-sends. */
+  const handleDraftReply = async () => {
+    if (!thread || drafting) return;
+    const conversation = thread.conversation;
+    setDrafting(true);
+    setDraftNote(null);
+    try {
+      const inbound = [...thread.messages]
+        .reverse()
+        .find((m) => m.direction === "inbound");
+      const firstName = conversation.contact_name.split(" ")[0] || undefined;
+      const res = await fetch("/api/ai/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channel: "email",
+          stepType: "inbox_reply",
+          inboundMessage: inbound?.content,
+          conversationContext: `${conversation.contact_name}${
+            conversation.company ? ` at ${conversation.company}` : ""
+          }`,
+          lead: {
+            firstName,
+            company: conversation.company ?? undefined,
+          },
+          existingContent: replyText.trim() ? replyText : undefined,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as DraftResponse;
+      if (!res.ok) {
+        setDraftNote({
+          tone: "error",
+          text: data.error ?? `The draft request failed (HTTP ${res.status}).`,
+        });
+        return;
+      }
+      if (data.state === "not_configured") {
+        setDraftNote({
+          tone: "error",
+          text:
+            (data.message ?? "AI is not configured.") +
+            " Configure a provider in the Integration Center (server-side API key required).",
+        });
+        return;
+      }
+      if (data.state === "error") {
+        setDraftNote({
+          tone: "error",
+          text: data.message ?? "The AI provider returned an error. Nothing was generated.",
+        });
+        return;
+      }
+      if (typeof data.draft === "string" && data.draft) {
+        setReplyText(data.draft);
+        if (data.state === "demo" || data.aiGenerated === false) {
+          setDraftNote({
+            tone: "simulated",
+            text:
+              data.message ??
+              "Demo Mode sample draft — locally templated, NOT AI-generated and NOT sent. Review it before sending.",
+          });
+        } else {
+          setDraftNote({
+            tone: "ai",
+            text: `Draft generated by ${data.provider ?? "AI provider"}. Review and edit it before sending — it has not been sent.`,
+          });
+        }
+        return;
+      }
+      setDraftNote({ tone: "error", text: data.message ?? "No draft was returned." });
+    } catch {
+      setDraftNote({
+        tone: "error",
+        text: "The draft request could not be reached. Nothing was generated.",
+      });
+    } finally {
+      setDrafting(false);
+    }
+  };
+
+  const insertSnippet = (snippet: PromptSnippet) => {
+    setReplyText((prev) =>
+      prev.trim() ? `${prev.trim()}\n\n${snippet.body}` : snippet.body
+    );
+    setSnippetPickerOpen(false);
+  };
+
+  /** Queues the composer text for later. Sends nothing now. */
+  const handleScheduleReply = async () => {
+    if (!replyText.trim() || !selectedId || !workspaceId || scheduling) return;
+    if (!scheduleAt) {
+      setScheduleNote({ tone: "error", text: "Pick a date and time first." });
+      return;
+    }
+    const at = new Date(scheduleAt);
+    if (Number.isNaN(at.getTime())) {
+      setScheduleNote({ tone: "error", text: "That date and time is not valid." });
+      return;
+    }
+    if (at.getTime() <= Date.now()) {
+      setScheduleNote({
+        tone: "error",
+        text: "Pick a future date and time — a past time would be due immediately.",
+      });
+      return;
+    }
+    setScheduling(true);
+    setScheduleNote(null);
+    try {
+      const row = await scheduledRepo.schedule(workspaceId, {
+        conversation_id: selectedId,
+        body: replyText.trim(),
+        scheduled_at: at.toISOString(),
+      });
+      setScheduled((prev) =>
+        [...prev, row].sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at))
+      );
+      setReplyText("");
+      setScheduleAt("");
+      setScheduleNote({
+        tone: "info",
+        text: `Reply scheduled for ${formatDate(row.scheduled_at, "short")} — nothing was sent now. ${
+          isDemoMode
+            ? "Demo Mode: it will be marked simulated when due, never actually sent."
+            : "It will be sent automatically when due."
+        }`,
+      });
+    } catch (err) {
+      setScheduleNote({
+        tone: "error",
+        text: err instanceof Error ? err.message : "Could not schedule this reply.",
+      });
+    } finally {
+      setScheduling(false);
+    }
+  };
+
+  const handleCancelScheduled = async (id: string) => {
+    if (cancellingId) return;
+    setCancellingId(id);
+    try {
+      await scheduledRepo.cancel(id);
+      setScheduled((prev) => prev.filter((r) => r.id !== id));
+    } catch (err) {
+      setScheduleNote({
+        tone: "error",
+        text: err instanceof Error ? err.message : "Could not cancel the scheduled reply.",
+      });
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -711,6 +957,70 @@ export default function InboxPage() {
                 <div ref={messagesEndRef} />
               </div>
 
+              {/* Scheduled replies (workspace-wide, upcoming only) */}
+              <div className="shrink-0 border-t border-black-700/70 bg-black-900/60 px-4 py-2">
+                <button
+                  type="button"
+                  onClick={() => setShowScheduled((v) => !v)}
+                  className="inline-flex items-center gap-1.5 text-12 font-medium text-black-300 hover:text-white"
+                  aria-expanded={showScheduled}
+                >
+                  <CalendarClock className="h-3.5 w-3.5 text-purple-400" />
+                  Scheduled replies ({scheduled.length})
+                  {showScheduled ? (
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  )}
+                </button>
+                {showScheduled && (
+                  <div className="mt-2 space-y-2">
+                    {isDemoMode && (
+                      <p className="text-11 text-amber-300/90">
+                        Scheduled (demo) — simulated when due, never actually
+                        sent.
+                      </p>
+                    )}
+                    {scheduled.length === 0 ? (
+                      <p className="text-12 text-black-400">
+                        No replies scheduled. Use the Schedule button below to
+                        queue one.
+                      </p>
+                    ) : (
+                      scheduled.map((row) => {
+                        const contact =
+                          summaries.find((s) => s.id === row.conversation_id)
+                            ?.contact_name ?? "Conversation";
+                        return (
+                          <div
+                            key={row.id}
+                            className="flex items-start justify-between gap-3 rounded-lg border border-black-700 bg-black-800/60 px-3 py-2"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-12 font-medium text-white">
+                                {contact} ·{" "}
+                                {formatDate(row.scheduled_at, "short")}
+                              </p>
+                              <p className="text-12 text-black-300 line-clamp-1">
+                                {row.body}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleCancelScheduled(row.id)}
+                              disabled={cancellingId === row.id}
+                              className="shrink-0 rounded-md bg-black-700 px-2 py-1 text-11 font-medium text-white hover:bg-rose-600 disabled:opacity-50"
+                            >
+                              {cancellingId === row.id ? "Cancelling…" : "Cancel"}
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Reply Composer / LinkedIn notice */}
               <div className="p-4 border-t border-black-700/70 bg-black-900/80 shrink-0">
                 {isLinkedIn ? (
@@ -756,6 +1066,135 @@ export default function InboxPage() {
                         <span>{sending ? "Sending…" : "Send"}</span>
                       </button>
                     </div>
+                    {/* Co-pilot: AI draft + snippet picker (drafts are for review — never auto-sent) */}
+                    <div className="relative flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleDraftReply}
+                        disabled={drafting}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-black-800 px-3 py-2 text-12 font-medium text-white hover:bg-black-700 disabled:opacity-50"
+                      >
+                        {drafting ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3.5 w-3.5 text-orange-300" />
+                        )}
+                        <span>{drafting ? "Drafting…" : "Draft with AI"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSnippetPickerOpen((v) => !v)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-black-800 px-3 py-2 text-12 font-medium text-white hover:bg-black-700"
+                        aria-expanded={snippetPickerOpen}
+                      >
+                        <MessageSquare className="h-3.5 w-3.5 text-purple-300" />
+                        <span>Snippets</span>
+                        <ChevronDown
+                          className={`h-3.5 w-3.5 transition-transform ${
+                            snippetPickerOpen ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+                      {snippetPickerOpen && (
+                        <div className="absolute left-0 top-full z-20 mt-1 w-80 max-w-full rounded-xl border border-black-600 bg-black-800 shadow-xl overflow-hidden">
+                          {snippets.length === 0 ? (
+                            <p className="px-3.5 py-3 text-12 text-black-400">
+                              No snippets yet — add some in the snippet library
+                              on the AI Personalization page.
+                            </p>
+                          ) : (
+                            <ul className="max-h-56 overflow-y-auto divide-y divide-black-700/60">
+                              {snippets.map((s) => (
+                                <li key={s.id}>
+                                  <button
+                                    type="button"
+                                    onClick={() => insertSnippet(s)}
+                                    className="block w-full px-3.5 py-2.5 text-left hover:bg-black-700/60"
+                                  >
+                                    <span className="flex items-center gap-2 text-12 font-medium text-white">
+                                      {s.title}
+                                      <span className="rounded bg-black-700 px-1.5 py-0.5 text-10 text-black-300">
+                                        {s.category}
+                                      </span>
+                                    </span>
+                                    <span className="mt-0.5 block truncate text-11 text-black-400">
+                                      {s.body}
+                                    </span>
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {draftNote && (
+                      <p
+                        className={`flex items-start gap-1.5 text-12 ${
+                          draftNote.tone === "error"
+                            ? "text-rose-300"
+                            : draftNote.tone === "simulated"
+                              ? "text-amber-300"
+                              : "text-emerald-300"
+                        }`}
+                        role="status"
+                      >
+                        {draftNote.tone === "error" ? (
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                        ) : (
+                          <Sparkles className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                        )}
+                        <span>{draftNote.text}</span>
+                      </p>
+                    )}
+                    {/* Schedule this reply for later — stores it, sends nothing now */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="inline-flex items-center gap-1.5 text-12 text-black-300">
+                        <Clock className="h-3.5 w-3.5 text-purple-300" />
+                        Schedule for
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={scheduleAt}
+                        onChange={(e) => setScheduleAt(e.target.value)}
+                        className="input-field py-1.5 text-12 w-auto"
+                        aria-label="Schedule date and time"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleScheduleReply}
+                        disabled={!replyText.trim() || scheduling}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-black-800 px-3 py-2 text-12 font-medium text-white hover:bg-black-700 disabled:opacity-40"
+                      >
+                        {scheduling ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <CalendarClock className="h-3.5 w-3.5 text-purple-300" />
+                        )}
+                        <span>{scheduling ? "Scheduling…" : "Schedule"}</span>
+                      </button>
+                      {isDemoMode && (
+                        <span className="text-11 text-amber-300/90">
+                          Demo Mode: scheduled replies are simulated when due,
+                          never actually sent.
+                        </span>
+                      )}
+                    </div>
+                    {scheduleNote && (
+                      <p
+                        className={`flex items-start gap-1.5 text-12 ${
+                          scheduleNote.tone === "error"
+                            ? "text-rose-300"
+                            : scheduleNote.tone === "simulated"
+                              ? "text-amber-300"
+                              : "text-emerald-300"
+                        }`}
+                        role="status"
+                      >
+                        <Clock className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                        <span>{scheduleNote.text}</span>
+                      </p>
+                    )}
                     <VoiceComposer
                       text={replyText}
                       onTextChange={setReplyText}

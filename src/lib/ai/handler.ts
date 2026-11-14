@@ -1,6 +1,10 @@
 /**
  * POST /api/ai/draft — request handling logic (unit-testable).
  *
+ * Serves both the outreach drafter and the Inbox co-pilot reply
+ * draft (stepType "inbox_reply", with inboundMessage +
+ * conversationContext); both go through the same guards.
+ *
  * Guard order:
  *   1. Demo mode: no session exists by design -> return the labelled
  *      simulated draft.
@@ -11,7 +15,7 @@
  *      the JSON body; HTTP stays 200 so the UI can render the state).
  */
 
-import { draftOutreachMessage } from "./index";
+import { draftOutreachMessage, draftReply } from "./index";
 import type { DraftRequest, DraftResult } from "./types";
 import type { DataMode } from "@/lib/data/mode";
 
@@ -31,8 +35,14 @@ export function parseDraftRequest(body: unknown): DraftRequest | null {
   const b = body as Record<string, unknown>;
   const stepType = cap(b.stepType, 40);
   if (!stepType) return null;
+  // The Inbox co-pilot posts an explicit channel with stepType
+  // "inbox_reply"; outreach steps keep deriving it from the step type.
   const channel =
-    b.channel === "email" || stepType === "email" ? "email" : "linkedin";
+    b.channel === "email" || b.channel === "linkedin"
+      ? b.channel
+      : stepType === "email"
+        ? "email"
+        : "linkedin";
   const leadRaw = (b.lead ?? {}) as Record<string, unknown>;
   return {
     channel,
@@ -40,6 +50,8 @@ export function parseDraftRequest(body: unknown): DraftRequest | null {
     campaignName: cap(b.campaignName, 120),
     campaignGoal: cap(b.campaignGoal, 300),
     existingContent: cap(b.existingContent, 4000),
+    inboundMessage: cap(b.inboundMessage, 4000),
+    conversationContext: cap(b.conversationContext, 1000),
     lead: {
       firstName: cap(leadRaw.firstName, 80),
       company: cap(leadRaw.company, 120),
@@ -68,7 +80,14 @@ export async function handleDraftRequest(args: {
       body: { error: "Invalid request: a stepType is required." },
     };
   }
-  const result = await (args.draftFn ?? draftOutreachMessage)(input);
+  // Co-pilot reply drafts (stepType "inbox_reply") go through the
+  // same guards and orchestration as outreach drafts; only the
+  // context differs (inbound message + thread). The draftFn seam
+  // still wins when a test injects one.
+  const draft =
+    args.draftFn ??
+    (input.stepType === "inbox_reply" ? draftReply : draftOutreachMessage);
+  const result = await draft(input);
   return {
     status: 200,
     body: {

@@ -24,7 +24,26 @@ ChatGPT and the widget render inside a live ChatGPT client are
 claimed. LinkedIn sends are **NOT SUPPORTED** (no tool exists).
 
 **Test result (own runs, this session): full suite 1,404 tests passing
-(119 files), 0 failures. Production build green. TypeScript clean.**
+(119 files), 0 failures at the main commit; 1,405 passing (120 files)
+after the live-verification fix (commit e72d58e added 1 test for the
+ChatGPT metadata route). Production build green. TypeScript clean.**
+
+## Live verification (2026-11-16, after Vercel deployed 70416f2 + e72d58e)
+
+Verified on https://nxtsend.com by a read-only live browser check
+(~17:42–17:57 UTC) plus direct `curl` checks:
+
+| Check | Result |
+| --- | --- |
+| Vercel deploy of 70416f2 | **PASS** — new build live by ~17:45 UTC (health went from toolCount 18 to 54) |
+| `GET /api/mcp/health` | **PASS** — `{"mode":"demo","mcpEnabled":true,"toolCount":54,"oauthConfigured":false,"protocolVersion":"2025-06-18","version":"1.0.0"}` |
+| `GET /.well-known/oauth-protected-resource` (root) | **PASS** — resource `https://nxtsend.com/api/mcp`, both scope sets (`muse.*` + `nxtsend.*`) |
+| `GET /.well-known/oauth-authorization-server` | **PASS** — issuer, authorize/token/revoke/register endpoints, `code_challenge_methods_supported: ["S256"]`, `token_endpoint_auth_methods_supported: ["none","client_secret_post"]` |
+| `GET /.well-known/oauth-protected-resource/api/mcp/chatgpt` | **FIXED** — was 404 on the first live check (the route file never existed; the final report's first version wrongly listed it). Fixed in commit e72d58e and re-verified live: returns `{"resource":"https://nxtsend.com/api/mcp/chatgpt","authorization_servers":["https://nxtsend.com"],"scopes_supported":[...]}` |
+| `POST /api/mcp/chatgpt` tools/list, no token | **PASS (demo behaviour)** — 503 `not_configured`, message now correctly "ChatGPT MCP is not available in Demo Mode…" (was "Muse MCP…" before e72d58e). Pre-auth tools/list only applies in live mode; demo refuses the whole surface by design |
+| Integration page `/dashboard/integrations/chatgpt` (demo) | **PASS** — renders fully: "Demo Mode" badge + banner, no Connected/Verified state, "Not submitted to OpenAI", MCP URL, all OAuth endpoints, `nxtsend.*` scopes in plain words, 5 Developer Mode steps, grants/activity panels with platform-neutral demo messages ("OAuth grants are unavailable in Demo Mode.", "Activity is unavailable in Demo Mode."). **FIXED**: the page now lists all 54 tools in a "Tool manifest — 54 tools" section (was counts-only on the first live check) |
+| Screenshots | **PENDING** — the live browser viewed the pages but cannot save PNG files into the repo, and no Chromium/Playwright exists in this VM to capture them. None fabricated. The 10 shots listed in `audit-screenshots/chatgpt-integration/README.md` still need capturing from a machine with a browser |
+| Live OAuth grant flow inside ChatGPT + widget render | **PENDING** — needs migration 023 + 024 applied + `TOKEN_ENCRYPTION_KEY` set + a live Supabase project + a real ChatGPT account with Developer Mode, none of which exist yet |
 
 ## Status table
 

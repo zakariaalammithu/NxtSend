@@ -72,6 +72,11 @@ import {
 import { getIntegrationStatuses } from "@/lib/integrations-center/status";
 import { getEmailState } from "@/lib/email/state";
 import { getBillingState } from "@/lib/billing/state";
+import {
+  isMuseMcpEnabled,
+  getMusePublicUrl,
+} from "@/lib/muse-connector/oauth/config";
+import { countActiveMuseGrants } from "@/lib/muse-connector/grants";
 import { PLAN_CATALOG } from "@/lib/billing/plans";
 import {
   mapBillingEventToTransaction,
@@ -1126,6 +1131,68 @@ export async function getSystemHealth(mode: DataMode): Promise<HealthSummary> {
         ? "All catalogued server environment variables are present."
         : `${missingServerSecrets} server environment variable(s) are not set (see Configure Secrets for the list). Presence only — values are never displayed.`,
   });
+
+  // ── Muse connector (MCP + OAuth) ──────────────────────────────────
+  // Optional check: the surface is configured when MUSE_MCP_ENABLED
+  // is on and a public URL is set; "healthy" here never claims a
+  // connection — grants are counted separately, and zero grants is
+  // normal (nobody has connected yet), not a failure. A null grant
+  // count means the migration 023 tables could not be read.
+  if (mode === "demo") {
+    checks.push({
+      id: "muse-mcp",
+      label: "Muse connector (MCP + OAuth)",
+      status: "warning",
+      required: false,
+      message:
+        "Demo Mode: the Muse OAuth + MCP surface is unavailable — no grants can be issued or used.",
+    });
+  } else {
+    const museEnabled = isMuseMcpEnabled();
+    const musePublicUrl = getMusePublicUrl();
+    let museGrants: number | null = null;
+    const admin = createAdminClient();
+    if (admin) {
+      museGrants = await countActiveMuseGrants(admin, {}).catch(() => null);
+    }
+    if (!museEnabled) {
+      checks.push({
+        id: "muse-mcp",
+        label: "Muse connector (MCP + OAuth)",
+        status: "warning",
+        required: false,
+        message: "Muse MCP surface is disabled (MUSE_MCP_ENABLED is false).",
+      });
+    } else if (!musePublicUrl) {
+      checks.push({
+        id: "muse-mcp",
+        label: "Muse connector (MCP + OAuth)",
+        status: "warning",
+        required: false,
+        message:
+          "Muse MCP surface is enabled but no public URL is set (MUSE_MCP_PUBLIC_URL or NEXT_PUBLIC_APP_URL).",
+      });
+    } else if (museGrants === null) {
+      checks.push({
+        id: "muse-mcp",
+        label: "Muse connector (MCP + OAuth)",
+        status: "warning",
+        required: false,
+        message: `Muse MCP surface is configured at ${musePublicUrl}, but the OAuth tables could not be read — migration 023 may not be applied to this project.`,
+      });
+    } else {
+      checks.push({
+        id: "muse-mcp",
+        label: "Muse connector (MCP + OAuth)",
+        status: "ok",
+        required: false,
+        message:
+          museGrants === 0
+            ? `Muse MCP surface is configured at ${musePublicUrl}; no active grants yet (no Muse user has connected).`
+            : `Muse MCP surface is configured at ${musePublicUrl}; ${museGrants} active grant(s) platform-wide.`,
+      });
+    }
+  }
 
   return aggregateHealth(checks);
 }

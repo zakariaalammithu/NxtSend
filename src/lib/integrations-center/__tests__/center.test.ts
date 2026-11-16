@@ -101,7 +101,7 @@ describe("getIntegrationStatuses", () => {
     for (const id of ["supabase", "resend", "stripe", "openai", "anthropic", "meta-model", "webhooks", "jobs", "linkedin"]) {
       expect(statusOf(entries, id), id).toBe("Demo Mode");
     }
-    expect(statusOf(entries, "muse-ai")).toBe("Unsupported / No Documented API");
+    expect(statusOf(entries, "muse-ai")).toBe("Demo Mode");
     expect(statusOf(entries, "google-sheets")).toBe("Not Connected");
     expect(statusOf(entries, "crm")).toBe("Not Connected");
     expect(statusOf(entries, "email-verification")).toBe("Not Connected");
@@ -130,6 +130,55 @@ describe("getIntegrationStatuses", () => {
     for (const id of ["supabase", "resend", "stripe", "openai", "anthropic", "meta-model", "meta-pixel", "webhooks", "jobs"]) {
       expect(statusOf(entries, id), id).toBe("Connected but Not Verified");
     }
+  });
+
+  it("muse-ai: status derives from the real config state, never a fake connection", () => {
+    // No public URL anywhere: enabled by default, but unreachable.
+    expect(
+      statusOf(getIntegrationStatuses({ env: {}, mode: "supabase" }), "muse-ai")
+    ).toBe("Configuration Required");
+    // Disabled outright.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { MUSE_MCP_ENABLED: "false", MUSE_MCP_PUBLIC_URL: "https://example.com" },
+          mode: "supabase",
+        }),
+        "muse-ai"
+      )
+    ).toBe("Not Connected");
+    // Enabled + public URL, but no grant: configured, not connected.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { MUSE_MCP_PUBLIC_URL: "https://example.com" },
+          mode: "supabase",
+        }),
+        "muse-ai"
+      )
+    ).toBe("Connected but Not Verified");
+    // A real active grant is the ONLY thing that yields Connected.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { MUSE_MCP_PUBLIC_URL: "https://example.com" },
+          mode: "supabase",
+          museGrantsActive: 1,
+        }),
+        "muse-ai"
+      )
+    ).toBe("Connected and Verified");
+    // Unknown grant count (migration 023 not applied) never invents a grant.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { MUSE_MCP_PUBLIC_URL: "https://example.com" },
+          mode: "supabase",
+          museGrantsActive: null,
+        }),
+        "muse-ai"
+      )
+    ).toBe("Connected but Not Verified");
   });
 
   it("partial configuration maps to Configuration Required", () => {
@@ -472,8 +521,9 @@ describe("verifyIntegration — live provider checks (fakes)", () => {
     expect((await verifyIntegration("linkedin", { env: FAKE_ENV, mode: "supabase" }))?.status).toBe(
       "Configuration Required"
     );
+    // FAKE_ENV sets no Muse public URL: configured surface, no grant.
     expect((await verifyIntegration("muse-ai", { env: FAKE_ENV, mode: "supabase" }))?.status).toBe(
-      "Unsupported / No Documented API"
+      "Configuration Required"
     );
     expect((await verifyIntegration("google-sheets", { env: FAKE_ENV, mode: "supabase" }))?.status).toBe(
       "Not Connected"

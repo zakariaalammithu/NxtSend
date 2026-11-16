@@ -23,6 +23,10 @@ import { getEmailState, isEmailFromConfigured } from "@/lib/email/state";
 import { describeLinkedInProvider } from "@/lib/linkedin/state";
 import { getBillingState } from "@/lib/billing/state";
 import { isPixelConfigured } from "@/lib/analytics/pixel";
+import {
+  isMuseMcpEnabled,
+  getMusePublicUrl,
+} from "@/lib/muse-connector/oauth/config";
 import { INTEGRATION_REGISTRY } from "./registry";
 import type {
   CenterStatus,
@@ -83,6 +87,13 @@ export interface IntegrationStatusOptions {
    * Absent/null = no connection is recorded for that provider.
    */
   oauthMailboxes?: Partial<Record<OAuthProvider, OAuthMailboxSummary | null>>;
+  /**
+   * Number of ACTIVE Muse OAuth grants for the caller's workspace
+   * (live mode, counted from muse_oauth_tokens). null = unknown
+   * (e.g. migration 023 not applied) — treated as "no grant seen".
+   * A grant is the ONLY thing that can make muse-ai "Connected".
+   */
+  museGrantsActive?: number | null;
 }
 
 interface DerivedStatus {
@@ -97,7 +108,8 @@ function deriveStatus(
   env: CenterEnv,
   mode: DataMode,
   webhookConfigured: boolean | null,
-  oauthMailboxes?: Partial<Record<OAuthProvider, OAuthMailboxSummary | null>>
+  oauthMailboxes?: Partial<Record<OAuthProvider, OAuthMailboxSummary | null>>,
+  museGrantsActive?: number | null
 ): DerivedStatus {
   const demo = mode === "demo";
   switch (id) {
@@ -339,13 +351,52 @@ function deriveStatus(
         configured: false,
       };
     }
-    case "muse-ai":
+    case "muse-ai": {
+      // The Muse surface is implemented (OAuth 2.1 server + MCP
+      // server, migration 023) — the status now derives from the
+      // REAL config state, never from the old research-only label:
+      //   - Demo Mode: the surface refuses demo outright.
+      //   - A real, active OAuth grant for this workspace is the
+      //     ONLY thing that yields "Connected" (and it is Verified:
+      //     the grant exists only after a completed OAuth exchange).
+      //   - Enabled + public URL set, no grant: "Connected but Not
+      //     Verified" — configuration alone is never a connection.
+      //   - Otherwise: Not Connected / Configuration Required.
+      // `configured` stays false without a grant, so a stale
+      // verification record can never upgrade config to Verified.
+      if (demo) {
+        return {
+          status: "Demo Mode",
+          message:
+            "Demo Mode: the Muse OAuth + MCP surface is unavailable — no grant can be issued or used.",
+          configured: false,
+        };
+      }
+      if (museGrantsActive != null && museGrantsActive > 0) {
+        return {
+          status: "Connected and Verified",
+          message: `${museGrantsActive} active Muse OAuth grant(s) exist for this workspace — Muse can call the MCP server on behalf of the granting user(s). Manage them from the grants panel on the detail page.`,
+          configured: true,
+        };
+      }
+      const museEnabled = isMuseMcpEnabled(env);
+      const musePublicUrl = getMusePublicUrl(undefined, env);
+      if (museEnabled && musePublicUrl) {
+        return {
+          status: "Connected but Not Verified",
+          message:
+            "Muse MCP surface is configured (MUSE_MCP_ENABLED + public URL are set). That is configuration, not a connection — 'Connected' requires a real OAuth grant; see the grants panel on the detail page.",
+          configured: false,
+        };
+      }
       return {
-        status: "Unsupported / No Documented API",
-        message:
-          "No public API exists for driving the Muse agent (researched 2026-10-19). The supported path is the Muse Connector Platform: NxtSend exposes an API/MCP server and submits it for Meta's review.",
+        status: museEnabled ? "Configuration Required" : "Not Connected",
+        message: museEnabled
+          ? "Muse MCP surface is enabled but no public URL is set (MUSE_MCP_PUBLIC_URL or NEXT_PUBLIC_APP_URL) — Muse cannot reach the connector until one is set."
+          : "Muse MCP surface is disabled (MUSE_MCP_ENABLED is false).",
         configured: false,
       };
+    }
     case "google-sheets":
     case "crm":
     case "email-verification":
@@ -378,7 +429,8 @@ export function getIntegrationStatuses(
       env,
       mode,
       webhookConfigured,
-      options.oauthMailboxes
+      options.oauthMailboxes,
+      options.museGrantsActive
     );
     const record = verifications[descriptor.id] ?? null;
     let status = applyVerification(derived.status, derived.configured, record);

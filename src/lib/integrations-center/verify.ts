@@ -39,6 +39,10 @@ import {
 import { getBillingState } from "@/lib/billing/state";
 import { NotConfiguredLinkedInAdapter } from "@/lib/linkedin/not-configured";
 import { isPixelConfigured } from "@/lib/analytics/pixel";
+import {
+  isMuseMcpEnabled,
+  getMusePublicUrl,
+} from "@/lib/muse-connector/oauth/config";
 import type { CenterStatus, VerifyOutcome } from "./types";
 
 export interface VerifyDeps {
@@ -148,10 +152,10 @@ export async function verifyIntegration(
     if (id === "muse-ai") {
       return outcome(
         id,
-        "Unsupported / No Documented API",
+        "Demo Mode",
         false,
         false,
-        "Demo Mode, and no documented public API exists for the Muse agent in any mode. See the readiness pack on this page."
+        "Demo Mode: the Muse OAuth + MCP surface is unavailable in Demo Mode — no grant can be issued or verified here. Configure Supabase, then check again in live mode."
       );
     }
     return outcome(
@@ -433,9 +437,22 @@ export async function verifyIntegration(
       );
     }
 
-    case "muse-ai":
-      return outcome(id, "Unsupported / No Documented API", false, false,
-        "No documented public API exists for the Muse agent — there is nothing to verify against. The Connector Platform path (NxtSend as the API provider) is documented on this page.");
+    case "muse-ai": {
+      // No safe read-only verification call exists for a connector:
+      // proving it works needs a real Muse OAuth grant (see the
+      // grants panel on the detail page). Configuration alone never
+      // counts as verified, and no outbound call is made here.
+      const museEnabled = isMuseMcpEnabled(env);
+      const musePublicUrl = getMusePublicUrl(undefined, env);
+      if (museEnabled && musePublicUrl) {
+        return outcome(id, "Connected but Not Verified", false, false,
+          "Muse MCP surface is configured (MUSE_MCP_ENABLED + public URL are set), but Test Connection cannot prove the connector works — that needs a real Muse OAuth grant, listed in the grants panel on this page. Configuration alone never counts as verified.");
+      }
+      return outcome(id, museEnabled ? "Configuration Required" : "Not Connected", false, false,
+        museEnabled
+          ? "Muse MCP surface is not fully configured: no public URL is set (MUSE_MCP_PUBLIC_URL or NEXT_PUBLIC_APP_URL). Set one, redeploy, and check the grants panel on this page."
+          : "Muse MCP surface is disabled (MUSE_MCP_ENABLED is false). The OAuth + MCP routes stay available, but Muse cannot reach the connector.");
+    }
 
     case "google-sheets":
     case "crm":

@@ -1,13 +1,21 @@
 /**
- * Muse.ai (Meta Muse) readiness pack.
+ * Muse.ai (Meta Muse) connector pack — CLIENT-SAFE barrel.
  *
- * There is NO Muse agent API for NxtSend to call — the integration
- * direction is inverted (Muse Connector Platform: NxtSend hosts the
- * API/MCP surface, Muse calls in, after Meta's review). This module
- * holds the preparation artefacts: the pre-classified tool manifest,
- * the submission readiness checklist, and the deliberately
- * unimplemented adapter interface. See ./adapter.ts before touching
- * anything here.
+ * Only the manifest, readiness checklist, input schemas and the
+ * adapter interface + unimplemented stub are exported here, because
+ * the Integration Center detail page ("use client") imports this
+ * barrel: anything server-only (next/headers, the Resend/AI provider
+ * SDKs, node:crypto) in this file's import graph breaks that page's
+ * build. The real adapter (./adapter.ts) is server-only and is
+ * imported directly by the MCP server, never through this barrel.
+ *
+ * Server-only pieces live in their own modules — import them
+ * directly from server code:
+ *   real adapter ....... ./adapter (NxtSendMuseConnectorAdapter)
+ *   audit .............. ./audit (recordMuseAudit, recordMuseOAuthEvent)
+ *   tokens/context ..... ./tokens, ./context (re-export Worker A's
+ *                        oauth/ server; resolveMuseContext)
+ *   MCP transport ...... ./mcp (handleMcpRequest)
  */
 
 export {
@@ -20,5 +28,16 @@ export type {
 } from "./manifest";
 export { MUSE_READINESS_CHECKLIST } from "./readiness";
 export type { MuseReadinessItem } from "./readiness";
-export { UnimplementedMuseConnectorAdapter } from "./adapter";
-export type { MuseConnectorAdapter, MuseConnectorResult } from "./adapter";
+export { UnimplementedMuseConnectorAdapter } from "./interface";
+export type {
+  MuseConnectorAdapter,
+  MuseConnectorResult,
+  MuseToolOutcomeStatus,
+} from "./interface";
+export {
+  TOOL_INPUT_SCHEMAS,
+  TOOL_SCOPES,
+  requiredScope,
+  validateToolInput,
+} from "./schemas";
+export type { MuseScope, ToolInputSchema, ToolValidationError } from "./schemas";

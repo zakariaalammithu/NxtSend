@@ -12,6 +12,9 @@ import {
   Loader2,
   FlaskConical,
   Puzzle,
+  Copy,
+  Check,
+  Shield,
 } from "lucide-react";
 import { DemoBanner, Badge } from "@/components/ui";
 import {
@@ -27,6 +30,8 @@ import {
   MUSE_READINESS_CHECKLIST,
   MUSE_CONNECTOR_MANIFEST_STATUS,
 } from "@/lib/muse-connector";
+import { MUSE_SCOPE_DESCRIPTIONS } from "@/lib/muse-connector/oauth/scopes";
+import type { MuseScope } from "@/lib/muse-connector/oauth/scopes";
 import EmailAuthPanel from "@/components/integrations/EmailAuthPanel";
 import EmailRoutingPanel from "@/components/integrations/EmailRoutingPanel";
 import OAuthMailboxPanel from "@/components/integrations/OAuthMailboxPanel";
@@ -304,6 +309,11 @@ export default function IntegrationDetailPage() {
       {/* Muse.ai readiness pack */}
       {d.id === "muse-ai" && <MuseReadinessPack />}
 
+      {/* Muse.ai live surface: endpoints, scopes, grants, activity */}
+      {d.id === "muse-ai" && (
+        <MuseLivePanels origin={origin} status={entry.status} mode={data?.mode ?? "demo"} />
+      )}
+
       {/* Environment variables */}
       {d.envVars.length > 0 && (
         <Section title="Required configuration (environment variables)">
@@ -393,7 +403,9 @@ export default function IntegrationDetailPage() {
             ? "Disable the subscription toggle in the Outbound Webhooks section (deliveries stop immediately), or delete the subscription to remove it entirely. Past delivery logs are kept."
             : d.id === "gmail" || d.id === "microsoft"
               ? "Use the Disconnect button in the Connected mailbox panel above: it deletes the stored (encrypted) OAuth tokens and marks the account disconnected — for Gmail it also revokes the grant at Google (best effort, reported in the result); Microsoft offers no revocation endpoint, so remove the app's consent in the Microsoft account too if you want it gone there. Removing the env variables additionally prevents NEW connections. Past message records are kept."
-              : d.id === "muse-ai" || d.kind === "info"
+              : d.id === "muse-ai"
+              ? "Revoke individual grants from the “Your Muse grants” panel above — revoking removes Muse's access for that grant immediately (every token for that client + user is revoked). Removing the environment variables additionally prevents NEW grants. Past audit entries are kept."
+              : d.kind === "info"
               ? "Nothing is connected, so there is nothing to disconnect. This entry documents the limitation and what implementing it would require."
               : "Remove (or replace) the environment variables listed above in Vercel and redeploy. The status returns to Not Connected, and any stored verification stops applying because the configuration it verified is gone. No data is deleted by disconnecting."}
         </p>
@@ -411,6 +423,346 @@ export default function IntegrationDetailPage() {
         </ul>
       </Section>
     </div>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = React.useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 2000);
+        } catch {
+          // Clipboard unavailable (non-secure context) — the URL is
+          // still shown in full and selectable.
+        }
+      }}
+      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-black-600 bg-black-800 px-2.5 py-1.5 text-11 font-semibold text-black-200 hover:text-white transition-colors"
+      aria-label="Copy URL"
+    >
+      {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+      {copied ? "Copied" : "Copy"}
+    </button>
+  );
+}
+
+interface MuseGrant {
+  clientId: string;
+  clientName: string;
+  scopes: MuseScope[];
+  createdAt: string;
+  refreshExpiresAt: string | null;
+  active: boolean;
+  lastUsedAt: string | null;
+}
+
+interface MuseActivityEntry {
+  action: string;
+  resource: string | null;
+  details: string;
+  created_at: string;
+}
+
+/**
+ * Live Muse panels (detail page only). Everything here comes from
+ * the real implementation: endpoint URLs from this deployment's
+ * origin, scopes from the OAuth module, grants + activity from the
+ * grants/activity APIs. No state is ever shown as "Connected"
+ * unless a real grant exists — the header badge already reflects
+ * that (derived from the grants count in GET /api/integrations/status).
+ */
+function MuseLivePanels({
+  origin,
+  status,
+  mode,
+}: {
+  origin: string;
+  status: string;
+  mode: string;
+}) {
+  const [grants, setGrants] = React.useState<MuseGrant[] | null>(null);
+  const [grantsError, setGrantsError] = React.useState<string | null>(null);
+  const [activity, setActivity] = React.useState<MuseActivityEntry[] | null>(null);
+  const [activityError, setActivityError] = React.useState<string | null>(null);
+  const [revokeBusy, setRevokeBusy] = React.useState<string | null>(null);
+  const [revokeError, setRevokeError] = React.useState<string | null>(null);
+  const [revokeNotice, setRevokeNotice] = React.useState<string | null>(null);
+
+  const loadGrants = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/muse/grants");
+      const body = (await res.json().catch(() => null)) as
+        | { grants?: MuseGrant[]; error?: string }
+        | null;
+      if (!res.ok) throw new Error(body?.error ?? `Grants request failed (HTTP ${res.status})`);
+      setGrants(body?.grants ?? []);
+      setGrantsError(null);
+    } catch (err) {
+      setGrantsError(err instanceof Error ? err.message : "Failed to load Muse grants.");
+    }
+  }, []);
+
+  const loadActivity = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/muse/activity");
+      const body = (await res.json().catch(() => null)) as
+        | { entries?: MuseActivityEntry[]; error?: string }
+        | null;
+      if (!res.ok) throw new Error(body?.error ?? `Activity request failed (HTTP ${res.status})`);
+      setActivity(body?.entries ?? []);
+      setActivityError(null);
+    } catch (err) {
+      setActivityError(err instanceof Error ? err.message : "Failed to load Muse activity.");
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void loadGrants();
+    void loadActivity();
+  }, [loadGrants, loadActivity]);
+
+  const revokeGrant = async (clientId: string) => {
+    setRevokeBusy(clientId);
+    setRevokeError(null);
+    setRevokeNotice(null);
+    try {
+      const res = await fetch(`/api/muse/grants?client_id=${encodeURIComponent(clientId)}`, {
+        method: "DELETE",
+      });
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) throw new Error(body?.error ?? `Revoke failed (HTTP ${res.status})`);
+      setRevokeNotice(`Grant for “${clientId}” revoked — Muse can no longer use it.`);
+      await loadGrants();
+      await loadActivity();
+    } catch (err) {
+      setRevokeError(err instanceof Error ? err.message : "Revoke failed.");
+    } finally {
+      setRevokeBusy(null);
+    }
+  };
+
+  const endpoints: { label: string; path: string; note: string }[] = [
+    {
+      label: "MCP endpoint",
+      path: "/api/mcp",
+      note: "Streamable HTTP, JSON-RPC 2.0. Give this URL to Muse as a Custom Connector.",
+    },
+    {
+      label: "Authorize (consent screen)",
+      path: "/api/muse/oauth/authorize",
+      note: "GET shows the consent screen; POST approves or denies.",
+    },
+    { label: "Token", path: "/api/muse/oauth/token", note: "authorization_code + refresh_token." },
+    { label: "Revoke", path: "/api/muse/oauth/revoke", note: "RFC 7009 token revocation." },
+    {
+      label: "Register (Dynamic Client Registration)",
+      path: "/api/muse/oauth/register",
+      note: "RFC 7591 — public clients by default; no pre-registered client secret exists.",
+    },
+    {
+      label: "Protected-resource metadata",
+      path: "/.well-known/oauth-protected-resource/api/mcp",
+      note: "RFC 9728 metadata for the MCP resource.",
+    },
+  ];
+
+  return (
+    <>
+      <Section title="Live connection status">
+        <p className="text-13 text-black-300 leading-relaxed">
+          Current status: <strong className="text-white">{status}</strong>.{" "}
+          {status === "Connected and Verified"
+            ? "At least one active Muse OAuth grant exists for this workspace — Muse can call the MCP server on behalf of the granting user(s)."
+            : status === "Connected but Not Verified"
+              ? "The MCP surface is configured, but no active Muse grant exists yet — configuration alone is not a connection. Connect from Muse (steps below) to create a grant."
+              : status === "Demo Mode"
+                ? "Demo Mode: the Muse OAuth + MCP surface refuses demo outright — no grant can be issued or used here."
+                : "The Muse surface is not fully configured on this deployment — see the environment variables above."}
+        </p>
+        {mode === "demo" && (
+          <p className="text-12 text-black-400 leading-relaxed">
+            Grants and activity are unavailable in Demo Mode by design; they appear here in live mode.
+          </p>
+        )}
+      </Section>
+
+      <Section title="Endpoints — this deployment">
+        <div className="divide-y divide-black-700/60">
+          {endpoints.map((e) => (
+            <div key={e.path} className="py-3 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-13 font-semibold text-white">{e.label}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <code className="min-w-0 flex-1 rounded-xl bg-black-800 border border-black-700 px-3 py-2 font-mono text-12 text-purple-200 break-all">
+                  {origin ? `${origin}${e.path}` : e.path}
+                </code>
+                <CopyButton text={origin ? `${origin}${e.path}` : e.path} />
+              </div>
+              <p className="text-12 text-black-400 leading-relaxed">{e.note}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Scopes — what a Muse grant can ask for">
+        <p className="text-13 text-black-300 leading-relaxed">
+          A <code className="font-mono text-black-100">muse.read</code>-only grant is the
+          recommended default — it lets Muse look things up without changing anything. The consent
+          screen offers it, and a requested scope outside these three is refused, never silently
+          widened.
+        </p>
+        <div className="divide-y divide-black-700/60">
+          {(Object.entries(MUSE_SCOPE_DESCRIPTIONS) as [MuseScope, string][]).map(
+            ([scope, description]) => (
+              <div key={scope} className="py-3 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <code className="font-mono text-13 text-white">{scope}</code>
+                  {scope === "muse.read" && (
+                    <Badge variant="blue" size="sm">Recommended default</Badge>
+                  )}
+                  {scope === "muse.send" && (
+                    <Badge variant="error" size="sm">Sensitive</Badge>
+                  )}
+                </div>
+                <p className="text-12 text-black-300 leading-relaxed">{description}</p>
+              </div>
+            )
+          )}
+        </div>
+      </Section>
+
+      <Section title="Connect to Muse">
+        <ol className="space-y-2 list-none">
+          {[
+            "In Muse, add NxtSend as a Custom Connector with the MCP endpoint URL above. Muse registers itself via Dynamic Client Registration — there is no client secret to copy (clients are public by default).",
+            "Sign in on NxtSend's consent screen and choose the scopes. Pick muse.read only unless Muse genuinely needs to change or send things.",
+            "Use NxtSend from inside Muse. Sensitive writes (sending email, deleting a lead) need your approval in Muse every single time — they can never be set to “Always allow”.",
+            "Directory listing is a separate step: submit at muse.ai/platform for Meta's review. That submission has NOT been made and no approval is claimed — the Custom Connector path above works without it.",
+          ].map((step, i) => (
+            <li key={step} className="flex items-start gap-3 text-13 text-black-300">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-600/20 border border-purple-500/30 text-11 font-bold text-purple-300 mt-0.5">
+                {i + 1}
+              </span>
+              <span className="leading-relaxed">{step}</span>
+            </li>
+          ))}
+        </ol>
+      </Section>
+
+      <Section title="Your Muse grants">
+        {grantsError && (
+          <p className="text-13 text-rose-200 leading-relaxed">{grantsError}</p>
+        )}
+        {!grantsError && grants === null && (
+          <p className="text-13 text-black-400">Loading grants…</p>
+        )}
+        {!grantsError && grants !== null && grants.length === 0 && (
+          <p className="text-13 text-black-300 leading-relaxed">
+            No Muse grants for your account. A grant appears here after you approve Muse on the
+            consent screen — until then, nothing is connected.
+          </p>
+        )}
+        {grants !== null && grants.length > 0 && (
+          <div className="divide-y divide-black-700/60">
+            {grants.map((g) => (
+              <div key={g.clientId} className="py-3 space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-13 font-semibold text-white">{g.clientName}</span>
+                  <code className="font-mono text-11 text-black-400 break-all">{g.clientId}</code>
+                  <Badge variant={g.active ? "success" : "gray"} size="sm">
+                    {g.active ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+                <p className="text-12 text-black-300">
+                  Scopes: {g.scopes.length > 0 ? g.scopes.join(", ") : "—"}
+                </p>
+                <p className="text-12 text-black-400">
+                  Created {new Date(g.createdAt).toLocaleString()}
+                  {g.refreshExpiresAt
+                    ? ` · refresh token expires ${new Date(g.refreshExpiresAt).toLocaleString()}`
+                    : " · no live refresh token"}
+                  {" · "}Last used: not tracked (migration 023 stores no last-used time).
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void revokeGrant(g.clientId)}
+                  disabled={revokeBusy === g.clientId || !g.active}
+                  className="inline-flex items-center gap-2 rounded-xl border border-rose-500/40 bg-rose-950/30 hover:bg-rose-950/50 disabled:opacity-50 px-3 py-1.5 text-12 font-semibold text-rose-200 transition-colors"
+                >
+                  {revokeBusy === g.clientId ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : null}
+                  {revokeBusy === g.clientId ? "Revoking…" : "Revoke grant"}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {revokeNotice && <p className="text-13 text-green-300">{revokeNotice}</p>}
+        {revokeError && <p className="text-13 text-rose-200">{revokeError}</p>}
+        <p className="text-12 text-black-400 leading-relaxed">
+          Revoking removes Muse&apos;s access for that grant immediately. Token values are never
+          shown here — grants are identified by client name and scopes only.
+        </p>
+      </Section>
+
+      <Section title="Integration activity history">
+        {activityError && (
+          <p className="text-13 text-rose-200 leading-relaxed">{activityError}</p>
+        )}
+        {!activityError && activity === null && (
+          <p className="text-13 text-black-400">Loading activity…</p>
+        )}
+        {!activityError && activity !== null && activity.length === 0 && (
+          <p className="text-13 text-black-300 leading-relaxed">
+            No Muse activity recorded for this workspace yet — MCP tool calls and OAuth
+            grant/revoke events appear here (newest first, up to 50).
+          </p>
+        )}
+        {activity !== null && activity.length > 0 && (
+          <div className="divide-y divide-black-700/60">
+            {activity.map((a, i) => (
+              <div key={`${a.created_at}-${a.action}-${i}`} className="py-2.5 space-y-0.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <code className="font-mono text-12 text-white">{a.action}</code>
+                  {a.resource && (
+                    <span className="font-mono text-11 text-black-400 break-all">{a.resource}</span>
+                  )}
+                  <span className="text-11 text-black-500">
+                    {new Date(a.created_at).toLocaleString()}
+                  </span>
+                </div>
+                {a.details && <p className="text-12 text-black-300 leading-relaxed">{a.details}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <Section title="Security & privacy notes">
+        <ul className="space-y-1.5">
+          {[
+            "Tokens and authorization codes are stored as SHA-256 hashes only — a database read can never yield a usable token, and no token value is ever logged or shown in the UI.",
+            "Refresh tokens rotate on every use; presenting an already-rotated refresh token revokes the whole grant.",
+            "The OAuth tables (migration 023) have RLS enabled with zero policies — only the service role can read or write them; the browser cannot reach them at all.",
+            "A grant is scoped to one user and one workspace. MCP tool calls are workspace-scoped and scope-enforced; a muse.read token cannot call a write tool.",
+            "Sensitive writes (send_email, send_inbox_reply, delete_lead) need approval in Muse every time. There is no LinkedIn-send tool: no authorized LinkedIn provider exists, and the official LinkedIn API exposes no connection-request/DM endpoints to standard developers.",
+            "Every MCP tool call and OAuth grant/revoke event is written to the audit log for this workspace (see the activity history above).",
+            "Demo Mode refuses the whole Muse surface (OAuth 503/400, MCP 503) — the demo persona is never served to Muse.",
+          ].map((note) => (
+            <li key={note} className="flex items-start gap-2 text-13 text-black-300">
+              <Shield className="h-4 w-4 shrink-0 text-purple-400 mt-0.5" />
+              <span className="leading-relaxed">{note}</span>
+            </li>
+          ))}
+        </ul>
+      </Section>
+    </>
   );
 }
 
@@ -508,13 +860,19 @@ function MuseReadinessPack() {
           ))}
         </ol>
         <p className="text-12 text-black-400 leading-relaxed pt-1">
-          When access is obtained, the files that change are:{" "}
+          The surface itself is implemented:{" "}
+          <code className="font-mono text-black-200">src/lib/muse-connector/oauth/</code>{" "}
+          (OAuth 2.1 server),{" "}
+          <code className="font-mono text-black-200">src/app/api/muse/oauth/</code>{" "}
+          and{" "}
+          <code className="font-mono text-black-200">src/app/api/muse/grants/</code>{" "}
+          (routes),{" "}
+          <code className="font-mono text-black-200">src/app/api/mcp/</code>{" "}
+          (MCP server),{" "}
           <code className="font-mono text-black-200">src/lib/muse-connector/adapter.ts</code>{" "}
-          (implement the hosted surface),{" "}
-          <code className="font-mono text-black-200">src/lib/muse-connector/manifest.ts</code>{" "}
-          (final JSON Schemas), the muse-ai registry/status source in{" "}
-          <code className="font-mono text-black-200">src/lib/integrations-center/</code>, and
-          SETUP.md §14 — no other part of the app needs to change.
+          (the 18 tools), and migration 023. What remains is the
+          submission itself (items above) — nothing here has been
+          submitted to Meta, and no approval is claimed.
         </p>
       </Section>
     </>

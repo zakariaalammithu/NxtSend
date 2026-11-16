@@ -1,0 +1,241 @@
+import { NextResponse } from "next/server";
+import { resolveCenterContext } from "@/lib/integrations-center/server";
+import { createAdminClient } from "@/lib/supabase/server";
+import { getDataMode } from "@/lib/data/mode";
+import {
+  buildOAuthErrorRedirect,
+  buildOAuthSuccessRedirect,
+  issueAuthorizationCode,
+  validateAuthorizeRequest,
+} from "@/lib/muse-connector/oauth/authorize";
+import {
+  createSupabaseMuseOAuthStore,
+  MUSE_SCOPE_DESCRIPTIONS,
+  recordMuseOAuthEvent,
+  signMuseAuthorizeState,
+  verifyMuseAuthorizeState,
+  type MuseScope,
+} from "@/lib/muse-connector/oauth";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+/**
+ * GET /api/muse/oauth/authorize — OAuth 2.1 authorization endpoint.
+ *
+ * Requires a signed-in NxtSend user (Supabase cookie session, via
+ * resolveCenterContext — the same guard the Integration Center
+ * uses). Demo Mode is REFUSED with a plain error page: no grant may
+ * ever be issued for the demo persona. On success the route renders
+ * the consent screen (NxtSend dark design, inline-styled HTML);
+ * approval is a POST back to this route.
+ *
+ * Invalid requests redirect with OAuth error params when a valid
+ * redirect_uri exists, else a plain error page — never leak
+ * internals.
+ */
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function errorPage(title: string, message: string, status = 400): NextResponse {
+  return new NextResponse(
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(title)} — NxtSend</title></head>` +
+      `<body style="margin:0;background:#070614;color:#f2f1fb;font-family:Manrope,ui-sans-serif,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;">` +
+      `<main style="max-width:480px;width:100%;background:#191825;border:1px solid #2a2942;border-radius:16px;padding:32px;">` +
+      `<h1 style="margin:0 0 8px;font-size:20px;">${escapeHtml(title)}</h1>` +
+      `<p style="margin:0;color:#bdbdd1;line-height:1.6;">${escapeHtml(message)}</p>` +
+      `</main></body></html>`,
+    { status, headers: { "content-type": "text/html; charset=utf-8" } }
+  );
+}
+
+function consentPage(input: {
+  clientName: string;
+  scopes: MuseScope[];
+  workspaceLabel: string;
+  userLabel: string;
+  signedState: string;
+}): NextResponse {
+  const scopeItems = input.scopes
+    .map(
+      (scope) =>
+        `<li style="margin:0 0 10px;line-height:1.5;"><strong style="color:#f2f1fb;">${escapeHtml(scope)}</strong><br><span style="color:#bdbdd1;">${escapeHtml(MUSE_SCOPE_DESCRIPTIONS[scope])}</span></li>`
+    )
+    .join("");
+  const html =
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Connect to NxtSend</title></head>` +
+    `<body style="margin:0;background:#070614;color:#f2f1fb;font-family:Manrope,ui-sans-serif,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;">` +
+    `<main style="max-width:520px;width:100%;background:#191825;border:1px solid #2a2942;border-radius:16px;padding:32px;">` +
+    `<p style="margin:0 0 4px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#8a7aff;">NxtSend</p>` +
+    `<h1 style="margin:0 0 8px;font-size:22px;">Connect <span style="color:#8a7aff;">${escapeHtml(input.clientName)}</span> to NxtSend?</h1>` +
+    `<p style="margin:0 0 20px;color:#bdbdd1;line-height:1.6;">This app is asking to access your NxtSend account <strong style="color:#f2f1fb;">${escapeHtml(input.userLabel)}</strong> in workspace <strong style="color:#f2f1fb;">${escapeHtml(input.workspaceLabel)}</strong>. It will be able to:</p>` +
+    `<ul style="margin:0 0 20px;padding-left:20px;">${scopeItems}</ul>` +
+    `<p style="margin:0 0 24px;color:#898ca2;font-size:13px;line-height:1.6;">You can revoke this access at any time. Sending email and deleting leads always need your approval in Muse, every time.</p>` +
+    `<form method="post" action="/api/muse/oauth/authorize" style="display:flex;gap:12px;">` +
+    `<input type="hidden" name="muse_state" value="${escapeHtml(input.signedState)}">` +
+    `<button type="submit" name="decision" value="approve" style="flex:1;background:#642cff;color:#fff;border:0;border-radius:10px;padding:12px 16px;font-size:15px;font-weight:600;cursor:pointer;">Allow access</button>` +
+    `<button type="submit" name="decision" value="deny" style="flex:1;background:transparent;color:#f2f1fb;border:1px solid #3a3956;border-radius:10px;padding:12px 16px;font-size:15px;font-weight:600;cursor:pointer;">Deny</button>` +
+    `</form></main></body></html>`;
+  return new NextResponse(html, {
+    status: 200,
+    headers: { "content-type": "text/html; charset=utf-8" },
+  });
+}
+
+export async function GET(req: Request) {
+  const ctx = await resolveCenterContext();
+  if (!ctx.ok) return ctx.response;
+  if (ctx.mode === "demo" || getDataMode() === "demo") {
+    return errorPage(
+      "Muse connection unavailable",
+      "NxtSend is running in Demo Mode, so no Muse connection can be created. Connect a real Supabase project first — demo data is never shared with Muse.",
+      503
+    );
+  }
+  if (!ctx.userId) {
+    return errorPage("Sign in required", "Sign in to NxtSend before connecting Muse.", 401);
+  }
+  const admin = createAdminClient();
+  if (!admin) {
+    return errorPage(
+      "Muse connection unavailable",
+      "The server is not configured for Muse connections right now. Please try again later.",
+      503
+    );
+  }
+  const store = createSupabaseMuseOAuthStore(admin);
+  const url = new URL(req.url);
+  const params = {
+    client_id: url.searchParams.get("client_id"),
+    redirect_uri: url.searchParams.get("redirect_uri"),
+    response_type: url.searchParams.get("response_type"),
+    scope: url.searchParams.get("scope"),
+    state: url.searchParams.get("state"),
+    code_challenge: url.searchParams.get("code_challenge"),
+    code_challenge_method: url.searchParams.get("code_challenge_method"),
+  };
+  const client = params.client_id ? await store.getClient(params.client_id) : null;
+  const validation = validateAuthorizeRequest(params, client);
+  if (!validation.ok) {
+    if (validation.redirectUri) {
+      return NextResponse.redirect(
+        buildOAuthErrorRedirect(
+          validation.redirectUri,
+          validation.error,
+          validation.errorDescription,
+          validation.clientState
+        )
+      );
+    }
+    return errorPage("Invalid authorization request", validation.errorDescription);
+  }
+  const { request } = validation;
+  const signedState = signMuseAuthorizeState({
+    clientId: request.client.client_id,
+    redirectUri: request.redirectUri,
+    scopes: request.scopes,
+    codeChallenge: request.codeChallenge,
+    clientState: request.clientState,
+    userId: ctx.userId,
+    workspaceId: ctx.workspaceId,
+  });
+  if (!signedState) {
+    return errorPage(
+      "Muse connection unavailable",
+      "The server could not start the authorization flow (signing key not configured). Please try again later.",
+      503
+    );
+  }
+  return consentPage({
+    clientName: request.client.name,
+    scopes: request.scopes,
+    workspaceLabel: ctx.workspaceId,
+    userLabel: ctx.userId,
+    signedState,
+  });
+}
+
+export async function POST(req: Request) {
+  const ctx = await resolveCenterContext();
+  if (!ctx.ok) return ctx.response;
+  if (ctx.mode === "demo" || getDataMode() === "demo" || !ctx.userId) {
+    return errorPage(
+      "Muse connection unavailable",
+      "This authorization request cannot be completed in Demo Mode or without a signed-in NxtSend user.",
+      401
+    );
+  }
+  const form = await req.formData().catch(() => null);
+  if (!form) return errorPage("Invalid request", "The consent form could not be read.", 400);
+  const signedState = String(form.get("muse_state") ?? "");
+  const decision = String(form.get("decision") ?? "");
+  const claims = verifyMuseAuthorizeState(signedState, {
+    userId: ctx.userId,
+    workspaceId: ctx.workspaceId,
+  });
+  if (!claims) {
+    return errorPage(
+      "Authorization expired",
+      "This consent request has expired or is no longer valid. Please start the connection again from Muse.",
+      400
+    );
+  }
+  const admin = createAdminClient();
+  if (!admin) {
+    return errorPage(
+      "Muse connection unavailable",
+      "The server is not configured for Muse connections right now. Please try again later.",
+      503
+    );
+  }
+  const store = createSupabaseMuseOAuthStore(admin);
+  if (decision === "deny") {
+    await recordMuseOAuthEvent({
+      workspaceId: ctx.workspaceId,
+      actorId: ctx.userId,
+      action: "MUSE_OAUTH_DENY",
+      resource: `muse_oauth_client:${claims.clientId}`,
+      details: "User denied the Muse authorization request.",
+    });
+    return NextResponse.redirect(
+      buildOAuthErrorRedirect(
+        claims.redirectUri,
+        "access_denied",
+        "The user denied the authorization request.",
+        claims.clientState
+      )
+    );
+  }
+  if (decision !== "approve") {
+    return errorPage("Invalid request", "Unknown consent decision.", 400);
+  }
+  const client = await store.getClient(claims.clientId);
+  if (!client) {
+    return errorPage("Invalid authorization request", "The client is no longer registered.", 400);
+  }
+  const code = await issueAuthorizationCode(store, {
+    clientId: claims.clientId,
+    userId: ctx.userId,
+    workspaceId: ctx.workspaceId,
+    scopes: claims.scopes,
+    codeChallenge: claims.codeChallenge,
+    redirectUri: claims.redirectUri,
+  });
+  await recordMuseOAuthEvent({
+    workspaceId: ctx.workspaceId,
+    actorId: ctx.userId,
+    action: "MUSE_OAUTH_GRANT",
+    resource: `muse_oauth_client:${claims.clientId}`,
+    details: `User approved Muse access (scopes: ${claims.scopes.join(" ")}).`,
+  });
+  return NextResponse.redirect(
+    buildOAuthSuccessRedirect(claims.redirectUri, code, claims.clientState)
+  );
+}

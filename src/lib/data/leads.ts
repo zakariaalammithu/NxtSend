@@ -89,6 +89,23 @@ function cloneMockLeads(): Lead[] {
   }));
 }
 
+/**
+ * Fetches one lead by id, scoped to the workspace. There is no
+ * getLead(id) on the repository interface, so this lists the
+ * workspace's leads and filters (a direct query in Supabase mode
+ * would need a new repository method; the list is already
+ * workspace-scoped by the repository, so this can never return
+ * another workspace's lead). Returns null when absent.
+ */
+export async function getLeadById(
+  repo: LeadsRepository,
+  workspaceId: string,
+  id: string
+): Promise<Lead | null> {
+  const leads = await repo.listLeads(workspaceId);
+  return leads.find((l) => l.id === id) ?? null;
+}
+
 // ============================================================================
 // Demo backend
 // ============================================================================

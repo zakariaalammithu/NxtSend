@@ -62,6 +62,8 @@ const CATALOG = [
   ["LINKEDIN_REDIRECT_URI", "integrations", false],
   ["LINKEDIN_PROVIDER", "integrations", false],
   ["LINKEDIN_PROVIDER_API_KEY", "integrations", false],
+  ["MUSE_MCP_ENABLED", "integrations", false],
+  ["MUSE_MCP_PUBLIC_URL", "integrations", false],
 ];
 
 const GROUP_LABELS = {

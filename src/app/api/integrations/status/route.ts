@@ -8,6 +8,7 @@ import {
   summariseOAuthMailboxes,
   type OAuthMailboxSummary,
 } from "@/lib/oauth/store";
+import { countActiveMuseGrants } from "@/lib/muse-connector/grants";
 import type { OAuthProvider } from "@/lib/oauth/types";
 
 /**
@@ -28,6 +29,7 @@ export async function GET() {
 
   let verifications: Record<string, import("@/lib/integrations-center/types").VerificationRecord> = {};
   let webhookConfigured: boolean | null = null;
+  let museGrantsActive: number | null = null;
   let oauthMailboxes:
     | Partial<Record<OAuthProvider, OAuthMailboxSummary | null>>
     | undefined;
@@ -36,9 +38,13 @@ export async function GET() {
     verifications = await readVerificationRecords(ctx.admin, ctx.workspaceId);
     const config = await getWorkspaceWebhookConfig(ctx.admin, ctx.workspaceId);
     webhookConfigured = Boolean(config && config.enabled);
-    // Mailbox OAuth summaries (metadata only — the store's views
-    // carry no token fields) drive the gmail/microsoft statuses: a
-    // "Connected" there can only come from a stored connection.
+    // Active Muse OAuth grants for this workspace (metadata only —
+    // the count query selects no token material). null when the
+    // migration 023 tables cannot be read; the status then falls
+    // back to the env-derived state.
+    museGrantsActive = await countActiveMuseGrants(ctx.admin, {
+      workspaceId: ctx.workspaceId,
+    });
     try {
       const store = createSupabaseOAuthStore(ctx.admin);
       const views = await store.listConnectionViews(ctx.workspaceId);
@@ -54,6 +60,7 @@ export async function GET() {
     verifications,
     webhookConfigured,
     oauthMailboxes,
+    museGrantsActive,
   });
 
   return NextResponse.json({ mode: ctx.mode, integrations });

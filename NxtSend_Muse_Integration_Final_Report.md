@@ -34,6 +34,21 @@ committed or pushed** by this worker).
 No item in this report is marked PASS on the basis of an untested
 claim. Anything needing a live deployment is marked PENDING.
 
+## Live verification (2026-11-16, after Vercel deployed 1806e2a)
+
+Verified on https://nxtsend.com by a read-only live browser check
+(~16:21–16:26 UTC) plus direct `curl` checks from the build machine:
+
+| Check | Result |
+| --- | --- |
+| Vercel deploy of 1806e2a | **PASS** — new routes 404'd at 16:21 UTC, live by ~16:24 UTC |
+| `GET /api/mcp/health` | **PASS** — `{"mode":"demo","mcpEnabled":true,"toolCount":18,"oauthConfigured":false,"protocolVersion":"2025-06-18","version":"1.0.0"}` |
+| `GET /.well-known/oauth-protected-resource/api/mcp` | **PASS** — resource `https://nxtsend.com/api/mcp`, authorization server `https://nxtsend.com`, scopes `muse.read/muse.write/muse.send`, bearer via header |
+| `POST /api/mcp` without token / with bogus token | **PENDING (live mode)** — the live site is in Demo Mode, so the route answers **503 `not_configured`** ("Muse MCP is not available in Demo Mode…") before reaching auth. The 401 + `WWW-Authenticate` path exists in code and is covered by unit tests (`src/app/api/mcp/__tests__/route.test.ts`, `src/lib/muse-connector/__tests__/mcp.test.ts`), but it can only be observed live once Supabase + migration 023 + `TOKEN_ENCRYPTION_KEY` are configured |
+| Integration page `/dashboard/integrations/muse-ai` (demo) | **PASS** — renders fully: status badge "Demo Mode", orange "not connected" banner, MCP endpoint + all 5 OAuth endpoints with Copy buttons, 3 scopes in plain words (`muse.read` = recommended default), 4-step Connect to Muse (directory listing stated as a separate submission), grants + activity panels honestly "unavailable in Demo Mode", all 18 tools in the manifest (8 Read / 7 Write / 3 Sensitive write). No "Connected"/"Verified" state anywhere. Env vars `MUSE_MCP_ENABLED`, `MUSE_MCP_PUBLIC_URL`, `TOKEN_ENCRYPTION_KEY` all show "Not set" |
+| Screenshots | **PENDING** — the live browser visually inspected the pages but cannot write PNG files into the repo, and no Chromium/Playwright exists in this VM to capture them. None fabricated. The 10 shots listed in `audit-screenshots/muse-integration/README.md` still need capturing from a machine with a browser |
+| Live OAuth grant flow (real Muse client) | **PENDING** — needs migration 023 applied + `TOKEN_ENCRYPTION_KEY` set + a live Supabase project, none of which exist yet |
+
 ## What was built by Worker C
 
 ### 1. Grants API — PASS

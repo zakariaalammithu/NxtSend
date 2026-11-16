@@ -35,14 +35,23 @@ docs pass was fixed by the coordinator afterwards; see
 
 ## Live verification
 
-**NONE was done from this environment, and none is claimed.** No
-deployed-URL check and no live-Claude connection test were possible
-here (no deployed site was exercised from this session, no Claude
-account, no Chromium). Every live check in VERCEL_DEPLOYMENT.md is
-**PENDING** until the deploy is live and a real Claude account on a
-plan that offers custom connectors connects. Screenshots: none exist;
-no Chromium/Playwright in this VM. The 12 captures to take live are
-listed in `audit-screenshots/claude-integration/README.md`.
+Verified on https://nxtsend.com by read-only live checks after the
+Vercel deploy of commit 2c0ae30 (deploy landed ~18:36 UTC, 2026-11-16;
+curl checks + a live browser check of the settings page at ~18:39–18:40
+UTC):
+
+| Check | Result |
+| --- | --- |
+| Vercel deploy of 2c0ae30 | **PASS** — Claude metadata route 404'd until ~18:36 UTC, then returned JSON |
+| `GET /api/mcp/health` | **PASS** — `{"mode":"demo","mcpEnabled":true,"toolCount":54,"oauthConfigured":false,"protocolVersion":"2025-06-18","version":"1.0.0"}` |
+| `GET /.well-known/oauth-protected-resource/api/mcp/claude` | **PASS** — `{"resource":"https://nxtsend.com/api/mcp/claude","authorization_servers":["https://nxtsend.com"],"scopes_supported":["muse.read","muse.write","muse.send","nxtsend.read","nxtsend.write","nxtsend.send","claude.read","claude.write","claude.send"],"bearer_methods_supported":["header"]}` |
+| `GET /.well-known/oauth-protected-resource?resource=https://nxtsend.com/api/mcp/claude` | **PASS** — same Claude resource + all nine scopes |
+| `GET /.well-known/oauth-authorization-server` | **PASS** — issuer, authorize/token/revoke/register endpoints, `grant_types_supported: ["authorization_code","refresh_token"]`, `code_challenge_methods_supported: ["S256"]`, `client_id_metadata_document_supported: true`, all nine scopes |
+| `POST /api/mcp/claude` tools/list, no token | **PASS (demo behaviour)** — 503 `not_configured`, message "Claude MCP is not available in Demo Mode. Connect Supabase and configure OAuth to enable it." (tools/list requires a token on this flavour, like Muse; the 401 + `WWW-Authenticate` path is live-mode only) |
+| Integration page `/dashboard/integrations/claude` (demo) | **PASS** — renders fully: "Claude.ai (Anthropic)" heading, Demo Mode badge + banner, MCP URL `https://nxtsend.com/api/mcp/claude`, both Claude redirect URIs, `claude.*` scopes in plain words, Customize → Connectors steps, 54-tool manifest (54 rows counted, 36 Read / 14 Write / 4 Sensitive write), "Not submitted to Anthropic", no Connected/Verified state |
+| Naming note (by design, not a bug) | The page's implementation details still say "Muse": the OAuth endpoints are `/api/muse/oauth/*`, code paths `src/lib/muse-connector/…`, env fallbacks `MUSE_MCP_ENABLED`/`MUSE_MCP_PUBLIC_URL`, audit actions `muse.tool.*`. One OAuth server is deliberately shared by all three platforms (Muse, ChatGPT, Claude); renaming its paths would break the two live connectors for no functional gain |
+| Screenshots | **PENDING** — the live browser viewed the page but cannot save PNG files into the repo, and no Chromium/Playwright exists in this VM. None fabricated. The 12 shots listed in `audit-screenshots/claude-integration/README.md` still need capturing from a machine with a browser |
+| Live OAuth grant flow inside Claude + prompts surfacing + account-resource read + widget render | **PENDING** — needs migrations 023+024 applied + `TOKEN_ENCRYPTION_KEY` set in Vercel + a live Supabase project + a real Claude account on a plan with custom connectors (Pro/Max/Team/Enterprise) |
 
 ## Status table
 

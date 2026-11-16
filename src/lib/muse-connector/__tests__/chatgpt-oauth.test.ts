@@ -120,6 +120,9 @@ describe("platform-neutral scopes", () => {
       "nxtsend.read",
       "nxtsend.write",
       "nxtsend.send",
+      "claude.read",
+      "claude.write",
+      "claude.send",
     ]);
   });
 

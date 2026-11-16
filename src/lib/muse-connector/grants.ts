@@ -25,6 +25,7 @@ import type { MuseOAuthClientRow, MuseOAuthStore } from "./oauth/store";
 import type { OAuthScope } from "./oauth/scopes";
 import {
   CHATGPT_OAUTH_CALLBACK,
+  CLAUDE_OAUTH_CALLBACKS,
   MUSE_OAUTH_CALLBACK,
 } from "./oauth/clients";
 
@@ -33,27 +34,37 @@ import {
  * overview (grants by client origin). Classification is by the
  * client's identity, never by scope prefix alone:
  *   - a CIMD client_id is an https URL — chatgpt.com → ChatGPT,
- *     agent.meta.ai → Muse;
+ *     agent.meta.ai → Muse, claude.ai / claude.com → Claude;
  *   - otherwise the registered redirect URIs decide (ChatGPT
- *     callback → ChatGPT, Muse callback → Muse);
+ *     callback → ChatGPT, Muse callback → Muse, Claude callback
+ *     → Claude — CLAUDE_OAUTH_CALLBACKS in ./oauth/clients);
  *   - anything else (e.g. loopback-only clients) is "Other".
  * A client carrying the ChatGPT callback wins over Muse when both
  * are listed (ChatGPT clients register both callbacks in practice
  * only when they serve both platforms; the ChatGPT one is the
  * distinguishing signal).
  */
-export type GrantOrigin = "Muse" | "ChatGPT" | "Other";
+export type GrantOrigin = "Muse" | "ChatGPT" | "Claude" | "Other";
 
 export function grantOriginForClient(
   clientId: string,
   redirectUris: string[] = []
 ): GrantOrigin {
   if (redirectUris.includes(CHATGPT_OAUTH_CALLBACK)) return "ChatGPT";
+  if (redirectUris.some((u) => (CLAUDE_OAUTH_CALLBACKS as readonly string[]).includes(u)))
+    return "Claude";
   if (clientId.startsWith("https://")) {
     try {
       const origin = new URL(clientId).hostname.toLowerCase();
       if (origin === "chatgpt.com" || origin.endsWith(".chatgpt.com")) return "ChatGPT";
       if (origin === "agent.meta.ai" || origin.endsWith(".agent.meta.ai")) return "Muse";
+      if (
+        origin === "claude.ai" ||
+        origin.endsWith(".claude.ai") ||
+        origin === "claude.com" ||
+        origin.endsWith(".claude.com")
+      )
+        return "Claude";
     } catch {
       // Not a parseable URL — fall through to the redirect check.
     }
@@ -66,6 +77,7 @@ export function grantOriginForClient(
 export interface GrantsByOrigin {
   muse: number;
   chatgpt: number;
+  claude: number;
   other: number;
   /** Distinct client + user pairs with a live refresh token, all origins. */
   total: number;
@@ -74,6 +86,7 @@ export interface GrantsByOrigin {
 export const EMPTY_GRANTS_BY_ORIGIN: GrantsByOrigin = {
   muse: 0,
   chatgpt: 0,
+  claude: 0,
   other: 0,
   total: 0,
 };
@@ -115,10 +128,12 @@ export function summarizeGrantsByOrigin(
       // Client origin first; when it is unknown (e.g. a
       // loopback-only client with no stored platform signal),
       // the scope prefix is the fallback — nxtsend.* grants
-      // belong to ChatGPT, muse.* grants to Muse.
+      // belong to ChatGPT, muse.* grants to Muse, claude.* grants
+      // to Claude.
       let origin = grantOriginForClient(row.client_id, redirectByClient.get(row.client_id) ?? []);
       if (origin === "Other") {
         if (row.scopes.some((s) => s.startsWith("nxtsend."))) origin = "ChatGPT";
+        else if (row.scopes.some((s) => s.startsWith("claude."))) origin = "Claude";
         else if (row.scopes.some((s) => s.startsWith("muse."))) origin = "Muse";
       }
       pairs.set(key, origin);
@@ -128,6 +143,7 @@ export function summarizeGrantsByOrigin(
   pairs.forEach((origin) => {
     if (origin === "Muse") out.muse += 1;
     else if (origin === "ChatGPT") out.chatgpt += 1;
+    else if (origin === "Claude") out.claude += 1;
     else out.other += 1;
   });
   out.total = pairs.size;

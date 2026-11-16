@@ -10,9 +10,11 @@
 export {
   MUSE_SCOPES,
   NXT_SEND_SCOPES,
+  CLAUDE_SCOPES,
   ALL_OAUTH_SCOPES,
   MUSE_SCOPE_DESCRIPTIONS,
   NXT_SEND_SCOPE_DESCRIPTIONS,
+  CLAUDE_SCOPE_DESCRIPTIONS,
   SCOPE_DESCRIPTIONS,
   SCOPE_TIER_MAP,
   parseMuseScopes,
@@ -22,7 +24,7 @@ export {
   scopeDescription,
   defaultScopeForPlatform,
 } from "./scopes";
-export type { MuseScope, NxtSendScope, OAuthScope, ScopeTier } from "./scopes";
+export type { MuseScope, NxtSendScope, ClaudeScope, OAuthScope, ScopeTier } from "./scopes";
 export { computeCodeChallenge, verifyCodeChallenge, isS256Method } from "./pkce";
 export {
   hashToken,
@@ -43,12 +45,18 @@ export type { MuseOAuthStore, MuseOAuthClientRow, MuseOAuthCodeRow, MuseOAuthTok
 export {
   MUSE_OAUTH_CALLBACK,
   CHATGPT_OAUTH_CALLBACK,
+  CLAUDE_OAUTH_CALLBACK,
+  CLAUDE_COM_OAUTH_CALLBACK,
+  CLAUDE_OAUTH_CALLBACKS,
   MUSE_MAX_CLIENTS,
   isAllowedMuseRedirectUri,
+  isAllowedClaudeRedirectUri,
   isAllowedOAuthRedirectUri,
+  isAllowedRedirectUriForPlatform,
   isLoopbackRedirectUri,
   isRegisteredRedirectUri,
   validateRedirectUri,
+  validateRedirectUriForPlatform,
   verifyClientSecret,
   registerMuseClient,
   clientPlatform,
@@ -79,7 +87,7 @@ export { resolveMuseContext } from "./context";
 export type { ResolveMuseContextDeps } from "./context";
 export { recordMuseOAuthEvent } from "./audit";
 export type { MuseOAuthAuditAction } from "./audit";
-export { isMuseMcpEnabled, isChatGptMcpEnabled, getMusePublicUrl, getChatGptPublicUrl, getOAuthIssuer, getMcpResourceUrl, canonicalMcpResources, resourcePlatform, DEFAULT_OAUTH_ORIGIN, MCP_RESOURCE_PATHS } from "./config";
+export { isMuseMcpEnabled, isChatGptMcpEnabled, isClaudeMcpEnabled, getMusePublicUrl, getChatGptPublicUrl, getClaudePublicUrl, getOAuthIssuer, getMcpResourceUrl, canonicalMcpResources, resourcePlatform, DEFAULT_OAUTH_ORIGIN, MCP_RESOURCE_PATHS } from "./config";
 export type { McpPlatform } from "./config";
 export {
   handleMuseTokenRequest,

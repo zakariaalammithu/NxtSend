@@ -16,10 +16,12 @@ interface AdminMuseStats {
   publicUrl: string | null;
   chatgptMcpEnabled?: boolean;
   chatgptPublicUrl?: string | null;
+  claudeMcpEnabled?: boolean;
+  claudePublicUrl?: string | null;
   /** null = unknown (migration 023 tables could not be read). */
   grantCount: number | null;
   /** Active grants split by client origin; null = unknown. */
-  grantsByOrigin?: { muse: number; chatgpt: number; other: number; total: number } | null;
+  grantsByOrigin?: { muse: number; chatgpt: number; claude: number; other: number; total: number } | null;
   toolCounts: { tool: string; calls: number }[];
   recentErrors: { action: string; resource: string | null; details: string; created_at: string }[];
   recentEvents: { action: string; resource: string | null; details: string; created_at: string }[];
@@ -72,6 +74,19 @@ function AdminMusePanels() {
             </dd>
           </div>
           <div>
+            <dt className="text-12 text-black-400">Claude MCP surface</dt>
+            <dd className="text-14 font-semibold text-white mt-0.5">
+              {data.claudeMcpEnabled === undefined
+                ? "Unknown"
+                : data.claudeMcpEnabled
+                  ? "Enabled"
+                  : "Disabled"}
+            </dd>
+            <dd className="text-12 text-black-400 break-all mt-0.5">
+              {data.claudePublicUrl ?? "No public URL set"}
+            </dd>
+          </div>
+          <div>
             <dt className="text-12 text-black-400">Active grants (platform-wide)</dt>
             <dd className="text-14 font-semibold text-white mt-0.5">
               {data.grantCount === null ? "Unknown" : String(data.grantCount)}
@@ -97,23 +112,26 @@ function AdminMusePanels() {
       <div className="glass-card p-6 space-y-3">
         <h2 className="text-16 font-bold text-white">Grants by client origin</h2>
         <p className="text-12 text-black-400 leading-relaxed">
-          Active grants split by the client that holds them — Muse, ChatGPT, or Other
+          Active grants split by the client that holds them — Muse, ChatGPT, Claude, or Other
           (a client whose origin cannot be determined, e.g. a loopback-only test client).
           Classified by client identity (CIMD URL origin / registered redirect URI), with the
           grant&apos;s scope prefix as fallback. A ChatGPT grant is one whose client is ChatGPT;
-          counting by origin is what lets the ChatGPT Integration Center entry show
-          &ldquo;Connected&rdquo; only for a real ChatGPT grant.
+          a Claude grant is one whose client is Claude (claude.ai / claude.com origin or a
+          Claude redirect URI, or a claude.* scope as fallback). Counting by origin is what
+          lets each Integration Center entry show &ldquo;Connected&rdquo; only for a real
+          grant from its own platform.
         </p>
         {!data.grantsByOrigin ? (
           <p className="text-13 text-black-300 leading-relaxed">
             Unknown — migration 023 tables could not be read.
           </p>
         ) : (
-          <dl className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <dl className="grid grid-cols-1 sm:grid-cols-5 gap-4">
             {(
               [
                 ["Muse", data.grantsByOrigin.muse],
                 ["ChatGPT", data.grantsByOrigin.chatgpt],
+                ["Claude", data.grantsByOrigin.claude],
                 ["Other", data.grantsByOrigin.other],
                 ["Total", data.grantsByOrigin.total],
               ] as const
@@ -238,17 +256,17 @@ export default function AdminMuseAiPage() {
             connection-request/DM endpoints to standard developers.
           </li>
           <li>
-            ChatGPT grants are listed in the same overview above
+            Claude grants are listed in the same overview above
             (&ldquo;Grants by client origin&rdquo;) and on the{" "}
             <Link
-              href="/dashboard/integrations/chatgpt"
+              href="/dashboard/integrations/claude"
               className="font-semibold text-purple-400 hover:text-purple-300"
             >
-              ChatGPT Integration Center page
+              Claude Integration Center page
             </Link>{" "}
-            — the ChatGPT MCP surface (/api/mcp/chatgpt, 54 tools) shares
+            — the Claude MCP surface (/api/mcp/claude, 54 tools) shares
             the same OAuth tables (migrations 023 + 024) and has not
-            been submitted to OpenAI.
+            been submitted to Anthropic.
           </li>
         </ul>
         <Link

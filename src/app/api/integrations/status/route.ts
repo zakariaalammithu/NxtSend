@@ -31,6 +31,7 @@ export async function GET() {
   let webhookConfigured: boolean | null = null;
   let museGrantsActive: number | null = null;
   let chatgptGrantsActive: number | null = null;
+  let claudeGrantsActive: number | null = null;
   let oauthMailboxes:
     | Partial<Record<OAuthProvider, OAuthMailboxSummary | null>>
     | undefined;
@@ -44,8 +45,8 @@ export async function GET() {
     // migration 023 tables cannot be read; the statuses then fall
     // back to the env-derived state. The Muse count keeps its
     // existing query (all live grants, workspace-filtered); the
-    // ChatGPT count comes from the by-origin split of the same
-    // live refresh tokens.
+    // ChatGPT and Claude counts come from the by-origin split of
+    // the same live refresh tokens.
     museGrantsActive = await countActiveMuseGrants(ctx.admin, {
       workspaceId: ctx.workspaceId,
     });
@@ -53,6 +54,7 @@ export async function GET() {
       workspaceId: ctx.workspaceId,
     });
     chatgptGrantsActive = byOrigin ? byOrigin.chatgpt : null;
+    claudeGrantsActive = byOrigin ? byOrigin.claude : null;
     try {
       const store = createSupabaseOAuthStore(ctx.admin);
       const views = await store.listConnectionViews(ctx.workspaceId);
@@ -70,6 +72,7 @@ export async function GET() {
     oauthMailboxes,
     museGrantsActive,
     chatgptGrantsActive,
+    claudeGrantsActive,
   });
 
   return NextResponse.json({ mode: ctx.mode, integrations });

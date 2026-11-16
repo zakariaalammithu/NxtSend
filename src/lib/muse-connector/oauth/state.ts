@@ -37,7 +37,7 @@ export interface MuseAuthorizeStateClaims {
   /** RFC 8707 resource the grant is bound to (full MCP resource URL). */
   resource?: string;
   /** Which platform the client is (consent-screen wording). */
-  platform?: "muse" | "chatgpt";
+  platform?: "muse" | "chatgpt" | "claude";
   /** Origin of a CIMD client_id URL, else null. */
   clientOrigin?: string | null;
 }
@@ -135,7 +135,12 @@ export function verifyMuseAuthorizeState(
       typeof parsed.resource === "string" && parsed.resource.length > 0
         ? parsed.resource
         : getMcpResourceUrl(DEFAULT_OAUTH_ORIGIN, "muse"),
-    platform: parsed.platform === "chatgpt" ? "chatgpt" : "muse",
+    platform:
+      parsed.platform === "chatgpt"
+        ? "chatgpt"
+        : parsed.platform === "claude"
+          ? "claude"
+          : "muse",
     clientOrigin: parsed.clientOrigin ?? null,
   };
 }

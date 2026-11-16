@@ -30,7 +30,12 @@
  * methods need a secret this server never issued for a CIMD client.
  */
 
-import { CHATGPT_OAUTH_CALLBACK, isAllowedOAuthRedirectUri, type OAuthClientPlatform } from "./clients";
+import {
+  CHATGPT_OAUTH_CALLBACK,
+  CLAUDE_OAUTH_CALLBACKS,
+  isAllowedOAuthRedirectUri,
+  type OAuthClientPlatform,
+} from "./clients";
 import type { MuseOAuthClientRow } from "./store";
 
 /** Fetch timeout for a CIMD document (~5s). */
@@ -67,8 +72,9 @@ type ValidateCimdResult =
 
 /**
  * Validates a parsed CIMD document. `redirect_uris` must be a
- * non-empty array of allowlisted URIs (either platform callback or
- * loopback — so a ChatGPT document must list the ChatGPT callback);
+ * non-empty array of allowlisted URIs (a platform callback or
+ * loopback — so a ChatGPT document must list the ChatGPT callback
+ * and a Claude document must list a Claude callback);
  * `grant_types`, when present, must include `authorization_code`;
  * `response_types`, when present, must include `code`. A declared
  * `client_secret_*` auth method is refused (no secret exists for a
@@ -92,7 +98,7 @@ export function validateCimdDocument(doc: unknown): ValidateCimdResult {
       return {
         ok: false,
         detail:
-          "Every redirect_uri in the client metadata document must be the Muse callback, the ChatGPT callback, or a loopback http://localhost:* / http://127.0.0.1:* URI.",
+          "Every redirect_uri in the client metadata document must be the Muse callback, the ChatGPT callback, a Claude callback (https://claude.ai/api/mcp/auth_callback or https://claude.com/api/mcp/auth_callback), or a loopback http://localhost:* / http://127.0.0.1:* URI.",
       };
     }
   }
@@ -259,9 +265,30 @@ export async function resolveCimdClient(
     };
   }
   const origin = new URL(clientIdUrl).origin;
-  const platform: OAuthClientPlatform = document.redirect_uris.includes(CHATGPT_OAUTH_CALLBACK)
-    ? "chatgpt"
-    : "muse";
+  // Platform from the documented redirect URIs: a Claude callback
+  // (either host) means Claude, else the ChatGPT callback means
+  // ChatGPT, else Muse. The client_id URL's own host is checked
+  // too: Claude Code's published CIMD
+  // (https://claude.ai/oauth/claude-code-client-metadata) declares
+  // only loopback redirects (no Claude callback), so without the
+  // host check it would resolve as Muse. A document hosted on
+  // claude.ai / claude.com (or a subdomain) is Claude's published
+  // identity.
+  const host = new URL(clientIdUrl).hostname.toLowerCase();
+  const isClaudeHost =
+    host === "claude.ai" ||
+    host.endsWith(".claude.ai") ||
+    host === "claude.com" ||
+    host.endsWith(".claude.com");
+  const platform: OAuthClientPlatform =
+    isClaudeHost ||
+    document.redirect_uris.some((uri) =>
+      (CLAUDE_OAUTH_CALLBACKS as readonly string[]).includes(uri)
+    )
+      ? "claude"
+      : document.redirect_uris.includes(CHATGPT_OAUTH_CALLBACK)
+        ? "chatgpt"
+        : "muse";
   const now = opts.now ?? new Date();
   return {
     ok: true,

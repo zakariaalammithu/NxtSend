@@ -7,6 +7,8 @@ import {
   getMusePublicUrl,
   isChatGptMcpEnabled,
   getChatGptPublicUrl,
+  isClaudeMcpEnabled,
+  getClaudePublicUrl,
 } from "@/lib/muse-connector/oauth/config";
 
 export const dynamic = "force-dynamic";
@@ -33,9 +35,11 @@ export interface AdminMuseEvent {
  *     refresh token; null when the migration 023 tables cannot be
  *     read, reported as `grantCount: null` = unknown, never zero);
  *   - the same grants split by client origin (`grantsByOrigin`:
- *     Muse vs ChatGPT vs Other — see countActiveGrantsByOrigin in
+ *     Muse vs ChatGPT vs Claude vs Other — see
+ *     countActiveGrantsByOrigin in
  *     src/lib/muse-connector/grants.ts);
- *   - whether the ChatGPT MCP surface is enabled + its public URL;
+ *   - whether the ChatGPT and Claude MCP surfaces are enabled +
+ *     their public URLs;
  *   - MCP tool-call counts from audit_logs (`muse.tool.*` actions);
  *   - recent Muse errors: Muse audit entries whose detail mentions
  *     a failure/denial, plus OAuth denies — labelled as what they
@@ -58,12 +62,14 @@ export async function GET() {
       publicUrl: getMusePublicUrl(),
       chatgptMcpEnabled: isChatGptMcpEnabled(),
       chatgptPublicUrl: getChatGptPublicUrl(),
+      claudeMcpEnabled: isClaudeMcpEnabled(),
+      claudePublicUrl: getClaudePublicUrl(),
       grantCount: 0,
       grantsByOrigin: { ...EMPTY_GRANTS_BY_ORIGIN } as GrantsByOrigin,
       toolCounts: [] as AdminMuseToolCount[],
       recentErrors: [] as AdminMuseEvent[],
       recentEvents: [] as AdminMuseEvent[],
-      note: "Demo Mode: the Muse and ChatGPT OAuth + MCP surfaces are unavailable — no grants or tool calls exist.",
+      note: "Demo Mode: the Muse, ChatGPT and Claude OAuth + MCP surfaces are unavailable — no grants or tool calls exist.",
     });
   }
 
@@ -138,6 +144,8 @@ export async function GET() {
     publicUrl: getMusePublicUrl(),
     chatgptMcpEnabled: isChatGptMcpEnabled(),
     chatgptPublicUrl: getChatGptPublicUrl(),
+    claudeMcpEnabled: isClaudeMcpEnabled(),
+    claudePublicUrl: getClaudePublicUrl(),
     grantCount,
     grantsByOrigin,
     toolCounts,

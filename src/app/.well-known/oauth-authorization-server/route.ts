@@ -8,14 +8,18 @@ export const runtime = "nodejs";
  * GET /.well-known/oauth-authorization-server — RFC 8414 OAuth 2.0
  * Authorization Server Metadata.
  *
- * One authorization server serves both platforms (Muse and
- * ChatGPT): the same authorize / token / revoke / register
- * endpoints, PKCE S256 only, authorization_code + refresh_token
- * grants, and both scope sets. `private_key_jwt` is deliberately
- * NOT listed under token_endpoint_auth_methods_supported — it is
- * not implemented (see src/lib/muse-connector/oauth/cimd.ts):
- * clients authenticate as public clients ("none") or as
- * confidential clients registered via DCR ("client_secret_post").
+ * One authorization server serves all three platforms (Muse,
+ * ChatGPT and Claude): the same authorize / token / revoke /
+ * register endpoints, PKCE S256 only, authorization_code +
+ * refresh_token grants, and all three scope sets.
+ * `private_key_jwt` is deliberately NOT listed under
+ * token_endpoint_auth_methods_supported — it is not implemented
+ * (see src/lib/muse-connector/oauth/cimd.ts): clients authenticate
+ * as public clients ("none") or as confidential clients registered
+ * via DCR ("client_secret_post"). `client_id_metadata_document_supported`
+ * IS advertised: CIMD clients are public clients with
+ * `token_endpoint_auth_method: "none"`, and Claude selects CIMD
+ * only when this flag is present AND "none" is listed.
  */
 export async function GET(req: Request) {
   const origin = getMusePublicUrl(new URL(req.url).origin);
@@ -36,6 +40,7 @@ export async function GET(req: Request) {
     code_challenge_methods_supported: ["S256"],
     scopes_supported: [...ALL_OAUTH_SCOPES],
     token_endpoint_auth_methods_supported: ["none", "client_secret_post"],
+    client_id_metadata_document_supported: true,
     revocation_endpoint_auth_methods_supported: ["none", "client_secret_post"],
   });
 }

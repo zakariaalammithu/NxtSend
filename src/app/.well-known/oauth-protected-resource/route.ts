@@ -15,7 +15,7 @@ export const runtime = "nodejs";
  *
  * The resource this document describes is the MCP resource the
  * request is about: pass `?resource=<MCP resource URL>` and, when
- * it names one of the two canonical MCP resources, that resource
+ * it names one of the three canonical MCP resources, that resource
  * is returned; otherwise the canonical Muse MCP resource
  * (`<origin>/api/mcp`) is returned. The path-scoped variant at
  * /.well-known/oauth-protected-resource/api/mcp describes the Muse

@@ -7,15 +7,20 @@
  * the same seam (like handleDraftRequest's draftFn).
  *
  * Methods: initialize, notifications/initialized (no-op),
- * ping, tools/list, tools/call, resources/list, resources/read.
+ * ping, tools/list, tools/call, resources/list, resources/read,
+ * prompts/list, prompts/get.
  *
- * Two flavors share this handler (`flavor` option): "muse"
- * (/api/mcp, exact prior behaviour — every method needs a token)
- * and "chatgpt" (/api/mcp/chatgpt — initialize, tools/list and
+ * Three flavors share this handler (`flavor` option): "muse"
+ * (/api/mcp, exact prior behaviour — every method needs a token),
+ * "chatgpt" (/api/mcp/chatgpt — initialize, tools/list and
  * resources/list run without a token for discovery, tool calls and
  * resources/read need a valid token, and a call whose grant lacks
  * the required scope answers with a structured reconnect prompt
- * instead of a transport error).
+ * instead of a transport error) and "claude" (/api/mcp/claude —
+ * like "muse", every method needs a token; no pre-auth discovery.
+ * Additionally the Claude flavor advertises prompts/list +
+ * prompts/get — see ./prompts.ts for the decision — and returns
+ * Claude-specific server instructions on initialize).
  *
  * Auth: Authorization: Bearer <access token>, resolved via
  * resolveMuseContext. Missing/invalid/expired -> 401 with
@@ -52,7 +57,8 @@ import {
 } from "./adapter";
 import type { MuseGrantContext } from "./tokens";
 import { createRateLimiter, type RateLimiter } from "@/lib/admin/submissions-core";
-import { getMusePublicUrl } from "./oauth/config";
+import { getMusePublicUrl, MCP_RESOURCE_PATHS } from "./oauth/config";
+import { getMcpPrompt, listMcpPrompts } from "./prompts";
 import type { DataMode } from "@/lib/data/mode";
 
 export const MCP_PROTOCOL_VERSION = "2025-06-18";
@@ -81,8 +87,29 @@ export const MCP_SERVER_INSTRUCTIONS =
   "A send reports sent only with a provider message ID, simulated in demo mode. " +
   "If a tool answers that a scope is missing, tell the user to reconnect NxtSend and grant that permission.";
 
-/** MCP flavor: "muse" is the Meta Muse surface, "chatgpt" the ChatGPT one. */
-export type McpFlavor = "muse" | "chatgpt";
+/**
+ * Server instructions returned by `initialize` on the Claude
+ * flavor (`/api/mcp/claude`). Same ground rules as the ChatGPT
+ * instructions — confirm IDs, no LinkedIn sends, explicit
+ * confirmation for anything destructive, workspace-scoped data —
+ * plus Claude-specific guidance: prompts are templates that fetch
+ * no data themselves (call the named tools first), and the
+ * `nxtsend://account` resource identifies the connected account.
+ */
+export const MCP_CLAUDE_SERVER_INSTRUCTIONS =
+  "Confirm the exact lead, campaign, or conversation ID with the user before changing or deleting anything — never guess an ID. " +
+  "LinkedIn sends are NOT supported: no tool sends LinkedIn connection requests or messages, and LinkedIn steps are recorded as skipped. " +
+  "Destructive actions (delete a lead or campaign, send an email) need the user's explicit confirmation every time. " +
+  "All data is scoped to the connected workspace only. " +
+  "Use search to find leads and campaigns by name, then fetch one record by id for detail. " +
+  "Prompts are templates, not data: a prompt never fetches data itself — call the tools it names first and summarise the real results. " +
+  "A prompt never sends, merges or deletes anything; drafts are for the user to review. " +
+  "Creating a campaign only ever creates a draft; it never sends anything. " +
+  "A send reports sent only with a provider message ID, simulated in demo mode. " +
+  "If a tool answers that a scope is missing, tell the user to reconnect NxtSend in Claude and grant that permission.";
+
+/** MCP flavor: "muse" is the Meta Muse surface, "chatgpt" the ChatGPT one, "claude" the Claude one. */
+export type McpFlavor = "muse" | "chatgpt" | "claude";
 
 export function publicOrigin(req: Request): string {
   try {
@@ -92,8 +119,8 @@ export function publicOrigin(req: Request): string {
   }
 }
 
-export function wwwAuthenticateHeader(req: Request): string {
-  return `Bearer resource_metadata="${publicOrigin(req)}/.well-known/oauth-protected-resource/api/mcp"`;
+export function wwwAuthenticateHeader(req: Request, flavor: McpFlavor = "muse"): string {
+  return `Bearer resource_metadata="${publicOrigin(req)}/.well-known/oauth-protected-resource${MCP_RESOURCE_PATHS[flavor]}"`;
 }
 
 export interface McpHandleOptions {
@@ -116,7 +143,11 @@ export interface McpHandleOptions {
    * client can discover the server before OAuth; tool calls and
    * `resources/read` still need a valid token, and a call whose
    * grant lacks the required scope answers with a structured
-   * reconnect prompt instead of a transport error.
+   * reconnect prompt instead of a transport error. "claude" (the
+   * /api/mcp/claude route) is like "muse" — every method needs a
+   * token, no pre-auth discovery — and additionally advertises
+   * prompts/list + prompts/get and returns Claude instructions on
+   * `initialize`.
    */
   flavor?: McpFlavor;
 }
@@ -169,7 +200,10 @@ export function buildToolsList(
   });
 }
 
-/** The widget resource served by resources/list + resources/read. */
+/** The read-only account resource served by resources/list + resources/read. */
+export const NXT_SEND_ACCOUNT_RESOURCE_URI = "nxtsend://account";
+
+/** The resources served by resources/list: the widget plus the account resource. */
 export function buildResourcesList() {
   return [
     {
@@ -181,6 +215,14 @@ export function buildResourcesList() {
       mimeType: CAMPAIGNS_WIDGET_MIME_TYPE,
       _meta: CAMPAIGNS_WIDGET_META,
     },
+    {
+      uri: NXT_SEND_ACCOUNT_RESOURCE_URI,
+      name: "account",
+      title: "NxtSend account",
+      description:
+        "The connected NxtSend account for this grant: user, workspace, client and scopes. Read-only; no secrets and no token values are ever included.",
+      mimeType: "application/json",
+    },
   ];
 }
 
@@ -189,9 +231,14 @@ export async function handleMcpRequest(
 ): Promise<McpHandleResult> {
   const { request, body } = opts;
   const flavor = opts.flavor ?? "muse";
-  const label = flavor === "chatgpt" ? "ChatGPT MCP" : "Muse MCP";
+  const label =
+    flavor === "chatgpt" ? "ChatGPT MCP" : flavor === "claude" ? "Claude MCP" : "Muse MCP";
   const flag =
-    flavor === "chatgpt" ? "CHATGPT_MCP_ENABLED" : "MUSE_MCP_ENABLED";
+    flavor === "chatgpt"
+      ? "CHATGPT_MCP_ENABLED"
+      : flavor === "claude"
+        ? "CLAUDE_MCP_ENABLED"
+        : "MUSE_MCP_ENABLED";
 
   // Demo mode: the MCP surface is not served at all — the demo
   // persona must never be exposed to Muse or ChatGPT as if it were
@@ -273,13 +320,14 @@ export async function handleMcpRequest(
   }
 
   // Auth: every method (including initialize) requires a valid grant.
-  // No token means no data, ever.
+  // No token means no data, ever. (The ChatGPT pre-auth discovery
+  // branch above is the only exception.)
   const ctx = await opts.resolveContext(request);
   if (!ctx) {
     return {
       status: 401,
-      headers: { "WWW-Authenticate": wwwAuthenticateHeader(request) },
-      body: rpcError(id, -32001, "Unauthorized: a valid Muse access token is required."),
+      headers: { "WWW-Authenticate": wwwAuthenticateHeader(request, flavor) },
+      body: rpcError(id, -32001, `Unauthorized: a valid ${label} access token is required.`),
     };
   }
 
@@ -303,9 +351,11 @@ export async function handleMcpRequest(
         status: 200,
         body: rpcResult(id, {
           protocolVersion: MCP_PROTOCOL_VERSION,
-          capabilities: { tools: {} },
+          capabilities:
+            flavor === "claude" ? { tools: {}, prompts: {}, resources: {} } : { tools: {} },
           serverInfo: { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION },
           ...(flavor === "chatgpt" ? { instructions: MCP_SERVER_INSTRUCTIONS } : {}),
+          ...(flavor === "claude" ? { instructions: MCP_CLAUDE_SERVER_INSTRUCTIONS } : {}),
         }),
       };
     }
@@ -325,7 +375,22 @@ export async function handleMcpRequest(
       };
     }
     case "resources/read": {
-      return resourcesRead(id, msg.params);
+      return resourcesRead(id, msg.params, ctx);
+    }
+    case "prompts/list": {
+      if (flavor !== "claude") {
+        return { status: 200, body: rpcError(id, -32601, "Method not found: prompts/list") };
+      }
+      return {
+        status: 200,
+        body: rpcResult(id, { prompts: listMcpPrompts() }),
+      };
+    }
+    case "prompts/get": {
+      if (flavor !== "claude") {
+        return { status: 200, body: rpcError(id, -32601, "Method not found: prompts/get") };
+      }
+      return promptsGet(id, msg.params);
     }
     case "tools/call": {
       return toolsCall(adapter, ctx, id, msg.params, flavor);
@@ -336,12 +401,21 @@ export async function handleMcpRequest(
 }
 
 /**
- * resources/read — serves the campaigns widget. Requires a valid
- * token (the caller got past the auth check above): workspace data
- * is never served unauthenticated, and the widget template itself
- * is only handed out to an authenticated client.
+ * resources/read — serves the campaigns widget and the account
+ * resource. Requires a valid token (the caller got past the auth
+ * check above): workspace data is never served unauthenticated,
+ * and the widget template itself is only handed out to an
+ * authenticated client. The account resource is resolved from the
+ * grant only (user, workspace, client, scopes, audience) — it
+ * carries no secrets and no token values. A plan is deliberately
+ * NOT included: the grant does not store one, and inventing one
+ * would be fake data.
  */
-function resourcesRead(id: unknown, params: unknown): McpHandleResult {
+function resourcesRead(
+  id: unknown,
+  params: unknown,
+  ctx: MuseGrantContext
+): McpHandleResult {
   if (!params || typeof params !== "object" || Array.isArray(params)) {
     return {
       status: 200,
@@ -349,6 +423,27 @@ function resourcesRead(id: unknown, params: unknown): McpHandleResult {
     };
   }
   const uri = (params as Record<string, unknown>).uri;
+  if (uri === NXT_SEND_ACCOUNT_RESOURCE_URI) {
+    return {
+      status: 200,
+      body: rpcResult(id, {
+        contents: [
+          {
+            uri: NXT_SEND_ACCOUNT_RESOURCE_URI,
+            mimeType: "application/json",
+            text: JSON.stringify({
+              userId: ctx.userId,
+              workspaceId: ctx.workspaceId,
+              clientId: ctx.clientId,
+              grantId: ctx.grantId,
+              scopes: ctx.scopes,
+              resource: ctx.resource,
+            }),
+          },
+        ],
+      }),
+    };
+  }
   if (uri !== CAMPAIGNS_WIDGET_RESOURCE_URI) {
     return {
       status: 200,
@@ -366,6 +461,33 @@ function resourcesRead(id: unknown, params: unknown): McpHandleResult {
           _meta: CAMPAIGNS_WIDGET_META,
         },
       ],
+    }),
+  };
+}
+
+/**
+ * prompts/get (Claude flavor only) — validates the prompt name and
+ * arguments via ./prompts.ts and renders the template message.
+ * Argument problems answer -32602; the caller already holds a
+ * valid token (prompts are never served unauthenticated).
+ */
+function promptsGet(id: unknown, params: unknown): McpHandleResult {
+  if (!params || typeof params !== "object" || Array.isArray(params)) {
+    return {
+      status: 200,
+      body: rpcError(id, -32602, "Invalid params: prompts/get requires { name, arguments }."),
+    };
+  }
+  const p = params as Record<string, unknown>;
+  const result = getMcpPrompt(p.name, p.arguments);
+  if (!result.ok) {
+    return { status: 200, body: rpcError(id, -32602, result.message) };
+  }
+  return {
+    status: 200,
+    body: rpcResult(id, {
+      description: result.description,
+      messages: result.messages,
     }),
   };
 }

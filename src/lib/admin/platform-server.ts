@@ -77,6 +77,8 @@ import {
   getMusePublicUrl,
   isChatGptMcpEnabled,
   getChatGptPublicUrl,
+  isClaudeMcpEnabled,
+  getClaudePublicUrl,
 } from "@/lib/muse-connector/oauth/config";
 import { countActiveMuseGrants, countActiveGrantsByOrigin } from "@/lib/muse-connector/grants";
 import { PLAN_CATALOG } from "@/lib/billing/plans";
@@ -1254,6 +1256,68 @@ export async function getSystemHealth(mode: DataMode): Promise<HealthSummary> {
           chatgptGrants === 0
             ? `ChatGPT MCP surface is configured at ${chatgptPublicUrl}; no active grants yet (no ChatGPT user has connected).`
             : `ChatGPT MCP surface is configured at ${chatgptPublicUrl}; ${chatgptGrants} active grant(s) platform-wide.`,
+      });
+    }
+  }
+
+  // ── Claude connector (MCP + OAuth) ──────────────────────────────────
+  // Same shape as the ChatGPT check: configured when the Claude flag
+  // is on and a public URL is set; zero grants is normal, not a
+  // failure; a null grant count means the migration 023 tables
+  // could not be read.
+  if (mode === "demo") {
+    checks.push({
+      id: "claude-mcp",
+      label: "Claude connector (MCP + OAuth)",
+      status: "warning",
+      required: false,
+      message:
+        "Demo Mode: the Claude OAuth + MCP surface is unavailable — no grants can be issued or used.",
+    });
+  } else {
+    const claudeEnabled = isClaudeMcpEnabled();
+    const claudePublicUrl = getClaudePublicUrl();
+    let claudeGrants: number | null = null;
+    const claudeAdmin = createAdminClient();
+    if (claudeAdmin) {
+      const byOrigin = await countActiveGrantsByOrigin(claudeAdmin).catch(() => null);
+      claudeGrants = byOrigin ? byOrigin.claude : null;
+    }
+    if (!claudeEnabled) {
+      checks.push({
+        id: "claude-mcp",
+        label: "Claude connector (MCP + OAuth)",
+        status: "warning",
+        required: false,
+        message: "Claude MCP surface is disabled (CLAUDE_MCP_ENABLED — or its MUSE_MCP_ENABLED fallback — is false).",
+      });
+    } else if (!claudePublicUrl) {
+      checks.push({
+        id: "claude-mcp",
+        label: "Claude connector (MCP + OAuth)",
+        status: "warning",
+        required: false,
+        message:
+          "Claude MCP surface is enabled but no public URL is set (CLAUDE_MCP_PUBLIC_URL, MUSE_MCP_PUBLIC_URL or NEXT_PUBLIC_APP_URL).",
+      });
+    } else if (claudeGrants === null) {
+      checks.push({
+        id: "claude-mcp",
+        label: "Claude connector (MCP + OAuth)",
+        status: "warning",
+        required: false,
+        message: `Claude MCP surface is configured at ${claudePublicUrl}, but the OAuth tables could not be read — migration 023 may not be applied to this project.`,
+      });
+    } else {
+      checks.push({
+        id: "claude-mcp",
+        label: "Claude connector (MCP + OAuth)",
+        status: "ok",
+        required: false,
+        message:
+          claudeGrants === 0
+            ? `Claude MCP surface is configured at ${claudePublicUrl}; no active grants yet (no Claude user has connected).`
+            : `Claude MCP surface is configured at ${claudePublicUrl}; ${claudeGrants} active grant(s) platform-wide.`,
       });
     }
   }

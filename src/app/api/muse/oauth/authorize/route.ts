@@ -64,7 +64,8 @@ function errorPage(title: string, message: string, status = 400): NextResponse {
 function consentPage(input: {
   clientName: string;
   clientOrigin: string | null;
-  platform: "muse" | "chatgpt";
+  platform: "muse" | "chatgpt" | "claude";
+  redirectUri: string;
   scopes: OAuthScope[];
   workspaceLabel: string;
   userLabel: string;
@@ -77,8 +78,20 @@ function consentPage(input: {
     )
     .join("");
   const platformName = platformLabel(input.platform);
+  // The MCP authorization spec requires the consent screen to show
+  // the redirect URI's hostname clearly, so the user can see where
+  // they will be sent back to after approving.
+  let redirectHost: string | null = null;
+  try {
+    redirectHost = new URL(input.redirectUri).hostname;
+  } catch {
+    redirectHost = null;
+  }
   const originLine = input.clientOrigin
     ? `<p style="margin:0 0 20px;color:#bdbdd1;line-height:1.6;">Connecting from <strong style="color:#f2f1fb;">${escapeHtml(input.clientOrigin)}</strong> (${escapeHtml(platformName)}).</p>`
+    : "";
+  const redirectLine = redirectHost
+    ? `<p style="margin:0 0 20px;color:#bdbdd1;line-height:1.6;">After you approve, you will be sent back to <strong style="color:#f2f1fb;">${escapeHtml(redirectHost)}</strong>.</p>`
     : "";
   const html =
     `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Connect to NxtSend</title></head>` +
@@ -88,6 +101,7 @@ function consentPage(input: {
     `<h1 style="margin:0 0 8px;font-size:22px;">Connect <span style="color:#8a7aff;">${escapeHtml(input.clientName)}</span> to NxtSend?</h1>` +
     `<p style="margin:0 0 8px;color:#bdbdd1;line-height:1.6;">${escapeHtml(platformName)} is asking to access your NxtSend account <strong style="color:#f2f1fb;">${escapeHtml(input.userLabel)}</strong> in workspace <strong style="color:#f2f1fb;">${escapeHtml(input.workspaceLabel)}</strong>. It will be able to:</p>` +
     originLine +
+    redirectLine +
     `<ul style="margin:0 0 20px;padding-left:20px;">${scopeItems}</ul>` +
     `<p style="margin:0 0 24px;color:#898ca2;font-size:13px;line-height:1.6;">You can revoke this access at any time. Sending email and deleting leads always need your approval in ${escapeHtml(platformName)}, every time.</p>` +
     `<form method="post" action="/api/muse/oauth/authorize" style="display:flex;gap:12px;">` +
@@ -189,6 +203,7 @@ export async function GET(req: Request) {
     clientName: request.client.name,
     clientOrigin: request.clientOrigin,
     platform: request.platform,
+    redirectUri: request.redirectUri,
     scopes: request.scopes,
     workspaceLabel: ctx.workspaceId,
     userLabel: ctx.userId,

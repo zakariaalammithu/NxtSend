@@ -103,6 +103,7 @@ describe("getIntegrationStatuses", () => {
     }
     expect(statusOf(entries, "muse-ai")).toBe("Demo Mode");
     expect(statusOf(entries, "chatgpt")).toBe("Demo Mode");
+    expect(statusOf(entries, "claude")).toBe("Demo Mode");
     expect(statusOf(entries, "google-sheets")).toBe("Not Connected");
     expect(statusOf(entries, "crm")).toBe("Not Connected");
     expect(statusOf(entries, "email-verification")).toBe("Not Connected");
@@ -265,6 +266,108 @@ describe("getIntegrationStatuses", () => {
     expect(entry?.notImplementedNote).toContain("Not submitted to OpenAI");
     expect(entry?.description).toContain("/api/mcp/chatgpt");
     expect(entry?.description).toContain("Developer Mode");
+  });
+
+  it("claude: same rule as muse-ai, on the Claude surface (CLAUDE_* vars, claude.* grants)", () => {
+    // No public URL anywhere: enabled by default, but unreachable.
+    expect(
+      statusOf(getIntegrationStatuses({ env: {}, mode: "supabase" }), "claude")
+    ).toBe("Configuration Required");
+    // Disabled outright via the Claude flag.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { CLAUDE_MCP_ENABLED: "false", CLAUDE_MCP_PUBLIC_URL: "https://example.com" },
+          mode: "supabase",
+        }),
+        "claude"
+      )
+    ).toBe("Not Connected");
+    // Disabled via the MUSE_* fallback when the Claude flag is unset.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { MUSE_MCP_ENABLED: "false", NEXT_PUBLIC_APP_URL: "https://example.com" },
+          mode: "supabase",
+        }),
+        "claude"
+      )
+    ).toBe("Not Connected");
+    // Enabled + public URL, but no Claude grant: configured, not connected.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { CLAUDE_MCP_PUBLIC_URL: "https://example.com" },
+          mode: "supabase",
+        }),
+        "claude"
+      )
+    ).toBe("Connected but Not Verified");
+    // A Muse grant does NOT connect the Claude entry.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { CLAUDE_MCP_PUBLIC_URL: "https://example.com" },
+          mode: "supabase",
+          museGrantsActive: 1,
+          claudeGrantsActive: 0,
+        }),
+        "claude"
+      )
+    ).toBe("Connected but Not Verified");
+    // A ChatGPT grant does NOT connect the Claude entry either.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { CLAUDE_MCP_PUBLIC_URL: "https://example.com" },
+          mode: "supabase",
+          chatgptGrantsActive: 1,
+          claudeGrantsActive: 0,
+        }),
+        "claude"
+      )
+    ).toBe("Connected but Not Verified");
+    // A real active Claude grant is the ONLY thing that yields Connected.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { CLAUDE_MCP_PUBLIC_URL: "https://example.com" },
+          mode: "supabase",
+          museGrantsActive: 0,
+          chatgptGrantsActive: 0,
+          claudeGrantsActive: 1,
+        }),
+        "claude"
+      )
+    ).toBe("Connected and Verified");
+    // Unknown grant count (migration 023 not applied) never invents a grant.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { CLAUDE_MCP_PUBLIC_URL: "https://example.com" },
+          mode: "supabase",
+          claudeGrantsActive: null,
+        }),
+        "claude"
+      )
+    ).toBe("Connected but Not Verified");
+  });
+
+  it("claude registry entry: adapter kind, Claude env vars, no claimed submission", () => {
+    const entry = INTEGRATION_REGISTRY.find((d) => d.id === "claude");
+    expect(entry).toBeDefined();
+    expect(entry?.kind).toBe("adapter");
+    expect(entry?.envVars.map((v) => v.name)).toContain("CLAUDE_MCP_ENABLED");
+    expect(entry?.envVars.map((v) => v.name)).toContain("CLAUDE_MCP_PUBLIC_URL");
+    expect(entry?.envVars.map((v) => v.name)).not.toContain("CLAUDE_OAUTH_CLIENT_SECRET");
+    expect(entry?.verifySupported).toBe(false);
+    expect(entry?.notImplementedNote).toContain("Not submitted to Anthropic");
+    expect(entry?.description).toContain("/api/mcp/claude");
+    expect(entry?.description).toContain("https://nxtsend.com/api/mcp/claude");
+    expect(entry?.description).toContain("Customize → Connectors");
+    expect(entry?.troubleshooting.join(" ")).toContain("https://claude.ai/api/mcp/auth_callback");
+    expect(entry?.troubleshooting.join(" ")).toContain("https://claude.com/api/mcp/auth_callback");
+    expect(entry?.setupSteps.join(" ")).toContain("Advanced-settings");
   });
 
   it("grants UI scope descriptions: every issued scope has a plain-words description (muse.* and nxtsend.*)", async () => {
@@ -646,6 +749,35 @@ describe("verifyIntegration — live provider checks (fakes)", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("claude: Test Connection never pretends — no safe read-only verification call exists", async () => {
+    const fetchSpy = fakeFetch(200);
+    // Demo mode: honest demo result, nothing attempted.
+    const demo = await verifyIntegration("claude", {
+      env: FAKE_ENV,
+      mode: "demo",
+      fetchFn: fetchSpy as unknown as typeof fetch,
+    });
+    expect(demo?.status).toBe("Demo Mode");
+    expect(demo?.attempted).toBe(false);
+    // Live, configured, no grant: Connected but Not Verified, nothing attempted.
+    const configured = await verifyIntegration("claude", {
+      env: { CLAUDE_MCP_PUBLIC_URL: "https://example.com" },
+      mode: "supabase",
+      fetchFn: fetchSpy as unknown as typeof fetch,
+    });
+    expect(configured?.status).toBe("Connected but Not Verified");
+    expect(configured?.attempted).toBe(false);
+    expect(configured?.message).toContain("real Claude OAuth grant");
+    // Live, disabled: Not Connected, nothing attempted.
+    const disabled = await verifyIntegration("claude", {
+      env: { CLAUDE_MCP_ENABLED: "false", CLAUDE_MCP_PUBLIC_URL: "https://example.com" },
+      mode: "supabase",
+      fetchFn: fetchSpy as unknown as typeof fetch,
+    });
+    expect(disabled?.status).toBe("Not Connected");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("static entries never pretend: linkedin / muse-ai / not-implemented", async () => {
     expect((await verifyIntegration("linkedin", { env: FAKE_ENV, mode: "supabase" }))?.status).toBe(
       "Configuration Required"
@@ -688,7 +820,7 @@ describe("registry consistency", () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of [
       "supabase", "resend", "stripe", "openai", "anthropic", "meta-model",
-      "muse-ai", "chatgpt", "meta-pixel", "webhooks", "jobs", "linkedin",
+      "muse-ai", "chatgpt", "claude", "meta-pixel", "webhooks", "jobs", "linkedin",
       "google-sheets", "crm", "email-verification",
     ]) {
       expect(ids).toContain(id);

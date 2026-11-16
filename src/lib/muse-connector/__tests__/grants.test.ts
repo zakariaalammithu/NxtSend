@@ -202,6 +202,12 @@ describe("grantOriginForClient", () => {
     expect(
       grantOriginForClient("client-b", ["https://agent.meta.ai/api/hatch/oauth/callback"])
     ).toBe("Muse");
+    expect(
+      grantOriginForClient("client-d", ["https://claude.ai/api/mcp/auth_callback"])
+    ).toBe("Claude");
+    expect(
+      grantOriginForClient("client-e", ["https://claude.com/api/mcp/auth_callback"])
+    ).toBe("Claude");
     expect(grantOriginForClient("client-c", ["http://localhost:3000/callback"])).toBe("Other");
   });
 
@@ -209,6 +215,8 @@ describe("grantOriginForClient", () => {
     // A CIMD client has no stored client row, so the URL is the only signal.
     expect(grantOriginForClient("https://chatgpt.com/some-client", [])).toBe("ChatGPT");
     expect(grantOriginForClient("https://agent.meta.ai/some-client", [])).toBe("Muse");
+    expect(grantOriginForClient("https://claude.ai/some-client", [])).toBe("Claude");
+    expect(grantOriginForClient("https://claude.com/some-client", [])).toBe("Claude");
     expect(grantOriginForClient("https://example.com/some-client", [])).toBe("Other");
   });
 });
@@ -257,7 +265,37 @@ describe("summarizeGrantsByOrigin", () => {
       clients,
       NOW
     );
-    expect(out).toEqual({ muse: 2, chatgpt: 2, other: 0, total: 4 });
+    expect(out).toEqual({ muse: 2, chatgpt: 2, claude: 0, other: 0, total: 4 });
+  });
+
+  it("splits Claude grants by origin, including the claude.* scope fallback", () => {
+    const clients: MuseOAuthClientRow[] = [
+      ...CLIENTS,
+      {
+        id: "c4",
+        client_id: "claude-client-a",
+        client_secret_hash: null,
+        name: "Claude",
+        redirect_uris: ["https://claude.ai/api/mcp/auth_callback"],
+        created_at: "2026-11-10T00:00:00Z",
+      },
+    ];
+    const out = summarizeGrantsByOrigin(
+      [
+        countRow({ client_id: "claude-client-a", user_id: "user-1", scopes: ["claude.read"] }),
+        // CIMD client: no stored client row, classified by URL.
+        countRow({
+          client_id: "https://claude.com/abc",
+          user_id: "user-1",
+          scopes: ["claude.read", "claude.write"],
+        }),
+        // Loopback-only client (CLIENTS[1]): origin unknown, scope prefix decides.
+        countRow({ client_id: "muse-client-b", user_id: "user-6", scopes: ["claude.read"] }),
+      ],
+      clients,
+      NOW
+    );
+    expect(out).toEqual({ muse: 0, chatgpt: 0, claude: 3, other: 0, total: 3 });
   });
 
   it("ignores expired, revoked and access tokens, and falls back to scope prefix for loopback-only clients", () => {
@@ -273,6 +311,6 @@ describe("summarizeGrantsByOrigin", () => {
       CLIENTS,
       NOW
     );
-    expect(out).toEqual({ muse: 1, chatgpt: 1, other: 0, total: 2 });
+    expect(out).toEqual({ muse: 1, chatgpt: 1, claude: 0, other: 0, total: 2 });
   });
 });

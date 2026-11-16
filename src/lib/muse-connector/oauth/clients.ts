@@ -4,17 +4,26 @@
  * There is NO env-configured static client anywhere in NxtSend (no
  * other integration has one either): clients exist only by Dynamic
  * Client Registration (RFC 7591) into `muse_oauth_clients`, or —
- * for ChatGPT — as ephemeral CIMD clients (see ./cimd.ts), which
- * are validated per request and never stored.
+ * for ChatGPT and Claude — as ephemeral CIMD clients (see ./cimd.ts),
+ * which are validated per request and never stored. There is NO
+ * CLAUDE_OAUTH_CLIENT_SECRET anywhere: Claude connects as a public
+ * client (DCR or CIMD, `token_endpoint_auth_method: "none"`, PKCE
+ * S256); a customer-entered client ID is used without a secret.
  *
  * Redirect allowlist: the Muse callback
  * https://agent.meta.ai/api/hatch/oauth/callback, the ChatGPT
  * callback https://chatgpt.com/connector_platform_oauth_redirect,
- * or a loopback http://localhost:* / http://127.0.0.1:* URI (local
- * testing). Anything else is refused — an open-redirect via a
- * registered client is not possible. A redirect URI must ALSO be
- * exactly registered/documented for the client using it
- * (validateRedirectUri); the allowlist alone is never enough.
+ * the Claude callbacks https://claude.ai/api/mcp/auth_callback and
+ * https://claude.com/api/mcp/auth_callback, or a loopback
+ * http://localhost:* / http://127.0.0.1:* URI (local testing,
+ * incl. Claude Code's ephemeral loopback port). Anything else is
+ * refused — an open-redirect via a registered client is not
+ * possible. A redirect URI must ALSO be exactly registered/
+ * documented for the client using it (validateRedirectUri) AND
+ * valid for that client's platform (validateRedirectUriForPlatform):
+ * a Muse client must NOT be able to use a Claude callback URI and
+ * vice versa, even if the URI were registered for it. The allowlist
+ * alone is never enough.
  */
 
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
@@ -26,23 +35,47 @@ export const MUSE_OAUTH_CALLBACK = "https://agent.meta.ai/api/hatch/oauth/callba
 /** The ChatGPT connector-platform callback. */
 export const CHATGPT_OAUTH_CALLBACK = "https://chatgpt.com/connector_platform_oauth_redirect";
 
-export type OAuthClientPlatform = "muse" | "chatgpt";
+/**
+ * The Claude callbacks. Anthropic's hosted surfaces (claude.ai web,
+ * Desktop, mobile, Cowork) use `https://claude.ai/api/mcp/auth_callback`
+ * (verified against claude.com/docs/connectors/building/authentication,
+ * 2026-11-16); `https://claude.com/api/mcp/auth_callback` is allowlisted
+ * alongside it because Claude's web app is served from both hosts —
+ * it was NOT confirmed in the official doc fetched that day, so if
+ * Claude ever stops sending it, remove it here.
+ */
+export const CLAUDE_OAUTH_CALLBACK = "https://claude.ai/api/mcp/auth_callback";
+export const CLAUDE_COM_OAUTH_CALLBACK = "https://claude.com/api/mcp/auth_callback";
+/** Both Claude callback URIs. */
+export const CLAUDE_OAUTH_CALLBACKS = [CLAUDE_OAUTH_CALLBACK, CLAUDE_COM_OAUTH_CALLBACK] as const;
+
+export type OAuthClientPlatform = "muse" | "chatgpt" | "claude";
 
 /**
  * Which platform a client belongs to, from its registered /
- * documented redirect URIs: a client carrying the ChatGPT callback
+ * documented redirect URIs: a client carrying a Claude callback
+ * is a Claude client, else a client carrying the ChatGPT callback
  * is a ChatGPT client, otherwise a Muse client. Used only for
- * defaults (default scope, default `resource`); it never grants
- * anything — authorization always goes through the grant's scopes
- * and tiers.
+ * defaults (default scope, default `resource`) and for binding
+ * redirect validation to the platform; it never grants anything —
+ * authorization always goes through the grant's scopes and tiers.
+ * A client registering callbacks for two platforms resolves to
+ * one platform (Claude wins over ChatGPT wins over Muse) and can
+ * then only use that platform's callback (see
+ * validateRedirectUriForPlatform).
  */
 export function clientPlatform(client: Pick<MuseOAuthClientRow, "redirect_uris">): OAuthClientPlatform {
+  if (client.redirect_uris.some((uri) => (CLAUDE_OAUTH_CALLBACKS as readonly string[]).includes(uri))) {
+    return "claude";
+  }
   return client.redirect_uris.includes(CHATGPT_OAUTH_CALLBACK) ? "chatgpt" : "muse";
 }
 
 /** Human label for a client platform, shown on the consent screen. */
 export function platformLabel(platform: OAuthClientPlatform): string {
-  return platform === "chatgpt" ? "ChatGPT" : "Muse";
+  if (platform === "chatgpt") return "ChatGPT";
+  if (platform === "claude") return "Claude";
+  return "Muse";
 }
 
 /** Cap on registered clients; oldest never-used client is evicted past it. */
@@ -64,14 +97,17 @@ export function isLoopbackRedirectUri(uri: string): boolean {
 }
 
 /**
- * True when a redirect URI is on the allowlist: exactly the Muse
- * callback, exactly the ChatGPT callback, or a loopback
+ * True when a redirect URI is on the allowlist: exactly one of the
+ * Muse, ChatGPT or Claude callbacks, or a loopback
  * http://localhost:<port>[/path] / http://127.0.0.1:<port>[/path]
  * URI.
  */
 export function isAllowedOAuthRedirectUri(uri: string): boolean {
   return (
-    uri === MUSE_OAUTH_CALLBACK || uri === CHATGPT_OAUTH_CALLBACK || isLoopbackRedirectUri(uri)
+    uri === MUSE_OAUTH_CALLBACK ||
+    uri === CHATGPT_OAUTH_CALLBACK ||
+    (CLAUDE_OAUTH_CALLBACKS as readonly string[]).includes(uri) ||
+    isLoopbackRedirectUri(uri)
   );
 }
 
@@ -84,6 +120,35 @@ export function isAllowedMuseRedirectUri(uri: string): boolean {
   return isLoopbackRedirectUri(uri);
 }
 
+/**
+ * True when a redirect URI is on the Claude allowlist: exactly one
+ * of the Claude callbacks, or a loopback http://localhost:<port>
+ * [/path] URI (Claude Code's ephemeral loopback port).
+ */
+export function isAllowedClaudeRedirectUri(uri: string): boolean {
+  if ((CLAUDE_OAUTH_CALLBACKS as readonly string[]).includes(uri)) return true;
+  return isLoopbackRedirectUri(uri);
+}
+
+/**
+ * True when a redirect URI is valid for a given platform: exactly
+ * that platform's callback(s), or a loopback URI (allowed for every
+ * platform — local testing, incl. Claude Code). This is the
+ * platform binding: a Muse client presenting a Claude callback
+ * (or a Claude client presenting the Muse callback) is refused
+ * here even when the URI is allowlisted globally.
+ */
+export function isAllowedRedirectUriForPlatform(
+  uri: string,
+  platform: OAuthClientPlatform
+): boolean {
+  if (platform === "claude") return isAllowedClaudeRedirectUri(uri);
+  if (platform === "chatgpt") {
+    return uri === CHATGPT_OAUTH_CALLBACK || isLoopbackRedirectUri(uri);
+  }
+  return isAllowedMuseRedirectUri(uri);
+}
+
 /** Exact-match check of a redirect URI against a client's allowlist. */
 export function isRegisteredRedirectUri(
   client: MuseOAuthClientRow,
@@ -93,9 +158,11 @@ export function isRegisteredRedirectUri(
 }
 
 /**
- * Validates a redirect URI for use: it must be allowlisted (either
+ * Validates a redirect URI for use: it must be allowlisted (a
  * platform callback, or loopback) AND exactly registered for this
- * client.
+ * client. This does NOT bind the URI to the client's platform —
+ * callers at the authorize boundary must also check
+ * isAllowedRedirectUriForPlatform (validateAuthorizeRequest does).
  */
 export function validateRedirectUri(
   client: MuseOAuthClientRow,
@@ -103,6 +170,23 @@ export function validateRedirectUri(
 ): boolean {
   if (!redirectUri) return false;
   if (!isAllowedOAuthRedirectUri(redirectUri)) return false;
+  return isRegisteredRedirectUri(client, redirectUri);
+}
+
+/**
+ * Validates a redirect URI for use by a client of a known platform:
+ * allowlisted AND exactly registered for this client AND valid for
+ * that platform (a Muse client may not use a Claude callback URI,
+ * a Claude client may not use the Muse or ChatGPT callback, and so
+ * on; loopback is valid for every platform).
+ */
+export function validateRedirectUriForPlatform(
+  client: MuseOAuthClientRow,
+  redirectUri: string | null | undefined,
+  platform: OAuthClientPlatform
+): boolean {
+  if (!redirectUri) return false;
+  if (!isAllowedRedirectUriForPlatform(redirectUri, platform)) return false;
   return isRegisteredRedirectUri(client, redirectUri);
 }
 
@@ -169,7 +253,7 @@ function validateRegistrationMetadata(input: RegisterMuseClientInput): {
       return {
         ok: false,
         detail:
-          "Every redirect_uri must be the Muse callback (https://agent.meta.ai/api/hatch/oauth/callback), the ChatGPT callback (https://chatgpt.com/connector_platform_oauth_redirect), or a loopback http://localhost:* / http://127.0.0.1:* URI.",
+          "Every redirect_uri must be the Muse callback (https://agent.meta.ai/api/hatch/oauth/callback), the ChatGPT callback (https://chatgpt.com/connector_platform_oauth_redirect), a Claude callback (https://claude.ai/api/mcp/auth_callback or https://claude.com/api/mcp/auth_callback), or a loopback http://localhost:* / http://127.0.0.1:* URI.",
       };
     }
     if (!redirectUris.includes(uri)) redirectUris.push(uri);

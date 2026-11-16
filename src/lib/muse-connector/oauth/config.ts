@@ -15,6 +15,8 @@ export interface MuseMcpEnv {
   MUSE_MCP_PUBLIC_URL?: string;
   CHATGPT_MCP_ENABLED?: string;
   CHATGPT_MCP_PUBLIC_URL?: string;
+  CLAUDE_MCP_ENABLED?: string;
+  CLAUDE_MCP_PUBLIC_URL?: string;
   NEXT_PUBLIC_APP_URL?: string;
 }
 
@@ -24,6 +26,8 @@ function envFromProcess(): MuseMcpEnv {
     MUSE_MCP_PUBLIC_URL: process.env.MUSE_MCP_PUBLIC_URL,
     CHATGPT_MCP_ENABLED: process.env.CHATGPT_MCP_ENABLED,
     CHATGPT_MCP_PUBLIC_URL: process.env.CHATGPT_MCP_PUBLIC_URL,
+    CLAUDE_MCP_ENABLED: process.env.CLAUDE_MCP_ENABLED,
+    CLAUDE_MCP_PUBLIC_URL: process.env.CLAUDE_MCP_PUBLIC_URL,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   };
 }
@@ -48,6 +52,16 @@ export function isMuseMcpEnabled(env: MuseMcpEnv = envFromProcess()): boolean {
  */
 export function isChatGptMcpEnabled(env: MuseMcpEnv = envFromProcess()): boolean {
   return parseEnabledFlag(env.CHATGPT_MCP_ENABLED) ?? isMuseMcpEnabled(env);
+}
+
+/**
+ * Claude MCP surface flag, mirroring isChatGptMcpEnabled with one
+ * precedence rule: CLAUDE_MCP_ENABLED wins when set; otherwise the
+ * MUSE_MCP_ENABLED value applies; otherwise the surface is on.
+ * The OAuth routes are never gated by this flag (same rule as Muse).
+ */
+export function isClaudeMcpEnabled(env: MuseMcpEnv = envFromProcess()): boolean {
+  return parseEnabledFlag(env.CLAUDE_MCP_ENABLED) ?? isMuseMcpEnabled(env);
 }
 
 /** Validates a raw origin string into an origin, or null. */
@@ -97,9 +111,27 @@ export function getChatGptPublicUrl(
   );
 }
 
+/**
+ * Public origin of the Claude surface, same shape as
+ * getChatGptPublicUrl with one precedence rule: CLAUDE_MCP_PUBLIC_URL
+ * wins when set, else MUSE_MCP_PUBLIC_URL, else NEXT_PUBLIC_APP_URL,
+ * else the request origin. Returns null when nothing usable is set.
+ */
+export function getClaudePublicUrl(
+  requestOrigin?: string,
+  env: MuseMcpEnv = envFromProcess()
+): string | null {
+  return (
+    parsePublicUrl(env.CLAUDE_MCP_PUBLIC_URL) ??
+    parsePublicUrl(env.MUSE_MCP_PUBLIC_URL) ??
+    parsePublicUrl(env.NEXT_PUBLIC_APP_URL) ??
+    parsePublicUrl(requestOrigin)
+  );
+}
+
 // ── MCP resources (RFC 8707 `resource` / RFC 9728 audience) ────────────────
 
-export type McpPlatform = "muse" | "chatgpt";
+export type McpPlatform = "muse" | "chatgpt" | "claude";
 
 /** Canonical public origin when no origin can be determined. */
 export const DEFAULT_OAUTH_ORIGIN = "https://nxtsend.com";
@@ -108,6 +140,7 @@ export const DEFAULT_OAUTH_ORIGIN = "https://nxtsend.com";
 export const MCP_RESOURCE_PATHS: Record<McpPlatform, string> = {
   muse: "/api/mcp",
   chatgpt: "/api/mcp/chatgpt",
+  claude: "/api/mcp/claude",
 };
 
 /** Full resource URL of a platform's MCP server for an origin. */
@@ -115,9 +148,13 @@ export function getMcpResourceUrl(origin: string, platform: McpPlatform): string
   return `${origin.replace(/\/+$/, "")}${MCP_RESOURCE_PATHS[platform]}`;
 }
 
-/** Both canonical MCP resource URLs for an origin. */
+/** All three canonical MCP resource URLs for an origin. */
 export function canonicalMcpResources(origin: string): string[] {
-  return [getMcpResourceUrl(origin, "muse"), getMcpResourceUrl(origin, "chatgpt")];
+  return [
+    getMcpResourceUrl(origin, "muse"),
+    getMcpResourceUrl(origin, "chatgpt"),
+    getMcpResourceUrl(origin, "claude"),
+  ];
 }
 
 /**
@@ -129,6 +166,7 @@ export function resourcePlatform(resource: string | null | undefined): McpPlatfo
   if (!resource) return null;
   try {
     const pathname = new URL(resource).pathname.replace(/\/+$/, "");
+    if (pathname === MCP_RESOURCE_PATHS.claude) return "claude";
     if (pathname === MCP_RESOURCE_PATHS.chatgpt) return "chatgpt";
     if (pathname === MCP_RESOURCE_PATHS.muse) return "muse";
     return null;

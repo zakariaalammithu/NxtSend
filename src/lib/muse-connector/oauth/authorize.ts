@@ -12,7 +12,8 @@
  * for. The value must equal one of the canonical MCP resource URLs
  * for this origin byte-for-byte, else `invalid_target`. When no
  * resource is sent, it defaults to the canonical resource for the
- * client's platform (Muse → /api/mcp, ChatGPT → /api/mcp/chatgpt)
+ * client's platform (Muse → /api/mcp, ChatGPT → /api/mcp/chatgpt,
+ * Claude → /api/mcp/claude)
  * and is recorded on the code, so the token is audience-bound
  * either way. RFC 9207 `iss` (the authorization server issuer) is
  * added to success and error redirects by the route.
@@ -27,7 +28,7 @@ import {
 import { DEFAULT_OAUTH_ORIGIN, getMcpResourceUrl } from "./config";
 import { defaultScopeForPlatform, normalizeScopes, type OAuthScope } from "./scopes";
 import { hashToken, MUSE_CODE_TTL_MS } from "./tokens";
-import { validateRedirectUri } from "./clients";
+import { validateRedirectUriForPlatform } from "./clients";
 import type { MuseOAuthClientRow, MuseOAuthStore } from "./store";
 
 export type AuthorizeErrorCode =
@@ -124,9 +125,13 @@ export function validateAuthorizeRequest(
     };
   }
   // From here a redirect_uri may be usable for error redirects — but
-  // only when it is exactly registered for this client.
+  // only when it is exactly registered for this client AND valid for
+  // this client's platform: a Muse client must not be able to use a
+  // Claude callback URI (and vice versa), even if it were registered.
   const usableRedirect =
-    redirectUri && validateRedirectUri(client, redirectUri) ? redirectUri : null;
+    redirectUri && validateRedirectUriForPlatform(client, redirectUri, platform)
+      ? redirectUri
+      : null;
   if (!redirectUri) {
     return {
       ok: false,
@@ -140,7 +145,8 @@ export function validateAuthorizeRequest(
     return {
       ok: false,
       error: "invalid_request",
-      errorDescription: "redirect_uri does not match the client's registered redirect URIs.",
+      errorDescription:
+        "redirect_uri does not match the client's registered redirect URIs for this platform.",
       redirectUri: null,
       clientState,
     };
@@ -155,7 +161,8 @@ export function validateAuthorizeRequest(
     };
   }
   // Scopes: when the client asks for none, default to the
-  // least-privilege scope for its platform (muse.read / nxtsend.read).
+  // least-privilege scope for its platform (muse.read / nxtsend.read /
+  // claude.read).
   const scopes =
     params.scope && params.scope.trim()
       ? normalizeScopes(params.scope)

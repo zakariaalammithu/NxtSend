@@ -319,6 +319,11 @@ export default function IntegrationDetailPage() {
         <ChatGptLivePanels origin={origin} status={entry.status} mode={data?.mode ?? "demo"} />
       )}
 
+      {/* Claude live surface: same machinery, Claude copy + claude.* scopes */}
+      {d.id === "claude" && (
+        <ClaudeLivePanels origin={origin} status={entry.status} mode={data?.mode ?? "demo"} />
+      )}
+
       {/* Environment variables */}
       {d.envVars.length > 0 && (
         <Section title="Required configuration (environment variables)">
@@ -412,6 +417,8 @@ export default function IntegrationDetailPage() {
               ? "Revoke individual grants from the “Your Muse grants” panel above — revoking removes Muse's access for that grant immediately (every token for that client + user is revoked). Removing the environment variables additionally prevents NEW grants. Past audit entries are kept."
               : d.id === "chatgpt"
               ? "Revoke individual grants from the “Your ChatGPT grants” panel above — revoking removes ChatGPT's access for that grant immediately (every token for that client + user is revoked). Removing the environment variables additionally prevents NEW grants. Past audit entries are kept."
+              : d.id === "claude"
+              ? "Revoke individual grants from the “Your Claude grants” panel above — revoking removes Claude's access for that grant immediately (every token for that client + user is revoked). Removing the environment variables additionally prevents NEW grants. Past audit entries are kept."
               : d.kind === "info"
               ? "Nothing is connected, so there is nothing to disconnect. This entry documents the limitation and what implementing it would require."
               : "Remove (or replace) the environment variables listed above in Vercel and redeploy. The status returns to Not Connected, and any stored verification stops applying because the configuration it verified is gone. No data is deleted by disconnecting."}
@@ -474,7 +481,7 @@ interface MuseActivityEntry {
   created_at: string;
 }
 
-type ConnectorPlatform = "muse" | "chatgpt";
+type ConnectorPlatform = "muse" | "chatgpt" | "claude";
 
 /**
  * Per-platform copy for the live panels. The machinery (grants +
@@ -482,8 +489,10 @@ type ConnectorPlatform = "muse" | "chatgpt";
  * words, the MCP path, the scope prefix and the connect steps
  * differ. The ChatGPT panel lists only grants whose scopes carry
  * the nxtsend.* prefix (or whose client_id is a chatgpt.com CIMD
- * URL); the Muse panel lists only muse.* grants. A grant holding
- * both prefixes appears in both — it genuinely is a grant for both.
+ * URL); the Muse panel lists only muse.* grants; the Claude panel
+ * lists only claude.* grants (or claude.ai / claude.com CIMD
+ * clients). A grant holding two prefixes appears in both panels —
+ * it genuinely is a grant for both.
  */
 const CONNECTOR_COPY: Record<
   ConnectorPlatform,
@@ -491,7 +500,7 @@ const CONNECTOR_COPY: Record<
     label: string;
     mcpPath: string;
     mcpNote: string;
-    scopePrefix: "muse" | "nxtsend";
+    scopePrefix: "muse" | "nxtsend" | "claude";
     endpoints: { label: string; path: string; note: string }[];
     connectSteps: string[];
     grantsTitle: string;
@@ -613,6 +622,67 @@ const CONNECTOR_COPY: Record<
       "Demo Mode refuses the whole ChatGPT surface (OAuth 503/400, MCP 503) — the demo persona is never served to ChatGPT.",
     ],
   },
+  claude: {
+    label: "Claude",
+    mcpPath: "/api/mcp/claude",
+    mcpNote:
+      "Streamable HTTP, JSON-RPC 2.0. Add this URL in Claude: Customize → Connectors → Add custom connector.",
+    scopePrefix: "claude",
+    endpoints: [
+      {
+        label: "MCP endpoint",
+        path: "/api/mcp/claude",
+        note: "Streamable HTTP, JSON-RPC 2.0. Add this URL in Claude: Customize → Connectors → Add custom connector.",
+      },
+      {
+        label: "Authorize (consent screen)",
+        path: "/api/muse/oauth/authorize",
+        note: "GET shows the consent screen; POST approves or denies.",
+      },
+      { label: "Token", path: "/api/muse/oauth/token", note: "authorization_code + refresh_token." },
+      { label: "Revoke", path: "/api/muse/oauth/revoke", note: "RFC 7009 token revocation." },
+      {
+        label: "Register (Dynamic Client Registration)",
+        path: "/api/muse/oauth/register",
+        note: "RFC 7591 — public clients by default; no pre-registered client secret exists.",
+      },
+      {
+        label: "Authorization-server metadata",
+        path: "/.well-known/oauth-authorization-server",
+        note: "RFC 8414 metadata: issuer, authorize/token/revoke/register endpoints (PKCE S256 only).",
+      },
+      {
+        label: "Protected-resource metadata (root)",
+        path: "/.well-known/oauth-protected-resource",
+        note: "RFC 9728 root metadata for all MCP resources.",
+      },
+      {
+        label: "Protected-resource metadata (Claude resource)",
+        path: "/.well-known/oauth-protected-resource/api/mcp/claude",
+        note: "RFC 9728 metadata for the Claude MCP resource.",
+      },
+    ],
+    connectSteps: [
+      "In Claude, open Customize → Connectors → Add custom connector, name it NxtSend, and paste the MCP endpoint URL above. Claude registers via Dynamic Client Registration or identifies itself with a CIMD client_id URL — there is no client secret to copy (clients are public by default). Claude's Advanced-settings client ID/secret fields are an optional fallback for pre-registered clients only, not required for this connection.",
+      "Sign in on NxtSend's consent screen and choose the scopes. Pick claude.read only unless Claude genuinely needs to change or send things.",
+      "Use NxtSend from inside Claude. Sensitive writes (sending email, deleting a lead or a campaign) need your approval in Claude every single time — they can never be set to “Always allow”.",
+      "Directory listing is a separate step: submit to Anthropic for review. That submission has NOT been made and no approval is claimed — the custom-connector path above works without it.",
+    ],
+    grantsTitle: "Your Claude grants",
+    grantsEmpty:
+      "No Claude grants for your account. A grant appears here after you approve Claude on the consent screen — until then, nothing is connected.",
+    activityEmpty:
+      "No Claude activity recorded for this workspace yet — MCP tool calls and OAuth grant/revoke events appear here (newest first, up to 50).",
+    securityNotes: [
+      "Tokens and authorization codes are stored as SHA-256 hashes only — a database read can never yield a usable token, and no token value is ever logged or shown in the UI.",
+      "Refresh tokens rotate on every use; presenting an already-rotated refresh token revokes the whole grant.",
+      "The OAuth tables (migrations 023 + 024) have RLS enabled with zero policies — only the service role can read or write them; the browser cannot reach them at all.",
+      "A grant is scoped to one user and one workspace and bound to one MCP resource (RFC 8707): a token issued for /api/mcp/claude does not validate for /api/mcp or /api/mcp/chatgpt, and vice versa. MCP tool calls are workspace-scoped and scope-enforced; a claude.read token cannot call a write tool.",
+      "Sensitive writes (send_email, send_inbox_reply, delete_lead, delete_campaign) need approval in Claude every time. There is no LinkedIn-send tool: no authorized LinkedIn provider exists, and the official LinkedIn API exposes no connection-request/DM endpoints to standard developers.",
+      "Every MCP tool call and OAuth grant/revoke event is written to the audit log for this workspace (see the activity history above).",
+      "Demo Mode refuses the whole Claude surface (OAuth 503/400, MCP 503) — the demo persona is never served to Claude.",
+    ],
+  },
 };
 
 /** True when a grant belongs to this platform (scope prefix or CIMD client origin). */
@@ -621,14 +691,20 @@ function grantBelongsToPlatform(grant: MuseGrant, platform: ConnectorPlatform): 
   if (grant.scopes.some((s) => s.startsWith(`${prefix}.`))) return true;
   if (platform === "chatgpt" && grant.clientId.startsWith("https://chatgpt.com")) return true;
   if (platform === "muse" && grant.clientId.startsWith("https://agent.meta.ai")) return true;
+  if (
+    platform === "claude" &&
+    (grant.clientId.startsWith("https://claude.ai") ||
+      grant.clientId.startsWith("https://claude.com"))
+  )
+    return true;
   return false;
 }
 
 /**
  * Live connector panels (detail page only). Everything here comes from
  * the real implementation: endpoint URLs from this deployment's
- * origin, scopes from the OAuth module (SCOPE_DESCRIPTIONS — both
- * muse.* and nxtsend.*), grants + activity from the grants/activity
+ * origin, scopes from the OAuth module (SCOPE_DESCRIPTIONS — muse.*,
+ * nxtsend.* and claude.*), grants + activity from the grants/activity
  * APIs. No state is ever shown as "Connected" unless a real grant
  * exists — the header badge already reflects that (derived from the
  * grants count in GET /api/integrations/status).
@@ -778,7 +854,7 @@ function ConnectorLivePanels({
         </div>
       </Section>
 
-      {platform === "chatgpt" && (
+      {(platform === "chatgpt" || platform === "claude") && (
         <Section title={`Tool manifest — ${NXTSEND_TOOL_MANIFEST.length} tools`}>
           <p className="text-12 text-black-400 leading-relaxed">
             Classifications: Read (no state change), Write (creates/changes), Sensitive write
@@ -854,8 +930,9 @@ function ConnectorLivePanels({
                   Scopes: {g.scopes.length > 0 ? g.scopes.join(", ") : "—"}
                 </p>
                 {/* Scope descriptions come from SCOPE_DESCRIPTIONS, so
-                    nxtsend.* grants list with descriptions exactly
-                    like muse.* grants — never a bare scope string. */}
+                    claude.* grants list with descriptions exactly
+                    like muse.* / nxtsend.* grants — never a bare
+                    scope string. */}
                 {g.scopes.length > 0 && (
                   <ul className="space-y-0.5">
                     {g.scopes.map((scope) => (
@@ -903,6 +980,13 @@ function ConnectorLivePanels({
           <p className="text-12 text-black-400 leading-relaxed">
             The audit log is shared with the Muse connector — entries here cover MCP tool calls
             and OAuth events from both platforms (actions are recorded as muse.tool.* for both).
+          </p>
+        )}
+        {platform === "claude" && (
+          <p className="text-12 text-black-400 leading-relaxed">
+            The audit log is shared with the Muse and ChatGPT connectors — entries here cover MCP
+            tool calls and OAuth events from all three platforms (actions are recorded as
+            muse.tool.* for all of them).
           </p>
         )}
         {activityError && (
@@ -972,6 +1056,18 @@ function ChatGptLivePanels({
   mode: string;
 }) {
   return <ConnectorLivePanels platform="chatgpt" origin={origin} status={status} mode={mode} />;
+}
+
+function ClaudeLivePanels({
+  origin,
+  status,
+  mode,
+}: {
+  origin: string;
+  status: string;
+  mode: string;
+}) {
+  return <ConnectorLivePanels platform="claude" origin={origin} status={status} mode={mode} />;
 }
 
 function BackLink() {

@@ -66,6 +66,8 @@ const CATALOG = [
   ["MUSE_MCP_PUBLIC_URL", "integrations", false],
   ["CHATGPT_MCP_ENABLED", "integrations", false],
   ["CHATGPT_MCP_PUBLIC_URL", "integrations", false],
+  ["CLAUDE_MCP_ENABLED", "integrations", false],
+  ["CLAUDE_MCP_PUBLIC_URL", "integrations", false],
 ];
 
 const GROUP_LABELS = {

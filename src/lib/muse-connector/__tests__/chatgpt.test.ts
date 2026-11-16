@@ -409,10 +409,11 @@ describe("handleMcpRequest (chatgpt flavor)", () => {
     );
     expect(list.status).toBe(200);
     const listResult = rpcResult(list.body);
-    expect(listResult.resources.length).toBe(1);
+    expect(listResult.resources.length).toBe(2);
     expect(listResult.resources[0].uri).toBe("ui://widget/campaigns.html");
     expect(listResult.resources[0].mimeType).toBe("text/html;profile=mcp-app");
     expect(listResult.resources[0]._meta.ui.prefersBorder).toBe(true);
+    expect(listResult.resources[1].uri).toBe("nxtsend://account");
 
     const readNoAuth = await handleMcpRequest(
       baseOpts({

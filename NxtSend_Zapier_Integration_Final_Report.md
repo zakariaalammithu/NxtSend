@@ -301,6 +301,24 @@ introduced by an edit (removed the duplicate) and an ESLint
 `prefer-const` error in the new admin route (changed `let` to
 `const`). Both are fixed; the final build passes.
 
+## Live verification
+
+Verified on https://nxtsend.com by read-only live checks after the
+Vercel deploy of commit e342e1a (deploy landed ~20:42 UTC, 2026-11-16;
+curl checks + a live browser check of the settings page at ~20:47 UTC):
+
+| Check | Result |
+| --- | --- |
+| Vercel deploy of e342e1a | **PASS** — Zapier health route 404'd until ~20:42 UTC, then returned JSON |
+| `GET /api/integrations/zapier/health` | **PASS** — `{"mode":"demo","zapierEnabled":true,"version":"1.0.0"}` |
+| `GET /.well-known/oauth-protected-resource/api/integrations/zapier` | **PASS** — `{"resource":"https://nxtsend.com/api/integrations/zapier","authorization_servers":["https://nxtsend.com"],"scopes_supported":[...all eleven scopes incl. "zapier.read","zapier.write"],"bearer_methods_supported":["header"]}` |
+| `GET /api/integrations/zapier/v1/auth/test` (no token) | **PASS (demo behaviour)** — 503 `{"error":"Zapier is not available in Demo Mode. Connect a real Supabase project first — demo data is never shared with Zapier.","code":"demo_mode"}` |
+| Integration page `/dashboard/integrations/zapier` (demo) | **PASS** — renders fully: "Zapier" heading, Demo Mode badge + banner, REST API base URL `https://nxtsend.com/api/integrations/zapier/v1`, `zapier.read`/`zapier.write` scopes ("there is no zapier.send tier"), 6-step Connect to Zapier, 13 triggers (5 polling + 8 REST-hook), 12 actions, 5 searches + 4 hidden dropdowns, webhook status + delivery rules, "Not published on Zapier", no Connected/Verified state |
+| Naming note (by design, not a bug) | The page's OAuth endpoints are `/api/muse/oauth/*` and audit events keep `MUSE_OAUTH_*` names — one OAuth server is deliberately shared by all four platforms (Muse, ChatGPT, Claude, Zapier); renaming its paths would break the three live connectors for no functional gain |
+| `zapier validate` (own run, this session) | **PASS** — re-run by the reviewer: "This project is structurally sound!", 27 checks passed, 0 failed, 1 general warning D027 (core 18.6.0 → 19.3.0, intentionally not upgraded) |
+| Screenshots | **PENDING** — the live browser viewed the page but cannot save PNG files into the repo, and no Chromium/Playwright exists in this VM. None fabricated. The 14 shots listed in `audit-screenshots/zapier-integration/README.md` still need capturing from a machine with a browser |
+| Live OAuth grant flow inside Zapier + one live run per trigger/action/search + REST-hook delivery to a real `hooks.zapier.com` URL | **PENDING** — needs migrations 025–027 applied + `TOKEN_ENCRYPTION_KEY` set in Vercel + a live Supabase project + the owner's Zapier developer account (`zapier register`/`push`, DCR-registered client id/secret, a non-expiring test account for `integration-testing@zapier.com`) |
+
 ## Vercel readiness
 
 - Env vars: `ZAPIER_ENABLED` (optional, default on),

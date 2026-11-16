@@ -111,5 +111,5 @@ flag by design; the ChatGPT route's own flag is
 | Tool set | 54 tools (same manifest) | 54 tools (same manifest) |
 | Scope prefix | `muse.*` | `nxtsend.*` |
 | Resource (RFC 8707) | `https://<origin>/api/mcp` | `https://<origin>/api/mcp/chatgpt` |
-| Missing-scope answer | same structured reconnect prompt shape | same, ChatGPT wording |
+| Missing-scope answer | plain `missing_scope` error (HTTP 200 tool result, `isError: true`, no reconnect prompt) | structured reconnect prompt (`isError: true`, `code: "missing_scope"`, `reconnect: true`, plain-words prompt) |
 | Demo mode | 503 | 503 |

@@ -778,6 +778,42 @@ function ConnectorLivePanels({
         </div>
       </Section>
 
+      {platform === "chatgpt" && (
+        <Section title={`Tool manifest — ${NXTSEND_TOOL_MANIFEST.length} tools`}>
+          <p className="text-12 text-black-400 leading-relaxed">
+            Classifications: Read (no state change), Write (creates/changes), Sensitive write
+            (irreversible/consequential — approval required every time, never “Always allow”).
+            MCP annotations (readOnlyHint / destructiveHint) for each tool are listed in
+            docs/chatgpt-integration/MCP_TOOLS.md. There is no LinkedIn-send tool.
+          </p>
+          <div className="divide-y divide-black-700/60">
+            {NXTSEND_TOOL_MANIFEST.map((tool) => (
+              <div key={tool.name} className="py-3 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <code className="font-mono text-13 text-white">{tool.name}</code>
+                  <Badge
+                    variant={
+                      tool.classification === "Read"
+                        ? "blue"
+                        : tool.classification === "Write"
+                          ? "purple"
+                          : "error"
+                    }
+                    size="sm"
+                  >
+                    {tool.classification}
+                  </Badge>
+                </div>
+                <p className="text-12 text-black-300 leading-relaxed">{tool.description}</p>
+                <p className="text-11 text-black-400">
+                  Inputs: {tool.inputs} · Side effects: {tool.sideEffects}
+                </p>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
       <Section title={`Connect to ${copy.label}`}>
         <ol className="space-y-2 list-none">
           {copy.connectSteps.map((step, i) => (

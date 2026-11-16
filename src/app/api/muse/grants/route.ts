@@ -32,7 +32,7 @@ export async function GET() {
   if (!ctx.ok) return ctx.response;
   if (ctx.mode === "demo") {
     return NextResponse.json(
-      { error: "Muse OAuth grants are unavailable in Demo Mode." },
+      { error: "OAuth grants are unavailable in Demo Mode." },
       { status: 503 }
     );
   }
@@ -58,7 +58,7 @@ async function revoke(req: Request) {
   if (!ctx.ok) return ctx.response;
   if (ctx.mode === "demo") {
     return NextResponse.json(
-      { error: "Muse OAuth grants are unavailable in Demo Mode." },
+      { error: "OAuth grants are unavailable in Demo Mode." },
       { status: 503 }
     );
   }

@@ -188,16 +188,21 @@ export async function handleMcpRequest(
   opts: McpHandleOptions
 ): Promise<McpHandleResult> {
   const { request, body } = opts;
+  const flavor = opts.flavor ?? "muse";
+  const label = flavor === "chatgpt" ? "ChatGPT MCP" : "Muse MCP";
+  const flag =
+    flavor === "chatgpt" ? "CHATGPT_MCP_ENABLED" : "MUSE_MCP_ENABLED";
 
   // Demo mode: the MCP surface is not served at all — the demo
-  // persona must never be exposed to Muse as if it were a user.
+  // persona must never be exposed to Muse or ChatGPT as if it were
+  // a user.
   if (opts.mode === "demo") {
     return {
       status: 503,
       body: {
         error: "not_configured",
         message:
-          "Muse MCP is not available in Demo Mode. Connect Supabase and configure Muse OAuth to enable it.",
+          `${label} is not available in Demo Mode. Connect Supabase and configure OAuth to enable it.`,
       },
     };
   }
@@ -206,7 +211,7 @@ export async function handleMcpRequest(
       status: 503,
       body: {
         error: "not_configured",
-        message: "Muse MCP is disabled (MUSE_MCP_ENABLED=false).",
+        message: `${label} is disabled (${flag}=false).`,
       },
     };
   }
@@ -230,11 +235,11 @@ export async function handleMcpRequest(
     return { status: 400, body: rpcError(id, -32600, "Invalid Request: jsonrpc must be \"2.0\" and method must be a string.") };
   }
 
-  const flavor = opts.flavor ?? "muse";
-
   // ChatGPT discovery: initialize, tools/list and resources/list run
   // WITHOUT a token — they return static metadata only, no data.
   // Everything else needs a valid grant, on both flavors.
+  // (In demo mode the whole surface already refused above with 503,
+  // so this pre-auth discovery only applies in live mode.)
   if (
     flavor === "chatgpt" &&
     (method === "initialize" || method === "tools/list" || method === "resources/list")

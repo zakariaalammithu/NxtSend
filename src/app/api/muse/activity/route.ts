@@ -25,7 +25,7 @@ export async function GET() {
   if (!ctx.ok) return ctx.response;
   if (ctx.mode === "demo") {
     return NextResponse.json(
-      { error: "Muse activity is unavailable in Demo Mode." },
+      { error: "Activity is unavailable in Demo Mode." },
       { status: 503 }
     );
   }

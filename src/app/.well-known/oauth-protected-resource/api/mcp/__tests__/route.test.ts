@@ -13,9 +13,9 @@ describe("GET /.well-known/oauth-protected-resource/api/mcp", () => {
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.resource).toBe("http://localhost:3000/api/mcp");
     expect(body.authorization_servers).toEqual(["http://localhost:3000"]);
-    // One authorization server serves all three platforms, so the
-    // resource advertises all three scope sets (muse.*, nxtsend.*
-    // and claude.*).
+    // One authorization server serves all four platforms, so the
+    // resource advertises all four scope sets (muse.*, nxtsend.*,
+    // claude.* and zapier.*).
     expect(body.scopes_supported).toEqual([
       "muse.read",
       "muse.write",
@@ -26,6 +26,8 @@ describe("GET /.well-known/oauth-protected-resource/api/mcp", () => {
       "claude.read",
       "claude.write",
       "claude.send",
+      "zapier.read",
+      "zapier.write",
     ]);
     expect(body.bearer_methods_supported).toEqual(["header"]);
   });

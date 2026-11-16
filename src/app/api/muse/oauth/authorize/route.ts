@@ -64,7 +64,7 @@ function errorPage(title: string, message: string, status = 400): NextResponse {
 function consentPage(input: {
   clientName: string;
   clientOrigin: string | null;
-  platform: "muse" | "chatgpt" | "claude";
+  platform: "muse" | "chatgpt" | "claude" | "zapier";
   redirectUri: string;
   scopes: OAuthScope[];
   workspaceLabel: string;
@@ -103,7 +103,7 @@ function consentPage(input: {
     originLine +
     redirectLine +
     `<ul style="margin:0 0 20px;padding-left:20px;">${scopeItems}</ul>` +
-    `<p style="margin:0 0 24px;color:#898ca2;font-size:13px;line-height:1.6;">You can revoke this access at any time. Sending email and deleting leads always need your approval in ${escapeHtml(platformName)}, every time.</p>` +
+    `<p style="margin:0 0 24px;color:#898ca2;font-size:13px;line-height:1.6;">${input.platform === "zapier" ? "Zapier will act with the permissions above on your behalf until you revoke this connection. It never sends LinkedIn messages." : `You can revoke this access at any time. Sending email and deleting leads always need your approval in ${escapeHtml(platformName)}, every time.`}</p>` +
     `<form method="post" action="/api/muse/oauth/authorize" style="display:flex;gap:12px;">` +
     `<input type="hidden" name="muse_state" value="${escapeHtml(input.signedState)}">` +
     `<button type="submit" name="decision" value="approve" style="flex:1;background:#642cff;color:#fff;border:0;border-radius:10px;padding:12px 16px;font-size:15px;font-weight:600;cursor:pointer;">Allow access</button>` +

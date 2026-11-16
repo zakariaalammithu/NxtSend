@@ -43,7 +43,13 @@ export interface ValidAuthorizeRequest {
   client: MuseOAuthClientRow;
   redirectUri: string;
   scopes: OAuthScope[];
-  codeChallenge: string;
+  /**
+   * PKCE S256 challenge, or null when the client is confidential
+   * and sent none (Zapier — see below). A stored null challenge
+   * means the token exchange must NOT require a verifier (the
+   * client authenticates with its secret instead).
+   */
+  codeChallenge: string | null;
   clientState: string | null;
   /** RFC 8707 resource the grant is bound to (full MCP resource URL). */
   resource: string;
@@ -177,15 +183,31 @@ export function validateAuthorizeRequest(
     };
   }
   if (!params.code_challenge) {
-    return {
-      ok: false,
-      error: "invalid_request",
-      errorDescription: "code_challenge is required (PKCE S256).",
-      redirectUri: usableRedirect,
-      clientState,
-    };
-  }
-  if (!isS256Method(params.code_challenge_method ?? null)) {
+    // PKCE is REQUIRED for public clients (no secret to fall back
+    // on) and OPTIONAL for confidential clients ONLY. Why the
+    // exception: Zapier's standard OAuth2 client sends no PKCE —
+    // its canonical CLI example has no code_challenge field and no
+    // official source shows Zapier sending one — so requiring PKCE
+    // would make the Zapier integration unusable. A confidential
+    // client authenticates the code exchange with its client_secret
+    // (verified in the token handler), which is the same
+    // authentication OAuth 2.0 relied on before PKCE existed; the
+    // code is still single-use, 10-minute, redirect-bound and
+    // audience-bound. Public clients keep the strict rule: no
+    // challenge, no code. A stored null challenge is verified at
+    // the token endpoint (handlers.ts) — a challenge that WAS
+    // stored must still be satisfied by a matching verifier.
+    const isConfidential = Boolean(client.client_secret_hash);
+    if (!isConfidential) {
+      return {
+        ok: false,
+        error: "invalid_request",
+        errorDescription: "code_challenge is required (PKCE S256).",
+        redirectUri: usableRedirect,
+        clientState,
+      };
+    }
+  } else if (!isS256Method(params.code_challenge_method ?? null)) {
     return {
       ok: false,
       error: "invalid_request",
@@ -222,7 +244,7 @@ export function validateAuthorizeRequest(
       client,
       redirectUri: usableRedirect,
       scopes,
-      codeChallenge: params.code_challenge,
+      codeChallenge: params.code_challenge ?? null,
       clientState,
       resource,
       platform,
@@ -266,7 +288,8 @@ export interface IssueCodeInput {
   userId: string;
   workspaceId: string;
   scopes: OAuthScope[];
-  codeChallenge: string;
+  /** PKCE S256 challenge, or null for a confidential client without PKCE (see validateAuthorizeRequest). */
+  codeChallenge: string | null;
   redirectUri: string;
   /** RFC 8707 resource the code is bound to; null stores a legacy (unbound) code. */
   resource?: string | null;

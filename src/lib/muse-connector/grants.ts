@@ -27,6 +27,7 @@ import {
   CHATGPT_OAUTH_CALLBACK,
   CLAUDE_OAUTH_CALLBACKS,
   MUSE_OAUTH_CALLBACK,
+  isZapierRedirectUri,
 } from "./oauth/clients";
 
 /**
@@ -37,19 +38,24 @@ import {
  *     agent.meta.ai → Muse, claude.ai / claude.com → Claude;
  *   - otherwise the registered redirect URIs decide (ChatGPT
  *     callback → ChatGPT, Muse callback → Muse, Claude callback
- *     → Claude — CLAUDE_OAUTH_CALLBACKS in ./oauth/clients);
+ *     → Claude — CLAUDE_OAUTH_CALLBACKS in ./oauth/clients — and
+ *     a Zapier callback → Zapier: host zapier.com, path
+ *     /dashboard/auth/oauth/return/App<digits>CLIAPI/);
  *   - anything else (e.g. loopback-only clients) is "Other".
  * A client carrying the ChatGPT callback wins over Muse when both
  * are listed (ChatGPT clients register both callbacks in practice
  * only when they serve both platforms; the ChatGPT one is the
- * distinguishing signal).
+ * distinguishing signal). A Zapier callback wins over Muse too:
+ * the Zapier client is pre-registered by DCR with only its Zapier
+ * redirect URI, so the check is unambiguous in practice.
  */
-export type GrantOrigin = "Muse" | "ChatGPT" | "Claude" | "Other";
+export type GrantOrigin = "Muse" | "ChatGPT" | "Claude" | "Zapier" | "Other";
 
 export function grantOriginForClient(
   clientId: string,
   redirectUris: string[] = []
 ): GrantOrigin {
+  if (redirectUris.some((u) => isZapierRedirectUri(u))) return "Zapier";
   if (redirectUris.includes(CHATGPT_OAUTH_CALLBACK)) return "ChatGPT";
   if (redirectUris.some((u) => (CLAUDE_OAUTH_CALLBACKS as readonly string[]).includes(u)))
     return "Claude";
@@ -78,6 +84,7 @@ export interface GrantsByOrigin {
   muse: number;
   chatgpt: number;
   claude: number;
+  zapier: number;
   other: number;
   /** Distinct client + user pairs with a live refresh token, all origins. */
   total: number;
@@ -87,6 +94,7 @@ export const EMPTY_GRANTS_BY_ORIGIN: GrantsByOrigin = {
   muse: 0,
   chatgpt: 0,
   claude: 0,
+  zapier: 0,
   other: 0,
   total: 0,
 };
@@ -129,11 +137,12 @@ export function summarizeGrantsByOrigin(
       // loopback-only client with no stored platform signal),
       // the scope prefix is the fallback — nxtsend.* grants
       // belong to ChatGPT, muse.* grants to Muse, claude.* grants
-      // to Claude.
+      // to Claude, zapier.* grants to Zapier.
       let origin = grantOriginForClient(row.client_id, redirectByClient.get(row.client_id) ?? []);
       if (origin === "Other") {
         if (row.scopes.some((s) => s.startsWith("nxtsend."))) origin = "ChatGPT";
         else if (row.scopes.some((s) => s.startsWith("claude."))) origin = "Claude";
+        else if (row.scopes.some((s) => s.startsWith("zapier."))) origin = "Zapier";
         else if (row.scopes.some((s) => s.startsWith("muse."))) origin = "Muse";
       }
       pairs.set(key, origin);
@@ -144,6 +153,7 @@ export function summarizeGrantsByOrigin(
     if (origin === "Muse") out.muse += 1;
     else if (origin === "ChatGPT") out.chatgpt += 1;
     else if (origin === "Claude") out.claude += 1;
+    else if (origin === "Zapier") out.zapier += 1;
     else out.other += 1;
   });
   out.total = pairs.size;

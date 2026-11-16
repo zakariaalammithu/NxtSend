@@ -7,6 +7,9 @@
  *                    run log via the billing limit helpers.
  *   webhook_retry  — REAL: re-attempts due failed webhook deliveries
  *                    through the same signed dispatch path.
+ *   zapier_webhook_retry — REAL: re-attempts due failed Zapier
+ *                    REST Hook deliveries (migration 025 outbox)
+ *                    and removes subscriptions inactive > 30 days.
  *   follow_up_due  — REAL (Round-2 Stage F): runs the sequence
  *                    executor (src/lib/executor) over due enrollments.
  *                    Email steps go through the email adapter
@@ -84,6 +87,45 @@ const webhookRetry: JobHandler = async (_job, ctx: JobsContext) => {
   };
 };
 
+/**
+ * Zapier REST Hook outbox retries (migration 025). Re-attempts due
+ * failed Zapier deliveries through the same signed attempt path,
+ * then deletes subscriptions inactive for over 30 days. Dead-letter
+ * rows are kept for inspection — they are never deleted here.
+ * Latency honesty: this job runs on the daily 06:00 cron, so a
+ * failed delivery may wait up to ~24h for its next attempt.
+ */
+const zapierWebhookRetry: JobHandler = async (_job, ctx: JobsContext) => {
+  if (!ctx.listDueZapierRetries || !ctx.retryZapierDelivery) {
+    return {
+      status: "skipped",
+      message:
+        "Zapier outbox is not available in this worker context (no Zapier store). Nothing was retried.",
+    };
+  }
+  const due = await ctx.listDueZapierRetries(new Date().toISOString());
+  let delivered = 0;
+  let stillFailing = 0;
+  let dead = 0;
+  for (const delivery of due) {
+    const result = await ctx.retryZapierDelivery(delivery.id);
+    if (result.status === "delivered") delivered++;
+    else if (result.status === "dead") dead++;
+    else stillFailing++;
+  }
+  let cleaned = 0;
+  if (ctx.cleanupStaleZapierSubscriptions) {
+    const cutoff = new Date(
+      Date.now() - 30 * 24 * 60 * 60 * 1000
+    ).toISOString();
+    cleaned = await ctx.cleanupStaleZapierSubscriptions(cutoff);
+  }
+  return {
+    status: "completed",
+    message: `Zapier webhook retries: ${due.length} due — ${delivered} delivered, ${stillFailing} still failing, ${dead} dead. ${cleaned} stale inactive subscription(s) removed.`,
+  };
+};
+
 const followUpDue: JobHandler = async (job, ctx: JobsContext) => {
   const executor = ctx.getSequenceExecutor?.() ?? null;
   if (!executor) {
@@ -113,6 +155,7 @@ export function createJobHandlers(): Record<string, JobHandler> {
   return {
     usage_rollup: usageRollup,
     webhook_retry: webhookRetry,
+    zapier_webhook_retry: zapierWebhookRetry,
     follow_up_due: followUpDue,
   };
 }

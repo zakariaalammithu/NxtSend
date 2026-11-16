@@ -22,6 +22,37 @@ export const MUSE_ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 export const MUSE_REFRESH_TOKEN_TTL_MS = 60 * 24 * 60 * 60 * 1000; // 60 days
 export const MUSE_CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
+/**
+ * Zapier refresh grace window (10 minutes). Zapier may re-present
+ * a refresh token it already rotated (its auto-refresh can race a
+ * retry / re-run the same exchange); without a grace window that
+ * re-presentation would look like token theft and revoke the whole
+ * grant, breaking the Zapier connection on a normal retry. Within
+ * the window, re-presenting an already-rotated Zapier refresh token
+ * rotates AGAIN from the current successor instead of revoking.
+ * This applies ONLY to Zapier grants (zapier.* scope or the Zapier
+ * resource) — Muse/ChatGPT/Claude keep strict reuse-revokes-grant.
+ * Tradeoff, stated plainly: inside the window a stolen Zapier
+ * refresh token could also be exchanged once more instead of
+ * triggering revocation. The window is short, the token is still
+ * single-use per rotation step, and the grant is revoked on any
+ * reuse outside the window — accepted because the alternative
+ * (Zapier connections dying on routine retries) breaks the
+ * integration in normal use.
+ */
+export const ZAPIER_REFRESH_GRACE_MS = 10 * 60 * 1000;
+
+/** True when a grant belongs to Zapier (scope prefix or resource path). */
+export function isZapierGrant(scopes: string[], resource: string | null | undefined): boolean {
+  if (scopes.some((s) => s.startsWith("zapier."))) return true;
+  if (!resource) return false;
+  try {
+    return new URL(resource).pathname.replace(/\/+$/, "") === "/api/integrations/zapier";
+  } catch {
+    return false;
+  }
+}
+
 /** SHA-256 hex of a token/code value — the only form ever stored. */
 export function hashToken(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
@@ -174,6 +205,12 @@ export type MuseTokenErrorCode = "invalid_grant" | "invalid_client" | "invalid_r
 export interface RotateRefreshDeps {
   store: MuseOAuthStore;
   now?: Date;
+  /**
+   * Grace window (ms) for re-presented Zapier refresh tokens.
+   * Defaults to ZAPIER_REFRESH_GRACE_MS. Pass 0 to disable the
+   * grace (strict reuse-revokes-grant for every platform).
+   */
+  zapierGraceMs?: number;
 }
 
 export type RotateRefreshResult =
@@ -188,13 +225,18 @@ export type RotateRefreshResult =
  * Reuse detection: presenting an already-revoked refresh token that
  * HAS a rotation successor means the token was already used once —
  * the grant is compromised, so the whole grant (all tokens for that
- * client + user) is revoked and the exchange is refused.
+ * client + user) is revoked and the exchange is refused. EXCEPTION:
+ * Zapier grants (see ZAPIER_REFRESH_GRACE_MS) — a re-presentation
+ * within the grace window rotates again from the successor instead
+ * of revoking, because Zapier re-presents rotated refresh tokens
+ * during routine retries.
  */
 export async function rotateRefreshToken(
   refreshToken: string,
   deps: RotateRefreshDeps
 ): Promise<RotateRefreshResult> {
   const now = deps.now ?? new Date();
+  const graceMs = deps.zapierGraceMs ?? ZAPIER_REFRESH_GRACE_MS;
   const hash = hashToken(refreshToken);
   const row = await deps.store.getToken(hash);
   if (!row || row.kind !== "refresh") {
@@ -203,7 +245,32 @@ export async function rotateRefreshToken(
   if (row.revoked_at) {
     const successor = await deps.store.getTokenRotatedFrom(hash);
     if (successor) {
-      // Reuse of an already-rotated refresh token: revoke the grant.
+      // Zapier grace: a recently-rotated Zapier refresh token
+      // re-presented within the window rotates again from the
+      // live successor instead of revoking the grant.
+      const revokedAtMs = new Date(row.revoked_at).getTime();
+      const successorLive =
+        !successor.revoked_at &&
+        new Date(successor.expires_at).getTime() > now.getTime();
+      if (
+        graceMs > 0 &&
+        successorLive &&
+        isZapierGrant(row.scopes, row.resource) &&
+        now.getTime() - revokedAtMs <= graceMs
+      ) {
+        const grant: MuseGrant = {
+          clientId: successor.client_id,
+          userId: successor.user_id,
+          workspaceId: successor.workspace_id,
+          scopes: successor.scopes,
+          resource: successor.resource,
+        };
+        await deps.store.revokeToken(successor.token_hash, now.toISOString());
+        const tokens = await issueMuseTokens(deps.store, grant, now);
+        await deps.store.setRotatedFrom(hashToken(tokens.refresh_token), successor.token_hash);
+        return { ok: true, tokens, grant };
+      }
+      // Genuine reuse (or an expired grace window): revoke the grant.
       await deps.store.revokeGrant(row.client_id, row.user_id, now.toISOString());
       return {
         ok: false,

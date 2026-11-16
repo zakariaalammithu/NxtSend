@@ -6,11 +6,12 @@ import {
   createConversationRoutingAdapter,
   type EmailProviderAdapter,
 } from "@/lib/email";
+import { sendInboxReply, type ReplyFailureCode, type ReplyVoiceNote } from "@/lib/inbox/reply";
+import { emitZapierEvent } from "@/lib/integrations/zapier/emit";
 import {
-  sendInboxReply,
-  type ReplyFailureCode,
-  type ReplyVoiceNote,
-} from "@/lib/inbox/reply";
+  createSupabaseZapierStore,
+  getDemoZapierStore,
+} from "@/lib/integrations/zapier/outbox";
 import {
   audioDataUrl,
   buildVoiceAttachment,
@@ -148,6 +149,22 @@ export async function POST(
       idempotencyKey:
         typeof body.idempotencyKey === "string" ? body.idempotencyKey : "",
       voiceNote,
+      // Zapier `conversation.reply_created`: emitted server-side
+      // after a terminal sent/simulated outcome (never on failure
+      // or duplicate replay). Best-effort — emission never breaks
+      // the reply.
+      onTerminalSent: async (message) => {
+        const admin = createAdminClient();
+        const store = admin
+          ? createSupabaseZapierStore(admin)
+          : getDemoZapierStore();
+        await emitZapierEvent({ store }, "conversation.reply_created", ctx.workspaceId, {
+          source: "dashboard",
+          conversationId: params.id,
+          messageId: message.id,
+          duplicate: false,
+        });
+      },
     }
   );
 

@@ -219,6 +219,24 @@ describe("grantOriginForClient", () => {
     expect(grantOriginForClient("https://claude.com/some-client", [])).toBe("Claude");
     expect(grantOriginForClient("https://example.com/some-client", [])).toBe("Other");
   });
+
+  it("classifies a Zapier client by its registered redirect URI (pattern, not a hardcoded App ID)", () => {
+    expect(
+      grantOriginForClient("zapier-client-a", [
+        "https://zapier.com/dashboard/auth/oauth/return/App1234567CLIAPI/",
+      ])
+    ).toBe("Zapier");
+    // Trailing-slash-tolerant, like the server's pattern check.
+    expect(
+      grantOriginForClient("zapier-client-b", [
+        "https://zapier.com/dashboard/auth/oauth/return/App9876543CLIAPI",
+      ])
+    ).toBe("Zapier");
+    // A non-Zapier zapier.com path is not a Zapier redirect.
+    expect(
+      grantOriginForClient("zapier-client-c", ["https://zapier.com/dashboard/"])
+    ).toBe("Other");
+  });
 });
 
 describe("summarizeGrantsByOrigin", () => {
@@ -265,7 +283,7 @@ describe("summarizeGrantsByOrigin", () => {
       clients,
       NOW
     );
-    expect(out).toEqual({ muse: 2, chatgpt: 2, claude: 0, other: 0, total: 4 });
+    expect(out).toEqual({ muse: 2, chatgpt: 2, claude: 0, zapier: 0, other: 0, total: 4 });
   });
 
   it("splits Claude grants by origin, including the claude.* scope fallback", () => {
@@ -295,7 +313,7 @@ describe("summarizeGrantsByOrigin", () => {
       clients,
       NOW
     );
-    expect(out).toEqual({ muse: 0, chatgpt: 0, claude: 3, other: 0, total: 3 });
+    expect(out).toEqual({ muse: 0, chatgpt: 0, claude: 3, zapier: 0, other: 0, total: 3 });
   });
 
   it("ignores expired, revoked and access tokens, and falls back to scope prefix for loopback-only clients", () => {
@@ -311,6 +329,37 @@ describe("summarizeGrantsByOrigin", () => {
       CLIENTS,
       NOW
     );
-    expect(out).toEqual({ muse: 1, chatgpt: 1, claude: 0, other: 0, total: 2 });
+    expect(out).toEqual({ muse: 1, chatgpt: 1, claude: 0, zapier: 0, other: 0, total: 2 });
+  });
+
+  it("splits Zapier grants by origin, including the zapier.* scope fallback", () => {
+    const clients: MuseOAuthClientRow[] = [
+      ...CLIENTS,
+      {
+        id: "c5",
+        client_id: "zapier-client-a",
+        client_secret_hash: "hash",
+        name: "Zapier",
+        redirect_uris: ["https://zapier.com/dashboard/auth/oauth/return/App1234567CLIAPI/"],
+        created_at: "2026-11-17T00:00:00Z",
+      },
+    ];
+    const out = summarizeGrantsByOrigin(
+      [
+        countRow({ client_id: "zapier-client-a", user_id: "user-1", scopes: ["zapier.read"] }),
+        countRow({
+          client_id: "zapier-client-a",
+          user_id: "user-2",
+          scopes: ["zapier.read", "zapier.write"],
+        }),
+        // Loopback-only client (CLIENTS[1]): origin unknown, scope prefix decides.
+        countRow({ client_id: "muse-client-b", user_id: "user-6", scopes: ["zapier.write"] }),
+        // Same client+user twice = one grant, not two.
+        countRow({ client_id: "zapier-client-a", user_id: "user-1", scopes: ["zapier.read"] }),
+      ],
+      clients,
+      NOW
+    );
+    expect(out).toEqual({ muse: 0, chatgpt: 0, claude: 0, zapier: 3, other: 0, total: 3 });
   });
 });

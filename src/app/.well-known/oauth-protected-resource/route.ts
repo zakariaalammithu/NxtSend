@@ -13,11 +13,12 @@ export const runtime = "nodejs";
  * GET /.well-known/oauth-protected-resource — RFC 9728 OAuth
  * Protected Resource Metadata (root document).
  *
- * The resource this document describes is the MCP resource the
- * request is about: pass `?resource=<MCP resource URL>` and, when
- * it names one of the three canonical MCP resources, that resource
- * is returned; otherwise the canonical Muse MCP resource
- * (`<origin>/api/mcp`) is returned. The path-scoped variant at
+ * The resource this document describes is the resource the
+ * request is about: pass `?resource=<resource URL>` and, when
+ * it names one of the canonical resources (the three MCP servers
+ * or the Zapier REST API), that resource is returned; otherwise
+ * the canonical Muse MCP resource (`<origin>/api/mcp`) is
+ * returned. The path-scoped variant at
  * /.well-known/oauth-protected-resource/api/mcp describes the Muse
  * resource specifically and keeps working unchanged.
  */

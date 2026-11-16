@@ -29,7 +29,8 @@ export interface MuseAuthorizeStateClaims {
   clientId: string;
   redirectUri: string;
   scopes: OAuthScope[];
-  codeChallenge: string;
+  /** PKCE S256 challenge, or null for a confidential client without PKCE (Zapier). */
+  codeChallenge: string | null;
   /** The OAuth client's own opaque `state` value, echoed back on redirect. */
   clientState: string | null;
   userId: string;
@@ -37,7 +38,7 @@ export interface MuseAuthorizeStateClaims {
   /** RFC 8707 resource the grant is bound to (full MCP resource URL). */
   resource?: string;
   /** Which platform the client is (consent-screen wording). */
-  platform?: "muse" | "chatgpt" | "claude";
+  platform?: "muse" | "chatgpt" | "claude" | "zapier";
   /** Origin of a CIMD client_id URL, else null. */
   clientOrigin?: string | null;
 }
@@ -118,13 +119,14 @@ export function verifyMuseAuthorizeState(
   if (parsed.workspaceId !== expected.workspaceId) return null;
   if (typeof parsed.exp !== "number" || parsed.exp <= now.getTime()) return null;
   if (typeof parsed.iat !== "number" || parsed.iat > now.getTime() + 60_000) return null;
-  if (!parsed.clientId || !parsed.redirectUri || !parsed.codeChallenge) return null;
+  if (!parsed.clientId || !parsed.redirectUri) return null;
+  if (parsed.codeChallenge !== null && typeof parsed.codeChallenge !== "string") return null;
   if (!Array.isArray(parsed.scopes)) return null;
   return {
     clientId: parsed.clientId,
     redirectUri: parsed.redirectUri,
     scopes: parsed.scopes,
-    codeChallenge: parsed.codeChallenge,
+    codeChallenge: parsed.codeChallenge ?? null,
     clientState: parsed.clientState ?? null,
     userId: parsed.userId,
     workspaceId: parsed.workspaceId,
@@ -140,7 +142,9 @@ export function verifyMuseAuthorizeState(
         ? "chatgpt"
         : parsed.platform === "claude"
           ? "claude"
-          : "muse",
+          : parsed.platform === "zapier"
+            ? "zapier"
+            : "muse",
     clientOrigin: parsed.clientOrigin ?? null,
   };
 }

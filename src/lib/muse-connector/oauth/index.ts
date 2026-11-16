@@ -11,10 +11,12 @@ export {
   MUSE_SCOPES,
   NXT_SEND_SCOPES,
   CLAUDE_SCOPES,
+  ZAPIER_SCOPES,
   ALL_OAUTH_SCOPES,
   MUSE_SCOPE_DESCRIPTIONS,
   NXT_SEND_SCOPE_DESCRIPTIONS,
   CLAUDE_SCOPE_DESCRIPTIONS,
+  ZAPIER_SCOPE_DESCRIPTIONS,
   SCOPE_DESCRIPTIONS,
   SCOPE_TIER_MAP,
   parseMuseScopes,
@@ -24,7 +26,7 @@ export {
   scopeDescription,
   defaultScopeForPlatform,
 } from "./scopes";
-export type { MuseScope, NxtSendScope, ClaudeScope, OAuthScope, ScopeTier } from "./scopes";
+export type { MuseScope, NxtSendScope, ClaudeScope, ZapierScope, OAuthScope, ScopeTier } from "./scopes";
 export { computeCodeChallenge, verifyCodeChallenge, isS256Method } from "./pkce";
 export {
   hashToken,
@@ -32,6 +34,8 @@ export {
   verifyMuseAccessToken,
   rotateRefreshToken,
   revokeMuseToken,
+  isZapierGrant,
+  ZAPIER_REFRESH_GRACE_MS,
   MUSE_ACCESS_TOKEN_TTL_MS,
   MUSE_REFRESH_TOKEN_TTL_MS,
   MUSE_CODE_TTL_MS,
@@ -48,9 +52,11 @@ export {
   CLAUDE_OAUTH_CALLBACK,
   CLAUDE_COM_OAUTH_CALLBACK,
   CLAUDE_OAUTH_CALLBACKS,
+  ZAPIER_REDIRECT_PATH_PATTERN,
   MUSE_MAX_CLIENTS,
   isAllowedMuseRedirectUri,
   isAllowedClaudeRedirectUri,
+  isZapierRedirectUri,
   isAllowedOAuthRedirectUri,
   isAllowedRedirectUriForPlatform,
   isLoopbackRedirectUri,
@@ -87,7 +93,7 @@ export { resolveMuseContext } from "./context";
 export type { ResolveMuseContextDeps } from "./context";
 export { recordMuseOAuthEvent } from "./audit";
 export type { MuseOAuthAuditAction } from "./audit";
-export { isMuseMcpEnabled, isChatGptMcpEnabled, isClaudeMcpEnabled, getMusePublicUrl, getChatGptPublicUrl, getClaudePublicUrl, getOAuthIssuer, getMcpResourceUrl, canonicalMcpResources, resourcePlatform, DEFAULT_OAUTH_ORIGIN, MCP_RESOURCE_PATHS } from "./config";
+export { isMuseMcpEnabled, isChatGptMcpEnabled, isClaudeMcpEnabled, getMusePublicUrl, getChatGptPublicUrl, getClaudePublicUrl, getOAuthIssuer, getMcpResourceUrl, getZapierResourceUrl, canonicalMcpResources, resourcePlatform, DEFAULT_OAUTH_ORIGIN, MCP_RESOURCE_PATHS } from "./config";
 export type { McpPlatform } from "./config";
 export {
   handleMuseTokenRequest,

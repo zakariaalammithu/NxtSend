@@ -316,6 +316,13 @@ export interface Lead {
   tags: string[];
   custom_fields: Record<string, unknown>;
   created_at: string;
+  /**
+   * Last update time. Set by the database trigger (migration 027)
+   * in live mode and by the repositories in demo mode; backfilled
+   * from created_at for older rows. Absent on rows written before
+   * the column existed and not yet re-read.
+   */
+  updated_at?: string;
 }
 
 export type EnrollmentStatus =

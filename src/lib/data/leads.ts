@@ -164,6 +164,7 @@ class DemoLeadsRepository implements LeadsRepository {
       custom_fields: {},
       created_at: new Date().toISOString(),
     };
+    lead.updated_at = lead.created_at;
     const leads = this.load();
     leads.unshift(lead);
     this.save(leads);
@@ -174,7 +175,12 @@ class DemoLeadsRepository implements LeadsRepository {
     const leads = this.load();
     const idx = leads.findIndex((l) => l.id === id);
     if (idx < 0) throw new Error(`Lead not found: ${id}`);
-    const updated = { ...leads[idx], ...patch, id: leads[idx].id };
+    const updated = {
+      ...leads[idx],
+      ...patch,
+      id: leads[idx].id,
+      updated_at: new Date().toISOString(),
+    };
     leads[idx] = updated;
     this.save(leads);
     return updated;
@@ -193,6 +199,7 @@ class DemoLeadsRepository implements LeadsRepository {
     const created: Lead[] = [];
     const leads = this.load();
     for (const input of inputs) {
+      const now = new Date().toISOString();
       const lead: Lead = {
         id: `lead_demo_${generateId()}`,
         workspace_id: workspaceId,
@@ -205,7 +212,8 @@ class DemoLeadsRepository implements LeadsRepository {
         status: "new",
         tags: [...input.tags],
         custom_fields: {},
-        created_at: new Date().toISOString(),
+        created_at: now,
+        updated_at: now,
       };
       leads.unshift(lead);
       created.push(lead);
@@ -305,6 +313,11 @@ function rowToLead(row: LeadRow): Lead {
         ? (row.custom_fields as Record<string, unknown>)
         : {},
     created_at: String(row.created_at ?? new Date().toISOString()),
+    // updated_at comes from the migration 027 trigger in live mode
+    // (backfilled from created_at); rows predating the column lack it.
+    ...(typeof row.updated_at === "string" && row.updated_at
+      ? { updated_at: row.updated_at }
+      : {}),
   };
 }
 
@@ -361,6 +374,9 @@ class SupabaseLeadsRepository implements LeadsRepository {
     delete safePatch.id;
     delete safePatch.workspace_id;
     delete safePatch.created_at;
+    // updated_at is maintained by the migration 027 trigger — never
+    // trust a caller-supplied value for it.
+    delete safePatch.updated_at;
     const { data, error } = await this.client()
       .from("leads")
       .update(safePatch)

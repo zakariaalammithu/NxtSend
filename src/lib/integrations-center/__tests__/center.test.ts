@@ -370,6 +370,103 @@ describe("getIntegrationStatuses", () => {
     expect(entry?.setupSteps.join(" ")).toContain("Advanced-settings");
   });
 
+  it("zapier: same grant-only rule as the MCP entries, on the Zapier REST surface (ZAPIER_* vars, zapier.* grants)", () => {
+    // Demo Mode refuses the surface outright.
+    expect(
+      statusOf(getIntegrationStatuses({ env: {}, mode: "demo" }), "zapier")
+    ).toBe("Demo Mode");
+    // No public URL anywhere: enabled by default, but unreachable.
+    expect(
+      statusOf(getIntegrationStatuses({ env: {}, mode: "supabase" }), "zapier")
+    ).toBe("Configuration Required");
+    // Disabled outright.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { ZAPIER_ENABLED: "false", ZAPIER_APP_BASE_URL: "https://example.com" },
+          mode: "supabase",
+        }),
+        "zapier"
+      )
+    ).toBe("Not Connected");
+    // Enabled + public URL, but no Zapier grant: configured, not connected.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { ZAPIER_APP_BASE_URL: "https://example.com" },
+          mode: "supabase",
+        }),
+        "zapier"
+      )
+    ).toBe("Connected but Not Verified");
+    // A Muse grant does NOT connect the Zapier entry.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { ZAPIER_APP_BASE_URL: "https://example.com" },
+          mode: "supabase",
+          museGrantsActive: 1,
+          zapierGrantsActive: 0,
+        }),
+        "zapier"
+      )
+    ).toBe("Connected but Not Verified");
+    // A ChatGPT grant does NOT connect the Zapier entry either.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { ZAPIER_APP_BASE_URL: "https://example.com" },
+          mode: "supabase",
+          chatgptGrantsActive: 1,
+          zapierGrantsActive: 0,
+        }),
+        "zapier"
+      )
+    ).toBe("Connected but Not Verified");
+    // A real active Zapier grant is the ONLY thing that yields Connected.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { ZAPIER_APP_BASE_URL: "https://example.com" },
+          mode: "supabase",
+          museGrantsActive: 0,
+          chatgptGrantsActive: 0,
+          claudeGrantsActive: 0,
+          zapierGrantsActive: 1,
+        }),
+        "zapier"
+      )
+    ).toBe("Connected and Verified");
+    // Unknown grant count (migration 023 not applied) never invents a grant.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { ZAPIER_APP_BASE_URL: "https://example.com" },
+          mode: "supabase",
+          zapierGrantsActive: null,
+        }),
+        "zapier"
+      )
+    ).toBe("Connected but Not Verified");
+  });
+
+  it("zapier registry entry: adapter kind, Zapier env vars, no claimed publication", () => {
+    const entry = INTEGRATION_REGISTRY.find((d) => d.id === "zapier");
+    expect(entry).toBeDefined();
+    expect(entry?.kind).toBe("adapter");
+    expect(entry?.category).toBe("Automation");
+    expect(entry?.envVars.map((v) => v.name)).toContain("ZAPIER_ENABLED");
+    expect(entry?.envVars.map((v) => v.name)).toContain("ZAPIER_APP_BASE_URL");
+    expect(entry?.envVars.map((v) => v.name)).toContain("TOKEN_ENCRYPTION_KEY");
+    expect(entry?.envVars.map((v) => v.name)).not.toContain("ZAPIER_OAUTH_CLIENT_SECRET");
+    expect(entry?.verifySupported).toBe(false);
+    expect(entry?.notImplementedNote).toContain("Not published on Zapier");
+    expect(entry?.description).toContain("/api/integrations/zapier/v1");
+    expect(entry?.description).toContain("zapier.read");
+    expect(entry?.description).toContain("no zapier.send");
+    expect(entry?.troubleshooting.join(" ")).toContain("up to ~24h");
+  });
+
   it("grants UI scope descriptions: every issued scope has a plain-words description (muse.* and nxtsend.*)", async () => {
     const { SCOPE_DESCRIPTIONS, ALL_OAUTH_SCOPES } = await import(
       "../../muse-connector/oauth/scopes"
@@ -467,6 +564,19 @@ describe("verifyIntegration — demo mode", () => {
     expect(out?.attempted).toBe(true);
     expect(out?.message).toContain("NOT actually called");
   });
+
+  it("zapier in demo mode: honest Demo Mode result, no grant can be issued or verified", async () => {
+    const fetchSpy = fakeFetch(200);
+    const out = await verifyIntegration("zapier", {
+      env: {},
+      mode: "demo",
+      fetchFn: fetchSpy as unknown as typeof fetch,
+    });
+    expect(out?.status).toBe("Demo Mode");
+    expect(out?.attempted).toBe(false);
+    expect(out?.message).toContain("503");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe("verifyIntegration — configuration guards (no outbound call without config)", () => {
@@ -527,6 +637,29 @@ describe("verifyIntegration — configuration guards (no outbound call without c
     });
     expect(out?.status).toBe("Not Connected");
     expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it("zapier: configuration alone never verifies — only a real grant does", async () => {
+    const fetchSpy = fakeFetch(200);
+    // Configured (enabled + public URL) but no grant: never Verified, nothing called.
+    const configured = await verifyIntegration("zapier", {
+      env: { ZAPIER_APP_BASE_URL: "https://example.com" },
+      mode: "supabase",
+      fetchFn: fetchSpy as unknown as typeof fetch,
+    });
+    expect(configured?.status).toBe("Connected but Not Verified");
+    expect(configured?.attempted).toBe(false);
+    expect(configured?.message).toContain("real Zapier OAuth grant");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    // Disabled outright.
+    const disabled = await verifyIntegration("zapier", {
+      env: { ZAPIER_ENABLED: "false" },
+      mode: "supabase",
+      fetchFn: fetchSpy as unknown as typeof fetch,
+    });
+    expect(disabled?.status).toBe("Not Connected");
+    expect(disabled?.attempted).toBe(false);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
 

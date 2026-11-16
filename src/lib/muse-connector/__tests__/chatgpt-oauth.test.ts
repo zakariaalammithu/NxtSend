@@ -123,6 +123,8 @@ describe("platform-neutral scopes", () => {
       "claude.read",
       "claude.write",
       "claude.send",
+      "zapier.read",
+      "zapier.write",
     ]);
   });
 

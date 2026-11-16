@@ -47,6 +47,7 @@ import {
   isClaudeMcpEnabled,
   getClaudePublicUrl,
 } from "@/lib/muse-connector/oauth/config";
+import { isZapierEnabled, getZapierBaseUrl } from "@/lib/integrations/zapier/config";
 import type { CenterStatus, VerifyOutcome } from "./types";
 
 export interface VerifyDeps {
@@ -178,6 +179,15 @@ export async function verifyIntegration(
         false,
         false,
         "Demo Mode: the Claude OAuth + MCP surface is unavailable in Demo Mode — no grant can be issued or verified here. Configure Supabase, then check again in live mode."
+      );
+    }
+    if (id === "zapier") {
+      return outcome(
+        id,
+        "Demo Mode",
+        false,
+        false,
+        "Demo Mode: the Zapier REST API + webhook surface is unavailable in Demo Mode — no grant can be issued or verified here (Zapier calls receive 503). Configure Supabase, then check again in live mode."
       );
     }
     return outcome(
@@ -508,6 +518,27 @@ export async function verifyIntegration(
         claudeEnabled
           ? "Claude MCP surface is not fully configured: no public URL is set (CLAUDE_MCP_PUBLIC_URL, MUSE_MCP_PUBLIC_URL or NEXT_PUBLIC_APP_URL). Set one, redeploy, and check the grants panel on this page."
           : "Claude MCP surface is disabled (CLAUDE_MCP_ENABLED — or MUSE_MCP_ENABLED as its fallback — is false). The OAuth + MCP routes stay available, but Claude cannot reach the connector.");
+    }
+
+    case "zapier": {
+      // No safe read-only verification call exists for a connector:
+      // proving it works needs a real Zapier OAuth grant (see the
+      // grants panel on the detail page). Configuration alone never
+      // counts as verified, and no outbound call is made here.
+      // (The public health endpoint GET /api/integrations/zapier/
+      // health only reports mode/enabled/version — it proves the
+      // route answers, not that Zapier is connected — so it is
+      // shown in the live panel below, not used as a verification.)
+      const zapierEnabled = isZapierEnabled(env);
+      const zapierBaseUrl = getZapierBaseUrl(undefined, env);
+      if (zapierEnabled && zapierBaseUrl) {
+        return outcome(id, "Connected but Not Verified", false, false,
+          "Zapier REST surface is configured (ZAPIER_ENABLED + public URL are set), but Test Connection cannot prove the connector works — that needs a real Zapier OAuth grant, listed in the grants panel on this page. Configuration alone never counts as verified.");
+      }
+      return outcome(id, zapierEnabled ? "Configuration Required" : "Not Connected", false, false,
+        zapierEnabled
+          ? "Zapier REST surface is not fully configured: no public URL is set (ZAPIER_APP_BASE_URL or NEXT_PUBLIC_APP_URL). Set one, redeploy, and check the grants panel on this page."
+          : "Zapier REST surface is disabled (ZAPIER_ENABLED is false). The OAuth routes stay available, but Zapier cannot call the REST API.");
     }
 
     case "google-sheets":

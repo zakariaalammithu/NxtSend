@@ -15,6 +15,10 @@ import {
   getWorkspaceWebhookConfig,
 } from "@/lib/webhooks/store";
 import { runDeliveryAttempt } from "@/lib/webhooks/dispatch";
+import {
+  attemptZapierDelivery,
+  createSupabaseZapierStore,
+} from "@/lib/integrations/zapier/outbox";
 import { resolveWorkspaceEntitlement } from "@/lib/billing/entitlement";
 import { SupabaseExecutorStore } from "@/lib/executor/supabase-store";
 import { createCampaignRoutingAdapter } from "@/lib/email";
@@ -97,6 +101,33 @@ export function createSupabaseJobsContext(admin: SupabaseClient): JobsContext {
         { ...delivery, target_url: config.url }
       );
       return { status: updated.status };
+    },
+    // ── Zapier REST Hook outbox (migration 025) ──────────────────
+    async listDueZapierRetries(nowIso) {
+      const zapierStore = createSupabaseZapierStore(admin);
+      const due = await zapierStore.listDueDeliveries(nowIso);
+      return due.map((d) => ({
+        id: d.id,
+        workspace_id: d.workspace_id,
+        status: d.status,
+        attempts: d.attempts,
+        max_attempts: d.max_attempts,
+      }));
+    },
+    async retryZapierDelivery(deliveryId) {
+      const zapierStore = createSupabaseZapierStore(admin);
+      const delivery = await zapierStore.getDelivery(deliveryId);
+      if (!delivery) return { status: "missing" };
+      const result = await attemptZapierDelivery({ store: zapierStore }, delivery);
+      return { status: result.status };
+    },
+    async cleanupStaleZapierSubscriptions(olderThanIso) {
+      const zapierStore = createSupabaseZapierStore(admin);
+      const stale = await zapierStore.listStaleInactive(olderThanIso);
+      for (const sub of stale) {
+        await zapierStore.deleteSubscription(sub.id);
+      }
+      return stale.length;
     },
     getSequenceExecutor() {
       // Live worker: the executor runs against the same service-role

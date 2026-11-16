@@ -8,7 +8,7 @@
  * a repeated cron tick can never double-execute a logical job.
  */
 
-export const JOB_TYPES = ["follow_up_due", "webhook_retry", "usage_rollup"] as const;
+export const JOB_TYPES = ["follow_up_due", "webhook_retry", "zapier_webhook_retry", "usage_rollup"] as const;
 export type JobType = (typeof JOB_TYPES)[number];
 
 export type JobStatus = "pending" | "running" | "completed" | "failed" | "skipped";
@@ -88,6 +88,27 @@ export interface JobsContext {
   retryWebhookDelivery(deliveryId: string): Promise<
     { status: string } | { status: "no_config" }
   >;
+  /**
+   * Zapier REST Hook outbox (migration 025). Optional: contexts
+   * that cannot reach the Zapier tables omit these and the
+   * `zapier_webhook_retry` handler records an honest "skipped"
+   * outcome. The daily cron that runs this job is the retry tick
+   * for failed Zapier deliveries, so a failed delivery may wait
+   * up to ~24h for its next attempt — the immediate attempt at
+   * enqueue time is best-effort, not a guarantee.
+   */
+  listDueZapierRetries?(nowIso: string): Promise<
+    Array<{
+      id: string;
+      workspace_id: string;
+      status: string;
+      attempts: number;
+      max_attempts: number;
+    }>
+  >;
+  retryZapierDelivery?(deliveryId: string): Promise<{ status: string }>;
+  /** Deletes subscriptions inactive longer than `olderThanIso`; returns how many were removed. */
+  cleanupStaleZapierSubscriptions?(olderThanIso: string): Promise<number>;
   /**
    * Sequence-executor capability for the follow_up_due handler
    * (Round-2 Stage F). Optional: contexts that cannot execute

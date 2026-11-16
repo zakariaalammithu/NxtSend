@@ -14,7 +14,9 @@
  * https://agent.meta.ai/api/hatch/oauth/callback, the ChatGPT
  * callback https://chatgpt.com/connector_platform_oauth_redirect,
  * the Claude callbacks https://claude.ai/api/mcp/auth_callback and
- * https://claude.com/api/mcp/auth_callback, or a loopback
+ * https://claude.com/api/mcp/auth_callback, any Zapier callback
+ * matching https://zapier.com/dashboard/auth/oauth/return/App<digits>CLIAPI/
+ * (pattern — the App ID is assigned at Zapier registration), or a loopback
  * http://localhost:* / http://127.0.0.1:* URI (local testing,
  * incl. Claude Code's ephemeral loopback port). Anything else is
  * refused — an open-redirect via a registered client is not
@@ -49,7 +51,40 @@ export const CLAUDE_COM_OAUTH_CALLBACK = "https://claude.com/api/mcp/auth_callba
 /** Both Claude callback URIs. */
 export const CLAUDE_OAUTH_CALLBACKS = [CLAUDE_OAUTH_CALLBACK, CLAUDE_COM_OAUTH_CALLBACK] as const;
 
-export type OAuthClientPlatform = "muse" | "chatgpt" | "claude";
+/**
+ * Zapier OAuth redirect URIs are NOT a fixed URL: Zapier shows one
+ * per app in the developer dashboard, of the form
+ * `https://zapier.com/dashboard/auth/oauth/return/AppXXXXXCLIAPI/`
+ * where `AppXXXXX` is the App ID assigned at registration. The App
+ * ID — and therefore the URL — may change after publish/beta, so
+ * the allowlist is a PATTERN, not a constant: host must be exactly
+ * `zapier.com`, path must be
+ * `/dashboard/auth/oauth/return/App<digits>CLIAPI/` (trailing slash
+ * tolerated). Verified against Zapier community snippets and the
+ * platform docs' REST-hook URL shape (hook targets live on
+ * `hooks.zapier.com`; the OAuth return URL is on `zapier.com`).
+ * The exact URL is copied from the Zapier app after registration
+ * and registered for the client via DCR — see
+ * docs/zapier-integration/ZAPIER_SERVER.md.
+ */
+export const ZAPIER_REDIRECT_PATH_PATTERN =
+  /^\/dashboard\/auth\/oauth\/return\/App\d+CLIAPI\/?$/;
+
+/** True when a URI is a Zapier OAuth redirect URI (see above). */
+export function isZapierRedirectUri(uri: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(uri);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "https:") return false;
+  if (parsed.hostname !== "zapier.com") return false;
+  if (parsed.search || parsed.hash) return false;
+  return ZAPIER_REDIRECT_PATH_PATTERN.test(parsed.pathname);
+}
+
+export type OAuthClientPlatform = "muse" | "chatgpt" | "claude" | "zapier";
 
 /**
  * Which platform a client belongs to, from its registered /
@@ -65,6 +100,9 @@ export type OAuthClientPlatform = "muse" | "chatgpt" | "claude";
  * validateRedirectUriForPlatform).
  */
 export function clientPlatform(client: Pick<MuseOAuthClientRow, "redirect_uris">): OAuthClientPlatform {
+  if (client.redirect_uris.some((uri) => isZapierRedirectUri(uri))) {
+    return "zapier";
+  }
   if (client.redirect_uris.some((uri) => (CLAUDE_OAUTH_CALLBACKS as readonly string[]).includes(uri))) {
     return "claude";
   }
@@ -75,6 +113,7 @@ export function clientPlatform(client: Pick<MuseOAuthClientRow, "redirect_uris">
 export function platformLabel(platform: OAuthClientPlatform): string {
   if (platform === "chatgpt") return "ChatGPT";
   if (platform === "claude") return "Claude";
+  if (platform === "zapier") return "Zapier";
   return "Muse";
 }
 
@@ -107,6 +146,7 @@ export function isAllowedOAuthRedirectUri(uri: string): boolean {
     uri === MUSE_OAUTH_CALLBACK ||
     uri === CHATGPT_OAUTH_CALLBACK ||
     (CLAUDE_OAUTH_CALLBACKS as readonly string[]).includes(uri) ||
+    isZapierRedirectUri(uri) ||
     isLoopbackRedirectUri(uri)
   );
 }
@@ -142,6 +182,9 @@ export function isAllowedRedirectUriForPlatform(
   uri: string,
   platform: OAuthClientPlatform
 ): boolean {
+  if (platform === "zapier") {
+    return isZapierRedirectUri(uri) || isLoopbackRedirectUri(uri);
+  }
   if (platform === "claude") return isAllowedClaudeRedirectUri(uri);
   if (platform === "chatgpt") {
     return uri === CHATGPT_OAUTH_CALLBACK || isLoopbackRedirectUri(uri);
@@ -253,7 +296,7 @@ function validateRegistrationMetadata(input: RegisterMuseClientInput): {
       return {
         ok: false,
         detail:
-          "Every redirect_uri must be the Muse callback (https://agent.meta.ai/api/hatch/oauth/callback), the ChatGPT callback (https://chatgpt.com/connector_platform_oauth_redirect), a Claude callback (https://claude.ai/api/mcp/auth_callback or https://claude.com/api/mcp/auth_callback), or a loopback http://localhost:* / http://127.0.0.1:* URI.",
+          "Every redirect_uri must be the Muse callback (https://agent.meta.ai/api/hatch/oauth/callback), the ChatGPT callback (https://chatgpt.com/connector_platform_oauth_redirect), a Claude callback (https://claude.ai/api/mcp/auth_callback or https://claude.com/api/mcp/auth_callback), a Zapier callback (https://zapier.com/dashboard/auth/oauth/return/App<digits>CLIAPI/), or a loopback http://localhost:* / http://127.0.0.1:* URI.",
       };
     }
     if (!redirectUris.includes(uri)) redirectUris.push(uri);

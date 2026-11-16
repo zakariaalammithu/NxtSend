@@ -29,6 +29,15 @@ yarn-error.log*
 .env
 .env*.local
 
+# Zapier Platform CLI app (integrations/zapier/) — generated / local-only.
+# The app itself IS committed; its dependencies, build output and the
+# register credential file are not. .zapierapprc is written by
+# `zapier-platform register` and holds the app's deploy identity —
+# never commit it.
+integrations/zapier/node_modules/
+integrations/zapier/build/
+integrations/zapier/.zapierapprc
+
 # vercel
 .vercel
 

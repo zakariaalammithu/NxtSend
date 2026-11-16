@@ -28,7 +28,13 @@ export interface MuseOAuthCodeRow {
   user_id: string;
   workspace_id: string;
   scopes: OAuthScope[];
-  code_challenge: string;
+  /**
+   * PKCE S256 code challenge, or null when the code was issued
+   * without PKCE — allowed ONLY for confidential clients (Zapier's
+   * standard OAuth2 client sends no PKCE; see authorize.ts and
+   * migration 026, which relaxes the column to nullable).
+   */
+  code_challenge: string | null;
   redirect_uri: string;
   /** RFC 8707 resource the code is bound to (full MCP resource URL), or null for legacy rows. */
   resource: string | null;
@@ -181,7 +187,10 @@ function rowToCode(row: Row): MuseOAuthCodeRow {
     user_id: String(row.user_id),
     workspace_id: String(row.workspace_id),
     scopes: scopesOf(row.scopes),
-    code_challenge: String(row.code_challenge ?? ""),
+    code_challenge:
+      typeof row.code_challenge === "string" && row.code_challenge
+        ? row.code_challenge
+        : null,
     redirect_uri: String(row.redirect_uri ?? ""),
     resource: resourceOf(row.resource),
     expires_at: String(row.expires_at),

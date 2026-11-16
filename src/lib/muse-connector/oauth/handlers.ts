@@ -154,11 +154,22 @@ async function exchangeCode(
   const code = params.get("code");
   const redirectUri = params.get("redirect_uri");
   const verifier = params.get("code_verifier");
-  if (!code || !redirectUri || !verifier) {
-    return oauthError(400, "invalid_request", "code, redirect_uri and code_verifier are required.");
+  if (!code || !redirectUri) {
+    return oauthError(400, "invalid_request", "code and redirect_uri are required.");
   }
   const row = await deps.store.getCode(hashToken(code));
   if (!row) return oauthError(400, "invalid_grant", "The authorization code is invalid.");
+  // PKCE: a stored challenge MUST be satisfied by a matching
+  // verifier (public clients always have one; confidential clients
+  // that sent a challenge at authorize time do too). A code issued
+  // WITHOUT a challenge (confidential client only — Zapier sends
+  // no PKCE; see authorize.ts) exchanges on the client_secret
+  // alone, which authenticateMuseClient + verifyClientSecret
+  // already verified above. A verifier presented without a stored
+  // challenge is ignored — there is nothing to check it against.
+  if (row.code_challenge && !verifier) {
+    return oauthError(400, "invalid_request", "code_verifier is required.");
+  }
   if (row.client_id !== client.client_id) {
     return oauthError(400, "invalid_grant", "The authorization code was issued to a different client.");
   }
@@ -180,7 +191,7 @@ async function exchangeCode(
       return oauthError(400, "invalid_target", "resource does not match the authorization request.");
     }
   }
-  if (!verifyCodeChallenge(verifier, row.code_challenge)) {
+  if (row.code_challenge && !verifyCodeChallenge(verifier, row.code_challenge)) {
     return oauthError(400, "invalid_grant", "PKCE code_verifier does not match the code_challenge.");
   }
   await deps.store.markCodeUsed(row.code_hash, now.toISOString());
@@ -216,11 +227,15 @@ function tokenResponseBody(tokens: MuseIssuedTokens, issuer: string): Record<str
 
 /**
  * POST /api/muse/oauth/token — grant_types `authorization_code`
- * (single-use code + PKCE S256 verifier) and `refresh_token`
+ * (single-use code + PKCE S256 verifier, except confidential
+ * clients whose code was issued without a challenge — Zapier —
+ * which exchange on client_secret alone) and `refresh_token`
  * (rotates on every use; reuse of an already-rotated refresh token
- * revokes the whole grant). Public clients send no secret;
- * confidential clients authenticate with client_secret (body or
- * HTTP Basic); CIMD clients authenticate as public clients.
+ * revokes the whole grant, except a Zapier re-presentation inside
+ * the 10-minute grace window, which rotates again — see
+ * tokens.ts). Public clients send no secret; confidential clients
+ * authenticate with client_secret (body or HTTP Basic); CIMD
+ * clients authenticate as public clients.
  * `private_key_jwt` is NOT supported — any `client_assertion` is
  * refused with `invalid_client`. Responses carry RFC 9207 `iss`.
  */

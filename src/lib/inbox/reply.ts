@@ -86,6 +86,15 @@ export interface SendReplyArgs {
   subject?: string;
   idempotencyKey: string;
   voiceNote?: ReplyVoiceNote;
+  /**
+   * Called after a terminal `sent` / `simulated` outcome with the
+   * final message row. Used by the Zapier integration to emit
+   * `conversation.reply_created` (and by the dashboard reply
+   * route). Never called on failure, and never for a duplicate
+   * replay (the original send already emitted). A throwing
+   * callback is swallowed — emission must never break the reply.
+   */
+  onTerminalSent?: (message: InboxMessage) => Promise<void> | void;
 }
 
 const TERMINAL_OK = new Set(["sent", "simulated"]);
@@ -228,6 +237,13 @@ export async function sendInboxReply(
 
   const now = new Date().toISOString();
   let updated: InboxMessage;
+  const notifySent = async (message: InboxMessage): Promise<void> => {
+    try {
+      await args.onTerminalSent?.(message);
+    } catch (err) {
+      console.error("[NxtSend] onTerminalSent callback failed (reply unaffected):", err);
+    }
+  };
   switch (result.status) {
     case "sent":
       updated = await repo.updateMessage(args.workspaceId, attempt.id, {
@@ -238,6 +254,7 @@ export async function sendInboxReply(
         sent_at: now,
       });
       await repo.touchConversation(args.workspaceId, args.conversationId, now);
+      await notifySent(updated);
       return { ok: true, duplicate: false, message: updated, providerResult: result };
     case "simulated":
       updated = await repo.updateMessage(args.workspaceId, attempt.id, {
@@ -248,6 +265,7 @@ export async function sendInboxReply(
         sent_at: now,
       });
       await repo.touchConversation(args.workspaceId, args.conversationId, now);
+      await notifySent(updated);
       return { ok: true, duplicate: false, message: updated, providerResult: result };
     case "suppressed":
       updated = await repo.updateMessage(args.workspaceId, attempt.id, {

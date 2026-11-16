@@ -32,6 +32,7 @@ export async function GET() {
   let museGrantsActive: number | null = null;
   let chatgptGrantsActive: number | null = null;
   let claudeGrantsActive: number | null = null;
+  let zapierGrantsActive: number | null = null;
   let oauthMailboxes:
     | Partial<Record<OAuthProvider, OAuthMailboxSummary | null>>
     | undefined;
@@ -55,6 +56,7 @@ export async function GET() {
     });
     chatgptGrantsActive = byOrigin ? byOrigin.chatgpt : null;
     claudeGrantsActive = byOrigin ? byOrigin.claude : null;
+    zapierGrantsActive = byOrigin ? byOrigin.zapier : null;
     try {
       const store = createSupabaseOAuthStore(ctx.admin);
       const views = await store.listConnectionViews(ctx.workspaceId);
@@ -73,6 +75,7 @@ export async function GET() {
     museGrantsActive,
     chatgptGrantsActive,
     claudeGrantsActive,
+    zapierGrantsActive,
   });
 
   return NextResponse.json({ mode: ctx.mode, integrations });

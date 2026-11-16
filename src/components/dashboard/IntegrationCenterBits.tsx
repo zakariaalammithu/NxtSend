@@ -26,6 +26,7 @@ import {
   Target,
   Cog,
   MailCheck,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import type { BadgeVariant } from "@/components/ui";
@@ -45,6 +46,7 @@ export const INTEGRATION_ICONS: Record<string, LucideIcon> = {
   claude: MessagesSquare,
   "meta-pixel": Target,
   webhooks: Webhook,
+  zapier: Zap,
   jobs: Cog,
   linkedin: Linkedin,
   "google-sheets": FileSpreadsheet,

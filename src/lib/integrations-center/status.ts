@@ -31,6 +31,7 @@ import {
   isClaudeMcpEnabled,
   getClaudePublicUrl,
 } from "@/lib/muse-connector/oauth/config";
+import { isZapierEnabled, getZapierBaseUrl } from "@/lib/integrations/zapier/config";
 import { INTEGRATION_REGISTRY } from "./registry";
 import type {
   CenterStatus,
@@ -114,6 +115,17 @@ export interface IntegrationStatusOptions {
    * Muse or ChatGPT grant never connects it.
    */
   claudeGrantsActive?: number | null;
+  /**
+   * Number of ACTIVE Zapier OAuth grants for the caller's workspace
+   * (live mode, counted from muse_oauth_tokens by client origin —
+   * see countActiveGrantsByOrigin). Same rule as the MCP entries:
+   * null = unknown, and a grant is the ONLY thing that can make
+   * the zapier entry "Connected". A Zapier webhook subscription is
+   * created with a grant token, so a subscription cannot exist
+   * without a grant — the grant count is the connection signal,
+   * and no separate subscription count is consulted here.
+   */
+  zapierGrantsActive?: number | null;
 }
 
 interface DerivedStatus {
@@ -131,7 +143,8 @@ function deriveStatus(
   oauthMailboxes?: Partial<Record<OAuthProvider, OAuthMailboxSummary | null>>,
   museGrantsActive?: number | null,
   chatgptGrantsActive?: number | null,
-  claudeGrantsActive?: number | null
+  claudeGrantsActive?: number | null,
+  zapierGrantsActive?: number | null
 ): DerivedStatus {
   const demo = mode === "demo";
   switch (id) {
@@ -508,6 +521,52 @@ function deriveStatus(
         configured: false,
       };
     }
+    case "zapier": {
+      // Same rule as the MCP entries, for the Zapier surface
+      // (REST API v1 + REST Hooks, zapier.* scopes, migrations
+      // 025–027): Demo Mode refuses the surface; a real, active
+      // Zapier OAuth grant is the ONLY thing that yields
+      // "Connected" (and it is Verified — the grant exists only
+      // after a completed OAuth exchange); enabled + public URL
+      // set, no grant, is "Connected but Not Verified" —
+      // configuration alone is never a connection. A Muse,
+      // ChatGPT or Claude grant never connects this entry: only
+      // the zapierGrantsActive count is consulted. `configured`
+      // stays false without a grant, so a stale verification
+      // record can never upgrade config to Verified.
+      if (demo) {
+        return {
+          status: "Demo Mode",
+          message:
+            "Demo Mode: the Zapier REST API + webhook surface is unavailable — no grant can be issued or used (Zapier calls receive 503).",
+          configured: false,
+        };
+      }
+      if (zapierGrantsActive != null && zapierGrantsActive > 0) {
+        return {
+          status: "Connected and Verified",
+          message: `${zapierGrantsActive} active Zapier OAuth grant(s) exist for this workspace — Zapier can call the REST API on behalf of the granting user(s). Manage them from the grants panel on the detail page.`,
+          configured: true,
+        };
+      }
+      const zapierEnabled = isZapierEnabled(env);
+      const zapierBaseUrl = getZapierBaseUrl(undefined, env);
+      if (zapierEnabled && zapierBaseUrl) {
+        return {
+          status: "Connected but Not Verified",
+          message:
+            "Zapier REST surface is configured (ZAPIER_ENABLED + public URL are set). That is configuration, not a connection — 'Connected' requires a real OAuth grant; see the grants panel on the detail page.",
+          configured: false,
+        };
+      }
+      return {
+        status: zapierEnabled ? "Configuration Required" : "Not Connected",
+        message: zapierEnabled
+          ? "Zapier REST surface is enabled but no public URL is set (ZAPIER_APP_BASE_URL or NEXT_PUBLIC_APP_URL) — Zapier cannot reach the API until one is set."
+          : "Zapier REST surface is disabled (ZAPIER_ENABLED is false).",
+        configured: false,
+      };
+    }
     case "google-sheets":
     case "crm":
     case "email-verification":
@@ -543,7 +602,8 @@ export function getIntegrationStatuses(
       options.oauthMailboxes,
       options.museGrantsActive,
       options.chatgptGrantsActive,
-      options.claudeGrantsActive
+      options.claudeGrantsActive,
+      options.zapierGrantsActive
     );
     const record = verifications[descriptor.id] ?? null;
     let status = applyVerification(derived.status, derived.configured, record);

@@ -81,6 +81,23 @@ export interface StripeWebhookDeps {
   store: BillingStore | null;
   priceToPlan: (priceId: string) => PlanType | null;
   retrieveSubscription: (id: string) => Promise<Stripe.Subscription>;
+  /**
+   * Called after a subscription mutation is successfully applied
+   * (upsert or cancel). Used by the Zapier integration to emit
+   * `subscription.changed`. Never called when the event is ignored
+   * (unknown price/customer) or the mutation fails. A throwing
+   * callback is swallowed by the caller — emission must never
+   * break Stripe processing.
+   */
+  onSubscriptionChanged?: (
+    workspaceId: string,
+    data: {
+      plan: PlanType | null;
+      status: string;
+      stripeSubscriptionId: string;
+      stripeCustomerId: string | null;
+    }
+  ) => Promise<void> | void;
 }
 
 export interface WebhookHandleResult {
@@ -106,7 +123,8 @@ async function applySubscription(
   store: BillingStore,
   workspaceId: string,
   sub: Stripe.Subscription,
-  priceToPlan: (priceId: string) => PlanType | null
+  priceToPlan: (priceId: string) => PlanType | null,
+  onSubscriptionChanged?: StripeWebhookDeps["onSubscriptionChanged"]
 ): Promise<string> {
   const priceId = firstPriceId(sub);
   const plan = priceId ? priceToPlan(priceId) : null;
@@ -122,6 +140,16 @@ async function applySubscription(
     stripePriceId: priceId,
     currentPeriodEnd: periodEndIso(sub),
   });
+  try {
+    await onSubscriptionChanged?.(workspaceId, {
+      plan,
+      status: sub.status,
+      stripeSubscriptionId: sub.id,
+      stripeCustomerId: typeof sub.customer === "string" ? sub.customer : null,
+    });
+  } catch (err) {
+    console.error("[NxtSend] onSubscriptionChanged callback failed (Stripe processing unaffected):", err);
+  }
   return "subscription_upserted";
 }
 
@@ -141,7 +169,7 @@ export async function applyStripeEvent(
         typeof session.subscription === "string" ? session.subscription : null;
       if (!workspaceId || !subscriptionId) return "ignored_missing_refs";
       const sub = await deps.retrieveSubscription(subscriptionId);
-      return applySubscription(store, workspaceId, sub, deps.priceToPlan);
+      return applySubscription(store, workspaceId, sub, deps.priceToPlan, deps.onSubscriptionChanged);
     }
     case "customer.subscription.created":
     case "customer.subscription.updated": {
@@ -150,13 +178,26 @@ export async function applyStripeEvent(
       if (!customerId) return "ignored_no_customer";
       const workspaceId = await store.getWorkspaceIdByCustomerId(customerId);
       if (!workspaceId) return "ignored_unknown_customer";
-      return applySubscription(store, workspaceId, sub, deps.priceToPlan);
+      return applySubscription(store, workspaceId, sub, deps.priceToPlan, deps.onSubscriptionChanged);
     }
     case "customer.subscription.deleted": {
       const sub = event.data.object as Stripe.Subscription;
       const customerId = typeof sub.customer === "string" ? sub.customer : null;
       if (!customerId) return "ignored_no_customer";
+      const workspaceId = await store.getWorkspaceIdByCustomerId(customerId);
       await store.setSubscriptionStatusByCustomer(customerId, "canceled");
+      if (workspaceId) {
+        try {
+          await deps.onSubscriptionChanged?.(workspaceId, {
+            plan: null,
+            status: "canceled",
+            stripeSubscriptionId: sub.id,
+            stripeCustomerId: customerId,
+          });
+        } catch (err) {
+          console.error("[NxtSend] onSubscriptionChanged callback failed (Stripe processing unaffected):", err);
+        }
+      }
       return "subscription_canceled";
     }
     case "invoice.payment_failed": {

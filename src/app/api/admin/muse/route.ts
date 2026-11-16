@@ -35,7 +35,7 @@ export interface AdminMuseEvent {
  *     refresh token; null when the migration 023 tables cannot be
  *     read, reported as `grantCount: null` = unknown, never zero);
  *   - the same grants split by client origin (`grantsByOrigin`:
- *     Muse vs ChatGPT vs Claude vs Other — see
+ *     Muse vs ChatGPT vs Claude vs Zapier vs Other — see
  *     countActiveGrantsByOrigin in
  *     src/lib/muse-connector/grants.ts);
  *   - whether the ChatGPT and Claude MCP surfaces are enabled +

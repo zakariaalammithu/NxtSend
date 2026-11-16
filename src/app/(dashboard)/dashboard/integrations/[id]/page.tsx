@@ -324,6 +324,15 @@ export default function IntegrationDetailPage() {
         <ClaudeLivePanels origin={origin} status={entry.status} mode={data?.mode ?? "demo"} />
       )}
 
+      {/* Zapier live surface: REST API + REST Hooks — a SEPARATE panel.
+          ConnectorLivePanels is MCP-specific (it fetches /api/muse/grants +
+          /api/muse/activity and renders MCP endpoints from CONNECTOR_COPY);
+          Zapier is a REST surface with its own endpoints, scopes and
+          trigger/action inventory, so it is not forced through it. */}
+      {d.id === "zapier" && (
+        <ZapierLivePanels origin={origin} status={entry.status} mode={data?.mode ?? "demo"} />
+      )}
+
       {/* Environment variables */}
       {d.envVars.length > 0 && (
         <Section title="Required configuration (environment variables)">
@@ -419,6 +428,8 @@ export default function IntegrationDetailPage() {
               ? "Revoke individual grants from the “Your ChatGPT grants” panel above — revoking removes ChatGPT's access for that grant immediately (every token for that client + user is revoked). Removing the environment variables additionally prevents NEW grants. Past audit entries are kept."
               : d.id === "claude"
               ? "Revoke individual grants from the “Your Claude grants” panel above — revoking removes Claude's access for that grant immediately (every token for that client + user is revoked). Removing the environment variables additionally prevents NEW grants. Past audit entries are kept."
+              : d.id === "zapier"
+              ? "Revoke individual grants from the “Your Zapier grants” panel above — revoking removes Zapier's access for that grant immediately (every token for that client + user is revoked), and any Zaps using it stop working. Setting ZAPIER_ENABLED=false additionally prevents NEW Zapier API calls (the OAuth routes stay available). Past audit entries and webhook delivery logs are kept; webhook subscriptions created by that grant stay in the outbox tables until they are unsubscribed from Zapier or cleaned up as stale (inactive > 30 days)."
               : d.kind === "info"
               ? "Nothing is connected, so there is nothing to disconnect. This entry documents the limitation and what implementing it would require."
               : "Remove (or replace) the environment variables listed above in Vercel and redeploy. The status returns to Not Connected, and any stored verification stops applying because the configuration it verified is gone. No data is deleted by disconnecting."}
@@ -472,6 +483,27 @@ interface MuseGrant {
   refreshExpiresAt: string | null;
   active: boolean;
   lastUsedAt: string | null;
+}
+
+interface ZapierSubscriptionEntry {
+  id: string;
+  event: string;
+  target_url: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ZapierDeliveryEntry {
+  id: string;
+  event: string;
+  subscription_id: string;
+  status: string;
+  attempts: number;
+  max_attempts: number;
+  last_error: string | null;
+  next_retry_at: string | null;
+  created_at: string;
 }
 
 interface MuseActivityEntry {
@@ -1068,6 +1100,628 @@ function ClaudeLivePanels({
   mode: string;
 }) {
   return <ConnectorLivePanels platform="claude" origin={origin} status={status} mode={mode} />;
+}
+
+/** True when a grant belongs to Zapier. The grants API returns client
+ * id + scopes only (no redirect URIs), so the scope prefix is the
+ * classifier here — and it is sufficient: a Zapier grant is
+ * resource-bound to /api/integrations/zapier and always carries
+ * zapier.* scopes (there is no zapier.send tier). */
+function grantBelongsToZapier(grant: MuseGrant): boolean {
+  return grant.scopes.some((s) => s.startsWith("zapier."));
+}
+
+interface ZapierHealth {
+  mode: string;
+  zapierEnabled: boolean;
+  version: string;
+}
+
+/** Polling triggers — Zapier polls the REST API on the plan's interval (minutes, not instant). */
+const ZAPIER_POLLING_TRIGGERS: { name: string; key: string; endpoint: string; dedupe: string }[] = [
+  { name: "New Lead", key: "new_lead", endpoint: "GET /v1/leads", dedupe: "Stable lead id" },
+  { name: "Lead Updated", key: "updated_lead", endpoint: "GET /v1/leads?order=updated_at_desc", dedupe: "<leadId>__<updated_at> (original id in lead_id)" },
+  { name: "New Campaign", key: "new_campaign", endpoint: "GET /v1/campaigns", dedupe: "Stable campaign id" },
+  { name: "Campaign Status Changed", key: "campaign_status_changed", endpoint: "GET /v1/campaigns", dedupe: "<campaignId>__<status> (original id in campaign_id)" },
+  { name: "New Conversation", key: "new_conversation", endpoint: "GET /v1/conversations", dedupe: "Stable conversation id" },
+];
+
+/** Instant (REST Hook) triggers — webhook delivery, best-effort immediate + cron retry, NOT instant-guaranteed. */
+const ZAPIER_INSTANT_TRIGGERS: { name: string; key: string; event: string }[] = [
+  { name: "New Lead (Instant)", key: "new_lead_instant", event: "lead.created" },
+  { name: "Lead Updated (Instant)", key: "updated_lead_instant", event: "lead.updated" },
+  { name: "Lead Added to Campaign (Instant)", key: "lead_added_to_campaign_instant", event: "lead.added_to_campaign" },
+  { name: "Lead Removed From Campaign (Instant)", key: "lead_removed_from_campaign_instant", event: "lead.removed_from_campaign" },
+  { name: "New Campaign (Instant)", key: "new_campaign_instant", event: "campaign.created" },
+  { name: "Campaign Status Changed (Instant)", key: "campaign_status_changed_instant", event: "campaign.status_changed" },
+  { name: "New Reply (Instant)", key: "new_reply_instant", event: "conversation.reply_created" },
+  { name: "Subscription Changed (Instant)", key: "subscription_changed_instant", event: "subscription.changed" },
+];
+
+const ZAPIER_ACTIONS: { name: string; key: string; note: string }[] = [
+  { name: "Create Lead", key: "create_lead", note: "Deduped by email — a duplicate returns the existing lead with duplicate: true." },
+  { name: "Update Lead", key: "update_lead", note: "Includes status; emits lead.updated with changed_fields." },
+  { name: "Import Leads", key: "import_leads", note: "Bulk, at most 100 rows per call; skipped covers invalid rows and duplicates." },
+  { name: "Create Campaign", key: "create_campaign", note: "Draft only — Zapier cannot launch a campaign. At least one sequence step is required. A retried create can duplicate a draft (no natural dedup key)." },
+  { name: "Update Campaign", key: "update_campaign", note: "Name / type / description only." },
+  { name: "Pause Campaign", key: "pause_campaign", note: "Needs an active campaign." },
+  { name: "Resume Campaign", key: "resume_campaign", note: "Needs a paused campaign." },
+  { name: "Stop Campaign", key: "stop_campaign", note: "Moves the campaign to archived — there is no stopped status." },
+  { name: "Archive Campaign", key: "archive_campaign", note: "Refuses an already-archived campaign." },
+  { name: "Add Leads to Campaign", key: "add_leads_to_campaign", note: "Returns {enrolled, skipped, notFound}." },
+  { name: "Remove Lead From Campaign", key: "remove_lead_from_campaign", note: "Removes the enrollment; the lead record is kept." },
+  { name: "Send Reply", key: "send_reply", note: "Email only — LinkedIn replies are refused 422 by the server. IdempotencyKey replays a retried reply instead of sending twice." },
+];
+
+const ZAPIER_SEARCHES: { name: string; key: string; note: string }[] = [
+  { name: "Find Lead", key: "find_lead", note: "By name, email, or ID. Paired with Create Lead as “Find or Create Lead”." },
+  { name: "Find Campaign", key: "find_campaign", note: "By name, ID, or status. Paired with Create Campaign as “Find or Create Campaign”." },
+  { name: "Find Conversation", key: "find_conversation", note: "By search text." },
+  { name: "Find LinkedIn Account", key: "find_account", note: "By search text. Read-only — accounts cannot be created from Zapier." },
+  { name: "Get Campaign Performance", key: "get_campaign_performance", note: "Real stats via loadCampaignStats; accepted is always null — no data source exists, never fabricated." },
+];
+
+const ZAPIER_DROPDOWNS: { name: string; key: string; note: string }[] = [
+  { name: "Campaigns", key: "list_campaigns", note: "GET /v1/dropdowns/campaigns." },
+  { name: "LinkedIn accounts", key: "list_accounts", note: "GET /v1/dropdowns/accounts." },
+  { name: "Lead statuses", key: "list_lead_statuses", note: "GET /v1/dropdowns/lead-statuses." },
+  { name: "Sequences", key: "list_sequences", note: "GET /v1/dropdowns/sequences?campaign_id= — campaign_id is required (steps belong to a campaign). No templates dropdown exists — there is no message-template store in the product." },
+];
+
+const ZAPIER_ENDPOINTS: { label: string; path: string; note: string }[] = [
+  { label: "Zapier REST API (v1)", path: "/api/integrations/zapier/v1", note: "Bearer access token for the Zapier resource + zapier.read (GETs) / zapier.write (mutations). Rate limit 120 req/min per token (in-memory, per-process). Demo Mode → 503." },
+  { label: "Health (public, no auth)", path: "/api/integrations/zapier/health", note: "Returns {mode, zapierEnabled, version}. Lets Zapier (and the owner) check the surface without a token." },
+  { label: "Connection test", path: "/api/integrations/zapier/v1/auth/test", note: "Returns the user, workspace and scopes for the token — never token values. Zapier calls this when an account is connected." },
+  { label: "Authorize (consent screen)", path: "/api/muse/oauth/authorize", note: "Shared OAuth server. GET shows the consent screen; POST approves or denies." },
+  { label: "Token", path: "/api/muse/oauth/token", note: "authorization_code + refresh_token. PKCE optional for confidential clients only; public clients still require PKCE S256." },
+  { label: "Revoke", path: "/api/muse/oauth/revoke", note: "RFC 7009 token revocation." },
+  { label: "Register (Dynamic Client Registration)", path: "/api/muse/oauth/register", note: "RFC 7591 — one-time call that creates the Zapier client (see docs/zapier-integration/ZAPIER_SERVER.md for the exact curl). No pre-registered client secret exists." },
+  { label: "Protected-resource metadata", path: "/.well-known/oauth-protected-resource/api/integrations/zapier", note: "RFC 9728 metadata for the Zapier resource (https://<origin>/api/integrations/zapier)." },
+];
+
+const ZAPIER_CONNECT_STEPS: string[] = [
+  "In the Zapier developer dashboard, create the app and copy its exact OAuth Redirect URL (https://zapier.com/dashboard/auth/oauth/return/App<digits>CLIAPI/ — the App ID is assigned at registration and may change after publish/beta, in which case the client must be re-registered with the new URL).",
+  "Register the Zapier OAuth client with the one-time Dynamic Client Registration call (exact curl in docs/zapier-integration/ZAPIER_SERVER.md). The response contains client_id + client_secret — shown once, store it in the Zapier dashboard immediately. There is no ZAPIER_OAUTH_CLIENT_SECRET env var.",
+  "In the Zapier app settings, enter CLIENT_ID / CLIENT_SECRET (from the DCR response) and ZAPIER_APP_BASE_URL (https://nxtsend.com in production), with Authorization URL https://<your-domain>/api/muse/oauth/authorize, Token URL https://<your-domain>/api/muse/oauth/token, scopes zapier.read zapier.write, and resource https://<your-domain>/api/integrations/zapier.",
+  "In the Zapier editor, add an NxtSend account: sign in on NxtSend's consent screen and choose the scopes. Pick zapier.read only unless the Zap genuinely needs to change things. A grant appears in the grants panel below only after that approval — until then, nothing is connected.",
+  "Build Zaps from the triggers, actions and searches listed below. Instant triggers use REST Hooks (webhook subscriptions are created by Zapier against hooks.zapier.com); polling triggers check the REST API on the Zap's plan interval.",
+  "Publication is a separate step: Zapier review (~1 week), then 90-day Beta, then Public. That submission has NOT been made and no approval is claimed — the developer-platform path above works without it.",
+];
+
+/**
+ * Live Zapier panels (detail page only). Everything here comes from
+ * the real implementation: endpoint URLs from this deployment's
+ * origin, scopes from the OAuth module (SCOPE_DESCRIPTIONS —
+ * zapier.*), the health endpoint, grants from the grants API, and
+ * the trigger/action/search inventory from the Platform CLI app
+ * (integrations/zapier/). No state is ever shown as "Connected"
+ * unless a real grant exists — the header badge already reflects
+ * that (derived from the Zapier grant count in GET
+ * /api/integrations/status).
+ *
+ * Two honest gaps, stated here rather than faked:
+ *   - Webhook subscriptions + delivery status: the subscriptions
+ *     list endpoint (GET /v1/webhooks/subscriptions) is
+ *     Zapier-token-authenticated, and the outbox tables are
+ *     service-role-only, so there is no session-authenticated
+ *     endpoint this page could call to list a workspace's Zapier
+ *     subscriptions or deliveries. Subscriptions are created from
+ *     Zapier; delivery failures are visible in Zapier's Task
+ *     History and in the admin Zapier panel. A
+ *     session-authenticated subscriptions/deliveries endpoint is a
+ *     PENDING follow-up (deliberately not added here — the Zapier
+ *     API tree is frozen for the server agent).
+ *   - Activity history: GET /api/muse/activity returns only
+ *     muse.% / MUSE_OAUTH% audit rows, so zapier.* entries never
+ *     reach this page. The zapier.* audit entries DO exist in
+ *     audit_logs (see the admin Zapier panel); a Zapier-aware
+ *     activity source is PENDING.
+ */
+function ZapierLivePanels({
+  origin,
+  status,
+  mode,
+}: {
+  origin: string;
+  status: string;
+  mode: string;
+}) {
+  const [health, setHealth] = React.useState<ZapierHealth | null>(null);
+  const [healthError, setHealthError] = React.useState<string | null>(null);
+  const [grants, setGrants] = React.useState<MuseGrant[] | null>(null);
+  const [grantsError, setGrantsError] = React.useState<string | null>(null);
+  const [revokeBusy, setRevokeBusy] = React.useState<string | null>(null);
+  const [revokeError, setRevokeError] = React.useState<string | null>(null);
+  const [revokeNotice, setRevokeNotice] = React.useState<string | null>(null);
+  const [subs, setSubs] = React.useState<ZapierSubscriptionEntry[] | null>(null);
+  const [deliveries, setDeliveries] = React.useState<ZapierDeliveryEntry[] | null>(null);
+  const [subsError, setSubsError] = React.useState<string | null>(null);
+  const [zapierActivity, setZapierActivity] = React.useState<MuseActivityEntry[] | null>(null);
+  const [zapierActivityError, setZapierActivityError] = React.useState<string | null>(null);
+
+  const loadHealth = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/integrations/zapier/health");
+      const body = (await res.json().catch(() => null)) as ZapierHealth | { error?: string } | null;
+      if (!res.ok) throw new Error((body as { error?: string } | null)?.error ?? `Health request failed (HTTP ${res.status})`);
+      setHealth(body as ZapierHealth);
+      setHealthError(null);
+    } catch (err) {
+      setHealthError(err instanceof Error ? err.message : "Failed to load Zapier health.");
+    }
+  }, []);
+
+  const loadGrants = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/muse/grants");
+      const body = (await res.json().catch(() => null)) as
+        | { grants?: MuseGrant[]; error?: string }
+        | null;
+      if (!res.ok) throw new Error(body?.error ?? `Grants request failed (HTTP ${res.status})`);
+      setGrants(body?.grants ?? []);
+      setGrantsError(null);
+    } catch (err) {
+      setGrantsError(err instanceof Error ? err.message : "Failed to load Zapier grants.");
+    }
+  }, []);
+
+  const loadWebhookStatus = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/integrations/zapier/subscriptions");
+      const body = (await res.json().catch(() => null)) as
+        | {
+            subscriptions?: ZapierSubscriptionEntry[];
+            deliveries?: ZapierDeliveryEntry[];
+            error?: string;
+          }
+        | null;
+      if (!res.ok) throw new Error(body?.error ?? `Webhook status request failed (HTTP ${res.status})`);
+      setSubs(body?.subscriptions ?? []);
+      setDeliveries(body?.deliveries ?? []);
+      setSubsError(null);
+    } catch (err) {
+      setSubsError(err instanceof Error ? err.message : "Failed to load Zapier webhook status.");
+    }
+  }, []);
+
+  const loadZapierActivity = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/muse/activity?platform=zapier");
+      const body = (await res.json().catch(() => null)) as
+        | { entries?: MuseActivityEntry[]; error?: string }
+        | null;
+      if (!res.ok) throw new Error(body?.error ?? `Activity request failed (HTTP ${res.status})`);
+      setZapierActivity(body?.entries ?? []);
+      setZapierActivityError(null);
+    } catch (err) {
+      setZapierActivityError(err instanceof Error ? err.message : "Failed to load Zapier activity.");
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void loadHealth();
+    void loadGrants();
+    void loadWebhookStatus();
+    void loadZapierActivity();
+  }, [loadHealth, loadGrants, loadWebhookStatus, loadZapierActivity]);
+
+  const revokeGrant = async (clientId: string) => {
+    setRevokeBusy(clientId);
+    setRevokeError(null);
+    setRevokeNotice(null);
+    try {
+      const res = await fetch(`/api/muse/grants?client_id=${encodeURIComponent(clientId)}`, {
+        method: "DELETE",
+      });
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) throw new Error(body?.error ?? `Revoke failed (HTTP ${res.status})`);
+      setRevokeNotice(`Grant for “${clientId}” revoked — Zapier can no longer use it.`);
+      await loadGrants();
+    } catch (err) {
+      setRevokeError(err instanceof Error ? err.message : "Revoke failed.");
+    } finally {
+      setRevokeBusy(null);
+    }
+  };
+
+  const zapierGrants = grants === null ? null : grants.filter(grantBelongsToZapier);
+
+  return (
+    <>
+      <Section title="Live connection status">
+        <p className="text-13 text-black-300 leading-relaxed">
+          Current status: <strong className="text-white">{status}</strong>.{" "}
+          {status === "Connected and Verified"
+            ? "At least one active Zapier OAuth grant exists for this workspace — Zapier can call the REST API on behalf of the granting user(s)."
+            : status === "Connected but Not Verified"
+              ? "The Zapier REST surface is configured, but no active Zapier grant exists yet — configuration alone is not a connection. Connect from Zapier (steps below) to create a grant."
+              : status === "Demo Mode"
+                ? "Demo Mode: the Zapier REST API + webhook surface refuses demo outright — no grant can be issued or used here."
+                : "The Zapier surface is not fully configured on this deployment — see the environment variables above."}
+        </p>
+        {healthError ? (
+          <p className="text-13 text-rose-200 leading-relaxed">{healthError}</p>
+        ) : health ? (
+          <p className="text-13 text-black-300 leading-relaxed">
+            API health (GET /api/integrations/zapier/health): mode{" "}
+            <code className="font-mono text-black-100">{health.mode}</code> · Zapier{" "}
+            <code className="font-mono text-black-100">{health.zapierEnabled ? "enabled" : "disabled"}</code> · API
+            version <code className="font-mono text-black-100">{health.version}</code>. The health
+            endpoint proves the route answers — it does not prove Zapier is connected; only a grant
+            does that.
+          </p>
+        ) : (
+          <p className="text-13 text-black-400">Loading API health…</p>
+        )}
+        {mode === "demo" && (
+          <p className="text-12 text-black-400 leading-relaxed">
+            Grants are unavailable in Demo Mode by design; they appear here in live mode.
+          </p>
+        )}
+        <p className="text-13 text-black-300 leading-relaxed">
+          <strong className="text-white">Not published on Zapier.</strong> The OAuth + REST +
+          webhook surface is implemented and testable in Zapier&apos;s developer platform, but no
+          app has been submitted to Zapier and Zapier has not approved anything — it does not
+          appear in Zapier&apos;s app directory.
+        </p>
+      </Section>
+
+      <Section title="Endpoints — this deployment">
+        <div className="divide-y divide-black-700/60">
+          {ZAPIER_ENDPOINTS.map((e) => (
+            <div key={e.path} className="py-3 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-13 font-semibold text-white">{e.label}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <code className="min-w-0 flex-1 rounded-xl bg-black-800 border border-black-700 px-3 py-2 font-mono text-12 text-purple-200 break-all">
+                  {origin ? `${origin}${e.path}` : e.path}
+                </code>
+                <CopyButton text={origin ? `${origin}${e.path}` : e.path} />
+              </div>
+              <p className="text-12 text-black-400 leading-relaxed">{e.note}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Scopes — what a Zapier grant can ask for">
+        <p className="text-13 text-black-300 leading-relaxed">
+          A <code className="font-mono text-black-100">zapier.read</code>-only grant is the
+          recommended default — it lets Zapier look things up without changing anything. The consent
+          screen offers it, and a requested scope outside these two is refused, never silently
+          widened. There is no <code className="font-mono text-black-100">zapier.send</code> tier:
+          Zapier never sends LinkedIn messages, and email inbox replies sent through the Zapier API
+          are covered by the write tier.
+        </p>
+        <div className="divide-y divide-black-700/60">
+          {(Object.entries(SCOPE_DESCRIPTIONS) as [OAuthScope, string][])
+            .filter(([scope]) => scope.startsWith("zapier."))
+            .map(([scope, description]) => (
+              <div key={scope} className="py-3 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <code className="font-mono text-13 text-white">{scope}</code>
+                  {scope === "zapier.read" && (
+                    <Badge variant="blue" size="sm">Recommended default</Badge>
+                  )}
+                </div>
+                <p className="text-12 text-black-300 leading-relaxed">{description}</p>
+              </div>
+            ))}
+        </div>
+      </Section>
+
+      <Section title="Triggers — polling (5)">
+        <p className="text-12 text-black-400 leading-relaxed">
+          Zapier checks the REST API on the Zap&apos;s plan interval — minutes, not instant. Each
+          poll returns at most the 100 newest items; an update or status change on a record outside
+          that window is not seen by polling — use the Instant version.
+        </p>
+        <div className="divide-y divide-black-700/60">
+          {ZAPIER_POLLING_TRIGGERS.map((t) => (
+            <div key={t.key} className="py-3 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-13 font-semibold text-white">{t.name}</span>
+                <code className="font-mono text-11 text-black-400">{t.key}</code>
+              </div>
+              <p className="text-12 text-black-300"><code className="font-mono text-black-200">{t.endpoint}</code></p>
+              <p className="text-12 text-black-400">Dedupe: {t.dedupe}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Triggers — instant / REST Hooks (8)">
+        <p className="text-12 text-black-400 leading-relaxed">
+          Webhook delivery: the mutation enqueues and a best-effort immediate attempt is made;
+          failures retry on the daily 06:00 cron (5m → 30m backoff, max 3 attempts, then dead) — a
+          failed delivery may wait up to ~24h for its next retry. Do not treat these as instant
+          guaranteed delivery. A 410 from Zapier deactivates the subscription. Zapier does not
+          document verifying the X-NxtSend-Signature / X-NxtSend-Timestamp signing headers.
+        </p>
+        <div className="divide-y divide-black-700/60">
+          {ZAPIER_INSTANT_TRIGGERS.map((t) => (
+            <div key={t.key} className="py-3 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-13 font-semibold text-white">{t.name}</span>
+                <code className="font-mono text-11 text-black-400">{t.key}</code>
+              </div>
+              <p className="text-12 text-black-300">Event: <code className="font-mono text-black-200">{t.event}</code></p>
+            </div>
+          ))}
+        </div>
+        <p className="text-12 text-black-400 leading-relaxed">
+          There is no polling version of Lead Added/Removed, New Reply, or Subscription Changed: no
+          list endpoint surfaces those events.
+        </p>
+      </Section>
+
+      <Section title="Actions (12)">
+        <div className="divide-y divide-black-700/60">
+          {ZAPIER_ACTIONS.map((a) => (
+            <div key={a.key} className="py-3 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-13 font-semibold text-white">{a.name}</span>
+                <code className="font-mono text-11 text-black-400">{a.key}</code>
+              </div>
+              <p className="text-12 text-black-300 leading-relaxed">{a.note}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-12 text-black-400 leading-relaxed">
+          Not implemented (deliberately): any LinkedIn send/accept action (no provider; accepted is
+          always null), a Create Draft action (no draft concept exists in the product), and
+          date-range reporting (no date filter exists in the stats loaders).
+        </p>
+      </Section>
+
+      <Section title="Searches (5) + dynamic dropdowns (4)">
+        <div className="divide-y divide-black-700/60">
+          {ZAPIER_SEARCHES.map((s) => (
+            <div key={s.key} className="py-3 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-13 font-semibold text-white">{s.name}</span>
+                <code className="font-mono text-11 text-black-400">{s.key}</code>
+                <Badge variant="blue" size="sm">Search</Badge>
+              </div>
+              <p className="text-12 text-black-300 leading-relaxed">{s.note}</p>
+            </div>
+          ))}
+          {ZAPIER_DROPDOWNS.map((s) => (
+            <div key={s.key} className="py-3 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-13 font-semibold text-white">{s.name}</span>
+                <code className="font-mono text-11 text-black-400">{s.key}</code>
+                <Badge variant="gray" size="sm">Hidden dropdown</Badge>
+              </div>
+              <p className="text-12 text-black-300 leading-relaxed">{s.note}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Webhook subscriptions + delivery status">
+        <p className="text-13 text-black-300 leading-relaxed">
+          Subscriptions are created from Zapier (POST /v1/webhooks/subscribe): the target URL must
+          be https on hooks.zapier.com or zapier.com, and the per-subscription HMAC secret is
+          generated server-side and never returned. Delivery latency: best-effort immediate
+          attempt, then the daily 06:00 cron retry (max 3 attempts, then dead) — a failed delivery
+          may wait up to ~24h for its next retry. Cross-check per-Zap runs in Zapier&apos;s Task
+          History, and platform-wide failures in the admin Zapier panel
+          (/admin/integrations/zapier).
+        </p>
+        {subsError && (
+          <p className="text-13 text-rose-200 leading-relaxed">{subsError}</p>
+        )}
+        {!subsError && subs === null && (
+          <p className="text-13 text-black-400">Loading webhook subscriptions…</p>
+        )}
+        {!subsError && subs !== null && subs.length === 0 && (
+          <p className="text-13 text-black-300 leading-relaxed">
+            No webhook subscriptions for this workspace yet — one appears here when a Zap with an
+            Instant trigger is turned on in Zapier.
+          </p>
+        )}
+        {subs !== null && subs.length > 0 && (
+          <div className="divide-y divide-black-700/60">
+            {subs.map((s) => (
+              <div key={s.id} className="py-3 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <code className="font-mono text-13 text-white">{s.event}</code>
+                  <Badge variant={s.active ? "success" : "gray"} size="sm">
+                    {s.active ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+                <p className="text-12 text-black-300 break-all">{s.target_url}</p>
+                <p className="text-11 text-black-400">
+                  Created {new Date(s.created_at).toLocaleString()}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+        {!subsError && deliveries !== null && deliveries.length === 0 && (
+          <p className="text-13 text-black-300 leading-relaxed">
+            No deliveries recorded yet.
+          </p>
+        )}
+        {deliveries !== null && deliveries.length > 0 && (
+          <div className="divide-y divide-black-700/60">
+            {deliveries.map((d) => (
+              <div key={d.id} className="py-2.5 space-y-0.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <code className="font-mono text-12 text-white">{d.event}</code>
+                  <Badge
+                    variant={
+                      d.status === "delivered"
+                        ? "success"
+                        : d.status === "dead"
+                          ? "error"
+                          : "gray"
+                    }
+                    size="sm"
+                  >
+                    {d.status}
+                  </Badge>
+                  <span className="text-11 text-black-500">
+                    {new Date(d.created_at).toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-12 text-black-400">
+                  Attempts: {d.attempts}/{d.max_attempts}
+                  {d.last_error ? ` · ${d.last_error}` : ""}
+                  {d.status !== "delivered" && d.next_retry_at
+                    ? ` · next retry ${new Date(d.next_retry_at).toLocaleString()}`
+                    : ""}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <Section title="Connect to Zapier">
+        <ol className="space-y-2 list-none">
+          {ZAPIER_CONNECT_STEPS.map((step, i) => (
+            <li key={step} className="flex items-start gap-3 text-13 text-black-300">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-600/20 border border-purple-500/30 text-11 font-bold text-purple-300 mt-0.5">
+                {i + 1}
+              </span>
+              <span className="leading-relaxed">{step}</span>
+            </li>
+          ))}
+        </ol>
+      </Section>
+
+      <Section title="Your Zapier grants">
+        {grantsError && (
+          <p className="text-13 text-rose-200 leading-relaxed">{grantsError}</p>
+        )}
+        {!grantsError && zapierGrants === null && (
+          <p className="text-13 text-black-400">Loading grants…</p>
+        )}
+        {!grantsError && zapierGrants !== null && zapierGrants.length === 0 && (
+          <p className="text-13 text-black-300 leading-relaxed">
+            No Zapier grants for your account. A grant appears here after you approve Zapier on the
+            consent screen — until then, nothing is connected.
+          </p>
+        )}
+        {zapierGrants !== null && zapierGrants.length > 0 && (
+          <div className="divide-y divide-black-700/60">
+            {zapierGrants.map((g) => (
+              <div key={g.clientId} className="py-3 space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-13 font-semibold text-white">{g.clientName}</span>
+                  <code className="font-mono text-11 text-black-400 break-all">{g.clientId}</code>
+                  <Badge variant={g.active ? "success" : "gray"} size="sm">
+                    {g.active ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+                <p className="text-12 text-black-300">
+                  Scopes: {g.scopes.length > 0 ? g.scopes.join(", ") : "—"}
+                </p>
+                {g.scopes.length > 0 && (
+                  <ul className="space-y-0.5">
+                    {g.scopes.map((scope) => (
+                      <li key={scope} className="text-12 text-black-400 leading-relaxed">
+                        <code className="font-mono text-black-200">{scope}</code>
+                        {SCOPE_DESCRIPTIONS[scope]
+                          ? ` — ${SCOPE_DESCRIPTIONS[scope]}`
+                          : " — unknown scope (refused at issue time; report it as a bug)."}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-12 text-black-400">
+                  Created {new Date(g.createdAt).toLocaleString()}
+                  {g.refreshExpiresAt
+                    ? ` · refresh token expires ${new Date(g.refreshExpiresAt).toLocaleString()}`
+                    : " · no live refresh token"}
+                  {" · "}Last used: not tracked (migration 023 stores no last-used time).
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void revokeGrant(g.clientId)}
+                  disabled={revokeBusy === g.clientId || !g.active}
+                  className="inline-flex items-center gap-2 rounded-xl border border-rose-500/40 bg-rose-950/30 hover:bg-rose-950/50 disabled:opacity-50 px-3 py-1.5 text-12 font-semibold text-rose-200 transition-colors"
+                >
+                  {revokeBusy === g.clientId ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : null}
+                  {revokeBusy === g.clientId ? "Revoking…" : "Revoke grant"}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {revokeNotice && <p className="text-13 text-green-300">{revokeNotice}</p>}
+        {revokeError && <p className="text-13 text-rose-200">{revokeError}</p>}
+        <p className="text-12 text-black-400 leading-relaxed">
+          Revoking removes Zapier&apos;s access for that grant immediately. Token values are never
+          shown here — grants are identified by client name and scopes only.
+        </p>
+      </Section>
+
+      <Section title="Integration activity history">
+        <p className="text-12 text-black-400 leading-relaxed">
+          The Zapier API writes <code className="font-mono text-black-100">zapier.*</code> audit
+          entries (lead created/updated, campaign created/status changed, reply sent, webhook
+          subscribed/unsubscribed) to the workspace audit log; OAuth-server-level events keep
+          their <code className="font-mono text-black-100">MUSE_OAUTH_*</code> names.
+        </p>
+        {zapierActivityError && (
+          <p className="text-13 text-rose-200 leading-relaxed">{zapierActivityError}</p>
+        )}
+        {!zapierActivityError && zapierActivity === null && (
+          <p className="text-13 text-black-400">Loading activity…</p>
+        )}
+        {!zapierActivityError && zapierActivity !== null && zapierActivity.length === 0 && (
+          <p className="text-13 text-black-300 leading-relaxed">
+            No Zapier activity recorded for this workspace yet — Zapier API calls and webhook
+            events appear here (newest first, up to 50).
+          </p>
+        )}
+        {zapierActivity !== null && zapierActivity.length > 0 && (
+          <div className="divide-y divide-black-700/60">
+            {zapierActivity.map((a, i) => (
+              <div key={`${a.created_at}-${a.action}-${i}`} className="py-2.5 space-y-0.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <code className="font-mono text-12 text-white">{a.action}</code>
+                  {a.resource && (
+                    <span className="font-mono text-11 text-black-400 break-all">{a.resource}</span>
+                  )}
+                  <span className="text-11 text-black-500">
+                    {new Date(a.created_at).toLocaleString()}
+                  </span>
+                </div>
+                {a.details && <p className="text-12 text-black-300 leading-relaxed">{a.details}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <Section title="Security & privacy notes">
+        <ul className="space-y-1.5">
+          {[
+            "Tokens and authorization codes are stored as SHA-256 hashes only — a database read can never yield a usable token, and no token value is ever logged or shown in the UI.",
+            "Refresh tokens rotate on every use. For Zapier grants only, re-presenting an already-rotated refresh token within 10 minutes of the rotation rotates again from the live successor instead of revoking the grant (Zapier's auto-refresh can race a retry); outside the window, or for Muse/ChatGPT/Claude grants, reuse still revokes the grant.",
+            "PKCE is optional for confidential clients only (Zapier's standard OAuth2 client sends no PKCE); public clients still require PKCE S256, and a stored challenge must still be satisfied by a matching verifier.",
+            "The OAuth tables (migrations 023 + 024 + 026) have RLS enabled with zero policies — only the service role can read or write them; the browser cannot reach them at all. The Zapier webhook tables (migration 025) are the same: RLS enabled, zero policies, service-role only.",
+            "A grant is scoped to one user and one workspace and bound to one resource (RFC 8707): a token issued for /api/integrations/zapier does not validate for /api/mcp*, and vice versa. API calls are workspace-scoped and scope-enforced; a zapier.read token cannot call a write endpoint.",
+            "There is no LinkedIn-send action: no authorized LinkedIn provider exists, and the official LinkedIn API exposes no connection-request/DM endpoints to standard developers. Email inbox replies through Zapier are covered by the zapier.write tier and need no per-send approval in Zapier (unlike the MCP sensitive-write approvals).",
+            "Every mutating Zapier API call is written to the audit log for this workspace as a zapier.* entry (see the admin Zapier panel). OAuth-server-level events keep their MUSE_OAUTH_* names — they describe the shared authorization server, not the calling platform.",
+            "Demo Mode refuses the whole Zapier surface (OAuth 503/400, REST API 503) — the demo persona is never served to Zapier.",
+          ].map((note) => (
+            <li key={note} className="flex items-start gap-2 text-13 text-black-300">
+              <Shield className="h-4 w-4 shrink-0 text-purple-400 mt-0.5" />
+              <span className="leading-relaxed">{note}</span>
+            </li>
+          ))}
+        </ul>
+      </Section>
+    </>
+  );
 }
 
 function BackLink() {

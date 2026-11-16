@@ -21,7 +21,7 @@ interface AdminMuseStats {
   /** null = unknown (migration 023 tables could not be read). */
   grantCount: number | null;
   /** Active grants split by client origin; null = unknown. */
-  grantsByOrigin?: { muse: number; chatgpt: number; claude: number; other: number; total: number } | null;
+  grantsByOrigin?: { muse: number; chatgpt: number; claude: number; zapier?: number; other: number; total: number } | null;
   toolCounts: { tool: string; calls: number }[];
   recentErrors: { action: string; resource: string | null; details: string; created_at: string }[];
   recentEvents: { action: string; resource: string | null; details: string; created_at: string }[];
@@ -112,26 +112,28 @@ function AdminMusePanels() {
       <div className="glass-card p-6 space-y-3">
         <h2 className="text-16 font-bold text-white">Grants by client origin</h2>
         <p className="text-12 text-black-400 leading-relaxed">
-          Active grants split by the client that holds them — Muse, ChatGPT, Claude, or Other
-          (a client whose origin cannot be determined, e.g. a loopback-only test client).
-          Classified by client identity (CIMD URL origin / registered redirect URI), with the
-          grant&apos;s scope prefix as fallback. A ChatGPT grant is one whose client is ChatGPT;
-          a Claude grant is one whose client is Claude (claude.ai / claude.com origin or a
-          Claude redirect URI, or a claude.* scope as fallback). Counting by origin is what
-          lets each Integration Center entry show &ldquo;Connected&rdquo; only for a real
-          grant from its own platform.
+          Active grants split by the client that holds them — Muse, ChatGPT, Claude, Zapier,
+          or Other (a client whose origin cannot be determined, e.g. a loopback-only test
+          client). Classified by client identity (CIMD URL origin / registered redirect URI),
+          with the grant&apos;s scope prefix as fallback. A ChatGPT grant is one whose client is
+          ChatGPT; a Claude grant is one whose client is Claude (claude.ai / claude.com origin
+          or a Claude redirect URI, or a claude.* scope as fallback); a Zapier grant is one
+          whose client carries the Zapier redirect URI (or a zapier.* scope as fallback).
+          Counting by origin is what lets each Integration Center entry show &ldquo;Connected&rdquo;
+          only for a real grant from its own platform.
         </p>
         {!data.grantsByOrigin ? (
           <p className="text-13 text-black-300 leading-relaxed">
             Unknown — migration 023 tables could not be read.
           </p>
         ) : (
-          <dl className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+          <dl className="grid grid-cols-1 sm:grid-cols-6 gap-4">
             {(
               [
                 ["Muse", data.grantsByOrigin.muse],
                 ["ChatGPT", data.grantsByOrigin.chatgpt],
                 ["Claude", data.grantsByOrigin.claude],
+                ["Zapier", data.grantsByOrigin.zapier ?? 0],
                 ["Other", data.grantsByOrigin.other],
                 ["Total", data.grantsByOrigin.total],
               ] as const

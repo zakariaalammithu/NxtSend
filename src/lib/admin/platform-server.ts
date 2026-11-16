@@ -81,6 +81,7 @@ import {
   getClaudePublicUrl,
 } from "@/lib/muse-connector/oauth/config";
 import { countActiveMuseGrants, countActiveGrantsByOrigin } from "@/lib/muse-connector/grants";
+import { isZapierEnabled, getZapierBaseUrl } from "@/lib/integrations/zapier/config";
 import { PLAN_CATALOG } from "@/lib/billing/plans";
 import {
   mapBillingEventToTransaction,
@@ -1318,6 +1319,69 @@ export async function getSystemHealth(mode: DataMode): Promise<HealthSummary> {
           claudeGrants === 0
             ? `Claude MCP surface is configured at ${claudePublicUrl}; no active grants yet (no Claude user has connected).`
             : `Claude MCP surface is configured at ${claudePublicUrl}; ${claudeGrants} active grant(s) platform-wide.`,
+      });
+    }
+  }
+
+  // ── Zapier connector (REST API + REST Hooks + OAuth) ──────────────────
+  // Same shape as the MCP checks: configured when ZAPIER_ENABLED is
+  // on and a public URL is set; zero grants is normal, not a
+  // failure; a null grant count means the migration 023 tables
+  // could not be read. "Healthy" here never claims a connection —
+  // grants are counted separately.
+  if (mode === "demo") {
+    checks.push({
+      id: "zapier",
+      label: "Zapier connector (REST API + OAuth)",
+      status: "warning",
+      required: false,
+      message:
+        "Demo Mode: the Zapier REST API + webhook surface is unavailable — no grants can be issued or used.",
+    });
+  } else {
+    const zapierEnabled = isZapierEnabled();
+    const zapierBaseUrl = getZapierBaseUrl();
+    let zapierGrants: number | null = null;
+    const zapierAdmin = createAdminClient();
+    if (zapierAdmin) {
+      const byOrigin = await countActiveGrantsByOrigin(zapierAdmin).catch(() => null);
+      zapierGrants = byOrigin ? byOrigin.zapier : null;
+    }
+    if (!zapierEnabled) {
+      checks.push({
+        id: "zapier",
+        label: "Zapier connector (REST API + OAuth)",
+        status: "warning",
+        required: false,
+        message: "Zapier REST surface is disabled (ZAPIER_ENABLED is false).",
+      });
+    } else if (!zapierBaseUrl) {
+      checks.push({
+        id: "zapier",
+        label: "Zapier connector (REST API + OAuth)",
+        status: "warning",
+        required: false,
+        message:
+          "Zapier REST surface is enabled but no public URL is set (ZAPIER_APP_BASE_URL or NEXT_PUBLIC_APP_URL).",
+      });
+    } else if (zapierGrants === null) {
+      checks.push({
+        id: "zapier",
+        label: "Zapier connector (REST API + OAuth)",
+        status: "warning",
+        required: false,
+        message: `Zapier REST surface is configured at ${zapierBaseUrl}, but the OAuth tables could not be read — migration 023 may not be applied to this project.`,
+      });
+    } else {
+      checks.push({
+        id: "zapier",
+        label: "Zapier connector (REST API + OAuth)",
+        status: "ok",
+        required: false,
+        message:
+          zapierGrants === 0
+            ? `Zapier REST surface is configured at ${zapierBaseUrl}; no active grants yet (no Zapier user has connected).`
+            : `Zapier REST surface is configured at ${zapierBaseUrl}; ${zapierGrants} active grant(s) platform-wide.`,
       });
     }
   }

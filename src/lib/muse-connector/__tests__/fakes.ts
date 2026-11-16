@@ -60,6 +60,7 @@ export function makeLead(over: Partial<Lead> & { workspace_id: string }): Lead {
     tags: [...(over.tags ?? [])],
     custom_fields: { ...(over.custom_fields ?? {}) },
     created_at: over.created_at ?? new Date().toISOString(),
+    ...(over.updated_at ? { updated_at: over.updated_at } : {}),
   };
 }
 

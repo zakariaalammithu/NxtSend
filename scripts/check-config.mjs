@@ -64,6 +64,8 @@ const CATALOG = [
   ["LINKEDIN_PROVIDER_API_KEY", "integrations", false],
   ["MUSE_MCP_ENABLED", "integrations", false],
   ["MUSE_MCP_PUBLIC_URL", "integrations", false],
+  ["CHATGPT_MCP_ENABLED", "integrations", false],
+  ["CHATGPT_MCP_PUBLIC_URL", "integrations", false],
 ];
 
 const GROUP_LABELS = {

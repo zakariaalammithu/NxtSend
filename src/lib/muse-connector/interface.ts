@@ -60,7 +60,15 @@ export interface MuseConnectorAdapter {
   handleToolCall(
     toolName: string,
     input: Record<string, unknown>,
-    caller: { subject: string; scopes: string[]; workspaceId?: string }
+    caller: {
+      subject: string;
+      scopes: string[];
+      workspaceId?: string;
+      /** OAuth client id, when the transport resolved one (profile tool). */
+      clientId?: string;
+      /** Grant id (client + user pair), when the transport resolved one. */
+      grantId?: string;
+    }
   ): Promise<MuseConnectorResult>;
   /** Liveness of the hosted surface (for Meta's review + monitoring). */
   healthCheck(): Promise<MuseConnectorResult>;

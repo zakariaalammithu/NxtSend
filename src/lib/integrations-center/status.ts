@@ -26,6 +26,8 @@ import { isPixelConfigured } from "@/lib/analytics/pixel";
 import {
   isMuseMcpEnabled,
   getMusePublicUrl,
+  isChatGptMcpEnabled,
+  getChatGptPublicUrl,
 } from "@/lib/muse-connector/oauth/config";
 import { INTEGRATION_REGISTRY } from "./registry";
 import type {
@@ -94,6 +96,14 @@ export interface IntegrationStatusOptions {
    * A grant is the ONLY thing that can make muse-ai "Connected".
    */
   museGrantsActive?: number | null;
+  /**
+   * Number of ACTIVE ChatGPT OAuth grants for the caller's workspace
+   * (live mode, counted from muse_oauth_tokens by client origin —
+   * see countActiveGrantsByOrigin). Same rule as museGrantsActive:
+   * null = unknown, and a grant is the ONLY thing that can make
+   * the chatgpt entry "Connected".
+   */
+  chatgptGrantsActive?: number | null;
 }
 
 interface DerivedStatus {
@@ -109,7 +119,8 @@ function deriveStatus(
   mode: DataMode,
   webhookConfigured: boolean | null,
   oauthMailboxes?: Partial<Record<OAuthProvider, OAuthMailboxSummary | null>>,
-  museGrantsActive?: number | null
+  museGrantsActive?: number | null,
+  chatgptGrantsActive?: number | null
 ): DerivedStatus {
   const demo = mode === "demo";
   switch (id) {
@@ -397,6 +408,50 @@ function deriveStatus(
         configured: false,
       };
     }
+    case "chatgpt": {
+      // Same rule as muse-ai, for the ChatGPT surface
+      // (/api/mcp/chatgpt, nxtsend.* scopes, migration 023 + 024):
+      // Demo Mode refuses the surface; a real, active ChatGPT
+      // OAuth grant is the ONLY thing that yields "Connected"
+      // (and it is Verified — the grant exists only after a
+      // completed OAuth exchange); enabled + public URL set, no
+      // grant, is "Connected but Not Verified" — configuration
+      // alone is never a connection. `configured` stays false
+      // without a grant, so a stale verification record can never
+      // upgrade config to Verified.
+      if (demo) {
+        return {
+          status: "Demo Mode",
+          message:
+            "Demo Mode: the ChatGPT OAuth + MCP surface is unavailable — no grant can be issued or used.",
+          configured: false,
+        };
+      }
+      if (chatgptGrantsActive != null && chatgptGrantsActive > 0) {
+        return {
+          status: "Connected and Verified",
+          message: `${chatgptGrantsActive} active ChatGPT OAuth grant(s) exist for this workspace — ChatGPT can call the MCP server on behalf of the granting user(s). Manage them from the grants panel on the detail page.`,
+          configured: true,
+        };
+      }
+      const chatgptEnabled = isChatGptMcpEnabled(env);
+      const chatgptPublicUrl = getChatGptPublicUrl(undefined, env);
+      if (chatgptEnabled && chatgptPublicUrl) {
+        return {
+          status: "Connected but Not Verified",
+          message:
+            "ChatGPT MCP surface is configured (CHATGPT_MCP_ENABLED / MUSE_MCP_ENABLED + public URL are set). That is configuration, not a connection — 'Connected' requires a real OAuth grant; see the grants panel on the detail page.",
+          configured: false,
+        };
+      }
+      return {
+        status: chatgptEnabled ? "Configuration Required" : "Not Connected",
+        message: chatgptEnabled
+          ? "ChatGPT MCP surface is enabled but no public URL is set (CHATGPT_MCP_PUBLIC_URL, MUSE_MCP_PUBLIC_URL or NEXT_PUBLIC_APP_URL) — ChatGPT cannot reach the connector until one is set."
+          : "ChatGPT MCP surface is disabled (CHATGPT_MCP_ENABLED — or MUSE_MCP_ENABLED as its fallback — is false).",
+        configured: false,
+      };
+    }
     case "google-sheets":
     case "crm":
     case "email-verification":
@@ -430,7 +485,8 @@ export function getIntegrationStatuses(
       mode,
       webhookConfigured,
       options.oauthMailboxes,
-      options.museGrantsActive
+      options.museGrantsActive,
+      options.chatgptGrantsActive
     );
     const record = verifications[descriptor.id] ?? null;
     let status = applyVerification(derived.status, derived.configured, record);

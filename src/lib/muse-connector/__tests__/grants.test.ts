@@ -15,7 +15,10 @@ import {
   summarizeMuseGrants,
   listMuseGrants,
   revokeMuseGrant,
+  grantOriginForClient,
+  summarizeGrantsByOrigin,
   type MuseGrantTokenRow,
+  type GrantCountRow,
   type MuseGrantsDataSource,
 } from "../grants";
 import { createMemoryMuseOAuthStore } from "../oauth/store";
@@ -164,6 +167,7 @@ describe("listMuseGrants / revokeMuseGrant (fake source + memory store)", () => 
       user_id: "user-1",
       workspace_id: "ws-1",
       scopes: ["muse.read"],
+      resource: null,
       expires_at: FUTURE,
       revoked_at: null,
       rotated_from_hash: null,
@@ -185,5 +189,90 @@ describe("listMuseGrants / revokeMuseGrant (fake source + memory store)", () => 
       now: NOW,
     });
     expect(missing).toEqual({ ok: false, error: "grant_not_found" });
+  });
+});
+
+// ── Grants by client origin (Worker C) ──────────────────────────────────────
+
+describe("grantOriginForClient", () => {
+  it("classifies by registered redirect URI", () => {
+    expect(
+      grantOriginForClient("client-a", ["https://chatgpt.com/connector_platform_oauth_redirect"])
+    ).toBe("ChatGPT");
+    expect(
+      grantOriginForClient("client-b", ["https://agent.meta.ai/api/hatch/oauth/callback"])
+    ).toBe("Muse");
+    expect(grantOriginForClient("client-c", ["http://localhost:3000/callback"])).toBe("Other");
+  });
+
+  it("classifies an ephemeral CIMD client by its client_id URL origin", () => {
+    // A CIMD client has no stored client row, so the URL is the only signal.
+    expect(grantOriginForClient("https://chatgpt.com/some-client", [])).toBe("ChatGPT");
+    expect(grantOriginForClient("https://agent.meta.ai/some-client", [])).toBe("Muse");
+    expect(grantOriginForClient("https://example.com/some-client", [])).toBe("Other");
+  });
+});
+
+describe("summarizeGrantsByOrigin", () => {
+  const countRow = (
+    partial: Partial<GrantCountRow> & { client_id: string; user_id: string }
+  ): GrantCountRow => ({
+    kind: "refresh",
+    expires_at: FUTURE,
+    revoked_at: null,
+    scopes: ["muse.read"],
+    ...partial,
+  });
+
+  it("splits distinct live client+user pairs by origin", () => {
+    const clients: MuseOAuthClientRow[] = [
+      ...CLIENTS,
+      {
+        id: "c3",
+        client_id: "chatgpt-client-a",
+        client_secret_hash: null,
+        name: "ChatGPT",
+        redirect_uris: ["https://chatgpt.com/connector_platform_oauth_redirect"],
+        created_at: "2026-11-10T00:00:00Z",
+      },
+    ];
+    const out = summarizeGrantsByOrigin(
+      [
+        countRow({ client_id: "muse-client-a", user_id: "user-1" }),
+        countRow({ client_id: "muse-client-a", user_id: "user-2" }),
+        countRow({
+          client_id: "chatgpt-client-a",
+          user_id: "user-1",
+          scopes: ["nxtsend.read"],
+        }),
+        // CIMD client: no stored client row, classified by URL.
+        countRow({
+          client_id: "https://chatgpt.com/abc",
+          user_id: "user-1",
+          scopes: ["nxtsend.read", "nxtsend.write"],
+        }),
+        // Same client+user twice = one grant, not two.
+        countRow({ client_id: "muse-client-a", user_id: "user-1" }),
+      ],
+      clients,
+      NOW
+    );
+    expect(out).toEqual({ muse: 2, chatgpt: 2, other: 0, total: 4 });
+  });
+
+  it("ignores expired, revoked and access tokens, and falls back to scope prefix for loopback-only clients", () => {
+    const out = summarizeGrantsByOrigin(
+      [
+        countRow({ client_id: "muse-client-b", user_id: "user-1", expires_at: PAST }),
+        countRow({ client_id: "muse-client-b", user_id: "user-2", revoked_at: "2026-11-15T00:00:00Z" }),
+        countRow({ client_id: "muse-client-b", user_id: "user-3", kind: "access" }),
+        // Loopback-only client (CLIENTS[1]): origin unknown, scope prefix decides.
+        countRow({ client_id: "muse-client-b", user_id: "user-4", scopes: ["nxtsend.read"] }),
+        countRow({ client_id: "muse-client-b", user_id: "user-5", scopes: ["muse.read"] }),
+      ],
+      CLIENTS,
+      NOW
+    );
+    expect(out).toEqual({ muse: 1, chatgpt: 1, other: 0, total: 2 });
   });
 });

@@ -14,8 +14,12 @@ interface AdminMuseStats {
   mode: string;
   mcpEnabled: boolean;
   publicUrl: string | null;
+  chatgptMcpEnabled?: boolean;
+  chatgptPublicUrl?: string | null;
   /** null = unknown (migration 023 tables could not be read). */
   grantCount: number | null;
+  /** Active grants split by client origin; null = unknown. */
+  grantsByOrigin?: { muse: number; chatgpt: number; other: number; total: number } | null;
   toolCounts: { tool: string; calls: number }[];
   recentErrors: { action: string; resource: string | null; details: string; created_at: string }[];
   recentEvents: { action: string; resource: string | null; details: string; created_at: string }[];
@@ -46,12 +50,25 @@ function AdminMusePanels() {
         {data.note && <p className="text-13 text-black-300 leading-relaxed">{data.note}</p>}
         <dl className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <dt className="text-12 text-black-400">MCP surface</dt>
+            <dt className="text-12 text-black-400">Muse MCP surface</dt>
             <dd className="text-14 font-semibold text-white mt-0.5">
               {data.mcpEnabled ? "Enabled" : "Disabled"}
             </dd>
             <dd className="text-12 text-black-400 break-all mt-0.5">
               {data.publicUrl ?? "No public URL set"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-12 text-black-400">ChatGPT MCP surface</dt>
+            <dd className="text-14 font-semibold text-white mt-0.5">
+              {data.chatgptMcpEnabled === undefined
+                ? "Unknown"
+                : data.chatgptMcpEnabled
+                  ? "Enabled"
+                  : "Disabled"}
+            </dd>
+            <dd className="text-12 text-black-400 break-all mt-0.5">
+              {data.chatgptPublicUrl ?? "No public URL set"}
             </dd>
           </div>
           <div>
@@ -75,6 +92,39 @@ function AdminMusePanels() {
             </dd>
           </div>
         </dl>
+      </div>
+
+      <div className="glass-card p-6 space-y-3">
+        <h2 className="text-16 font-bold text-white">Grants by client origin</h2>
+        <p className="text-12 text-black-400 leading-relaxed">
+          Active grants split by the client that holds them — Muse, ChatGPT, or Other
+          (a client whose origin cannot be determined, e.g. a loopback-only test client).
+          Classified by client identity (CIMD URL origin / registered redirect URI), with the
+          grant&apos;s scope prefix as fallback. A ChatGPT grant is one whose client is ChatGPT;
+          counting by origin is what lets the ChatGPT Integration Center entry show
+          &ldquo;Connected&rdquo; only for a real ChatGPT grant.
+        </p>
+        {!data.grantsByOrigin ? (
+          <p className="text-13 text-black-300 leading-relaxed">
+            Unknown — migration 023 tables could not be read.
+          </p>
+        ) : (
+          <dl className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            {(
+              [
+                ["Muse", data.grantsByOrigin.muse],
+                ["ChatGPT", data.grantsByOrigin.chatgpt],
+                ["Other", data.grantsByOrigin.other],
+                ["Total", data.grantsByOrigin.total],
+              ] as const
+            ).map(([label, count]) => (
+              <div key={label}>
+                <dt className="text-12 text-black-400">{label}</dt>
+                <dd className="text-14 font-semibold text-white mt-0.5">{count}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
       </div>
 
       <div className="glass-card p-6 space-y-3">
@@ -186,6 +236,19 @@ export default function AdminMuseAiPage() {
             LinkedIn-send tools stay unsupported: no authorized LinkedIn
             provider exists, and the official LinkedIn API exposes no
             connection-request/DM endpoints to standard developers.
+          </li>
+          <li>
+            ChatGPT grants are listed in the same overview above
+            (&ldquo;Grants by client origin&rdquo;) and on the{" "}
+            <Link
+              href="/dashboard/integrations/chatgpt"
+              className="font-semibold text-purple-400 hover:text-purple-300"
+            >
+              ChatGPT Integration Center page
+            </Link>{" "}
+            — the ChatGPT MCP surface (/api/mcp/chatgpt, 54 tools) shares
+            the same OAuth tables (migrations 023 + 024) and has not
+            been submitted to OpenAI.
           </li>
         </ul>
         <Link

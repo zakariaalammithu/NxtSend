@@ -15,6 +15,8 @@
  */
 
 
+import { SCOPE_TIER_MAP } from "./oauth/scopes";
+
 export type MuseScope = "muse.read" | "muse.write" | "muse.send";
 
 export const TOOL_SCOPES: Record<string, MuseScope> = {
@@ -36,10 +38,75 @@ export const TOOL_SCOPES: Record<string, MuseScope> = {
   send_email: "muse.send",
   send_inbox_reply: "muse.send",
   delete_lead: "muse.write",
+  // ── ChatGPT expansion ──────────────────────────────────────────────
+  // Read -> muse.read, Write -> muse.write. delete_campaign is a
+  // Sensitive write like delete_lead: the classification is a Meta
+  // approval property, not a scope, so it stays muse.write.
+  list_linkedin_accounts: "muse.read",
+  get_linkedin_account: "muse.read",
+  get_subscription_info: "muse.read",
+  get_account_limits: "muse.read",
+  search_campaigns: "muse.read",
+  stop_campaign: "muse.write",
+  delete_campaign: "muse.write",
+  get_campaign_performance: "muse.read",
+  get_campaign_execution_status: "muse.read",
+  search_leads: "muse.read",
+  import_leads: "muse.write",
+  add_leads_to_campaign: "muse.write",
+  remove_leads_from_campaign: "muse.write",
+  detect_duplicate_leads: "muse.read",
+  get_lead_activity_history: "muse.read",
+  list_leads_by_campaign: "muse.read",
+  get_campaign_sequence: "muse.read",
+  create_sequence_step: "muse.write",
+  update_sequence_step: "muse.write",
+  reorder_sequence_steps: "muse.write",
+  get_scheduled_follow_ups: "muse.read",
+  get_sequence_execution_status: "muse.read",
+  get_pending_actions: "muse.read",
+  get_failed_actions: "muse.read",
+  get_automation_execution_report: "muse.read",
+  search_conversations: "muse.read",
+  get_message_execution_status: "muse.read",
+  get_failed_messages: "muse.read",
+  compare_campaigns: "muse.read",
+  get_date_range_report: "muse.read",
+  get_performance_summary: "muse.read",
+  get_usage_report: "muse.read",
+  get_profile: "muse.read",
+  search: "muse.read",
+  fetch: "muse.read",
+  render_campaigns_widget: "muse.read",
 };
 
 export function requiredScope(toolName: string): MuseScope | null {
   return TOOL_SCOPES[toolName] ?? null;
+}
+
+/**
+ * Permission tiers — the scope-tier seam (Worker A owns
+ * SCOPE_TIER_MAP / grantHasTier in ./oauth/scopes.ts). A tool
+ * requires one tier; a grant satisfies a tier when it holds ANY
+ * scope mapping to that tier (muse.read / nxtsend.read -> read,
+ * muse.write / nxtsend.write -> write, muse.send / nxtsend.send ->
+ * send). Tiers are independent: `send` does NOT imply `write` or
+ * `read`. The canonical muse.* scope for a tier is what the
+ * missing-scope error names, so existing callers keep seeing the
+ * scope they asked for.
+ */
+export type ScopeTier = "read" | "write" | "send";
+
+export const TIER_SCOPE: Record<ScopeTier, MuseScope> = {
+  read: "muse.read",
+  write: "muse.write",
+  send: "muse.send",
+};
+
+export function requiredTier(toolName: string): ScopeTier | null {
+  const scope = requiredScope(toolName);
+  if (!scope) return null;
+  return SCOPE_TIER_MAP[scope] ?? null;
 }
 
 export interface ToolInputSchema {
@@ -130,6 +197,7 @@ export const TOOL_INPUT_SCHEMAS: Record<string, ToolInputSchema> = {
       status: str("Initial status.", {
         enum: ["new", "contacted", "replied", "qualified", "converted", "unsubscribed", "bounced"],
       }),
+      idempotencyKey: str("Client idempotency key for retries; defaults to a hash of the inputs."),
     },
     required: ["email"],
     additionalProperties: false,
@@ -148,6 +216,7 @@ export const TOOL_INPUT_SCHEMAS: Record<string, ToolInputSchema> = {
       status: str("Status.", {
         enum: ["new", "contacted", "replied", "qualified", "converted", "unsubscribed", "bounced"],
       }),
+      idempotencyKey: str("Client idempotency key for retries; defaults to a hash of the inputs."),
     },
     required: ["leadId"],
     additionalProperties: false,
@@ -172,25 +241,35 @@ export const TOOL_INPUT_SCHEMAS: Record<string, ToolInputSchema> = {
         additionalProperties: false,
       }),
       description: str("Campaign description."),
+      idempotencyKey: str("Client idempotency key for retries; defaults to a hash of the inputs."),
     },
     required: ["name", "channel", "steps"],
     additionalProperties: false,
   },
   pause_campaign: {
     type: "object",
-    properties: { campaignId: str("Campaign id.") },
+    properties: {
+      campaignId: str("Campaign id."),
+      idempotencyKey: str("Client idempotency key for retries; defaults to a hash of the inputs."),
+    },
     required: ["campaignId"],
     additionalProperties: false,
   },
   resume_campaign: {
     type: "object",
-    properties: { campaignId: str("Campaign id.") },
+    properties: {
+      campaignId: str("Campaign id."),
+      idempotencyKey: str("Client idempotency key for retries; defaults to a hash of the inputs."),
+    },
     required: ["campaignId"],
     additionalProperties: false,
   },
   archive_campaign: {
     type: "object",
-    properties: { campaignId: str("Campaign id.") },
+    properties: {
+      campaignId: str("Campaign id."),
+      idempotencyKey: str("Client idempotency key for retries; defaults to a hash of the inputs."),
+    },
     required: ["campaignId"],
     additionalProperties: false,
   },
@@ -205,6 +284,7 @@ export const TOOL_INPUT_SCHEMAS: Record<string, ToolInputSchema> = {
       leadFirstName: str("Lead first name for personalization."),
       leadCompany: str("Lead company for personalization."),
       leadJobTitle: str("Lead job title for personalization."),
+      idempotencyKey: str("Client idempotency key for retries; defaults to a hash of the inputs."),
     },
     required: ["channel", "stepType"],
     additionalProperties: false,
@@ -233,8 +313,302 @@ export const TOOL_INPUT_SCHEMAS: Record<string, ToolInputSchema> = {
   },
   delete_lead: {
     type: "object",
+    properties: {
+      leadId: str("Lead id."),
+      idempotencyKey: str("Client idempotency key for retries; defaults to a hash of the inputs."),
+    },
+    required: ["leadId"],
+    additionalProperties: false,
+  },
+  // ── ChatGPT expansion ──────────────────────────────────────────────
+  list_linkedin_accounts: { type: "object", properties: {}, additionalProperties: false },
+  get_linkedin_account: {
+    type: "object",
+    properties: { accountId: str("Connected account id.") },
+    required: ["accountId"],
+    additionalProperties: false,
+  },
+  get_subscription_info: { type: "object", properties: {}, additionalProperties: false },
+  get_account_limits: { type: "object", properties: {}, additionalProperties: false },
+  search_campaigns: {
+    type: "object",
+    properties: {
+      query: str("Substring match against the campaign name."),
+      status: str("Filter by status.", { enum: ["draft", "active", "paused", "archived"] }),
+      page: int("1-based page number.", { minimum: 1, default: 1 }),
+      pageSize: int("Rows per page (1-100).", { minimum: 1, maximum: 100, default: 20 }),
+    },
+    additionalProperties: false,
+  },
+  stop_campaign: {
+    type: "object",
+    properties: {
+      campaignId: str("Campaign id."),
+      idempotencyKey: str("Client idempotency key for retries; defaults to a hash of the inputs."),
+    },
+    required: ["campaignId"],
+    additionalProperties: false,
+  },
+  delete_campaign: {
+    type: "object",
+    properties: {
+      campaignId: str("Campaign id."),
+      idempotencyKey: str("Client idempotency key for retries; defaults to a hash of the inputs."),
+    },
+    required: ["campaignId"],
+    additionalProperties: false,
+  },
+  get_campaign_performance: {
+    type: "object",
+    properties: { campaignId: str("Campaign id.") },
+    required: ["campaignId"],
+    additionalProperties: false,
+  },
+  get_campaign_execution_status: {
+    type: "object",
+    properties: {
+      campaignId: str("Campaign id."),
+      page: int("1-based page number.", { minimum: 1, default: 1 }),
+      pageSize: int("Rows per page (1-100).", { minimum: 1, maximum: 100, default: 20 }),
+    },
+    required: ["campaignId"],
+    additionalProperties: false,
+  },
+  search_leads: {
+    type: "object",
+    properties: {
+      query: str("Substring match against name, email or company."),
+      page: int("1-based page number.", { minimum: 1, default: 1 }),
+      pageSize: int("Rows per page (1-100).", { minimum: 1, maximum: 100, default: 20 }),
+    },
+    required: ["query"],
+    additionalProperties: false,
+  },
+  import_leads: {
+    type: "object",
+    properties: {
+      leads: arr("Leads to import (1-100).", {
+        type: "object",
+        properties: {
+          email: { type: "string", format: "email" },
+          first_name: { type: "string" },
+          last_name: { type: "string" },
+          company: { type: "string" },
+          job_title: { type: "string" },
+          linkedin_url: { type: "string" },
+          tags: { type: "array", items: { type: "string" } },
+        },
+        required: ["email"],
+        additionalProperties: false,
+      }),
+      idempotencyKey: str("Client idempotency key for retries; defaults to a hash of the inputs."),
+    },
+    required: ["leads"],
+    additionalProperties: false,
+  },
+  add_leads_to_campaign: {
+    type: "object",
+    properties: {
+      campaignId: str("Campaign id."),
+      leadIds: arr("Lead ids to enroll.", { type: "string" }),
+      idempotencyKey: str("Client idempotency key for retries; defaults to a hash of the inputs."),
+    },
+    required: ["campaignId", "leadIds"],
+    additionalProperties: false,
+  },
+  remove_leads_from_campaign: {
+    type: "object",
+    properties: {
+      campaignId: str("Campaign id."),
+      leadIds: arr("Lead ids to remove.", { type: "string" }),
+      idempotencyKey: str("Client idempotency key for retries; defaults to a hash of the inputs."),
+    },
+    required: ["campaignId", "leadIds"],
+    additionalProperties: false,
+  },
+  detect_duplicate_leads: { type: "object", properties: {}, additionalProperties: false },
+  get_lead_activity_history: {
+    type: "object",
     properties: { leadId: str("Lead id.") },
     required: ["leadId"],
+    additionalProperties: false,
+  },
+  list_leads_by_campaign: {
+    type: "object",
+    properties: {
+      campaignId: str("Campaign id."),
+      page: int("1-based page number.", { minimum: 1, default: 1 }),
+      pageSize: int("Rows per page (1-100).", { minimum: 1, maximum: 100, default: 20 }),
+    },
+    required: ["campaignId"],
+    additionalProperties: false,
+  },
+  get_campaign_sequence: {
+    type: "object",
+    properties: { campaignId: str("Campaign id.") },
+    required: ["campaignId"],
+    additionalProperties: false,
+  },
+  create_sequence_step: {
+    type: "object",
+    properties: {
+      campaignId: str("Campaign id."),
+      stepType: str("Step type.", {
+        enum: ["connection_request", "linkedin_message", "email", "wait", "condition", "like_post", "view_profile", "endorse_skills"],
+      }),
+      delayHours: int("Hours to wait before this step runs.", { minimum: 0, default: 0 }),
+      subject: str("Step subject (email steps)."),
+      content: str("Step content (required for email and linkedin_message steps)."),
+      config: { type: "object", description: "Step-specific config." },
+      idempotencyKey: str("Client idempotency key for retries; defaults to a hash of the inputs."),
+    },
+    required: ["campaignId", "stepType"],
+    additionalProperties: false,
+  },
+  update_sequence_step: {
+    type: "object",
+    properties: {
+      campaignId: str("Campaign id."),
+      stepId: str("Sequence step id."),
+      stepType: str("Step type.", {
+        enum: ["connection_request", "linkedin_message", "email", "wait", "condition", "like_post", "view_profile", "endorse_skills"],
+      }),
+      delayHours: int("Hours to wait before this step runs.", { minimum: 0 }),
+      subject: str("Step subject (email steps)."),
+      content: str("Step content."),
+      config: { type: "object", description: "Step-specific config." },
+      idempotencyKey: str("Client idempotency key for retries; defaults to a hash of the inputs."),
+    },
+    required: ["campaignId", "stepId"],
+    additionalProperties: false,
+  },
+  reorder_sequence_steps: {
+    type: "object",
+    properties: {
+      campaignId: str("Campaign id."),
+      stepIds: arr("Step ids in the new order — exactly the campaign's current steps.", { type: "string" }),
+      idempotencyKey: str("Client idempotency key for retries; defaults to a hash of the inputs."),
+    },
+    required: ["campaignId", "stepIds"],
+    additionalProperties: false,
+  },
+  get_scheduled_follow_ups: {
+    type: "object",
+    properties: {
+      conversationId: str("Only follow-ups for this conversation."),
+      page: int("1-based page number.", { minimum: 1, default: 1 }),
+      pageSize: int("Rows per page (1-100).", { minimum: 1, maximum: 100, default: 20 }),
+    },
+    additionalProperties: false,
+  },
+  get_sequence_execution_status: {
+    type: "object",
+    properties: { campaignId: str("Campaign id.") },
+    required: ["campaignId"],
+    additionalProperties: false,
+  },
+  get_pending_actions: {
+    type: "object",
+    properties: {
+      campaignId: str("Only pending actions for this campaign."),
+      page: int("1-based page number.", { minimum: 1, default: 1 }),
+      pageSize: int("Rows per page (1-100).", { minimum: 1, maximum: 100, default: 20 }),
+    },
+    additionalProperties: false,
+  },
+  get_failed_actions: {
+    type: "object",
+    properties: {
+      campaignId: str("Only failed actions for this campaign."),
+      page: int("1-based page number.", { minimum: 1, default: 1 }),
+      pageSize: int("Rows per page (1-100).", { minimum: 1, maximum: 100, default: 20 }),
+    },
+    additionalProperties: false,
+  },
+  get_automation_execution_report: {
+    type: "object",
+    properties: { campaignId: str("Only this campaign's report (otherwise the whole workspace).") },
+    additionalProperties: false,
+  },
+  search_conversations: {
+    type: "object",
+    properties: {
+      query: str("Substring match against contact name, email, company or subject."),
+      channel: str("Filter by channel.", { enum: ["email", "linkedin"] }),
+      page: int("1-based page number.", { minimum: 1, default: 1 }),
+      pageSize: int("Rows per page (1-100).", { minimum: 1, maximum: 100, default: 20 }),
+    },
+    required: ["query"],
+    additionalProperties: false,
+  },
+  get_message_execution_status: {
+    type: "object",
+    properties: {
+      messageId: str("Message id."),
+      idempotencyKey: str("Idempotency key the message was sent with."),
+      conversationId: str("Conversation id (required when looking up by idempotency key)."),
+    },
+    additionalProperties: false,
+  },
+  get_failed_messages: {
+    type: "object",
+    properties: {
+      page: int("1-based page number.", { minimum: 1, default: 1 }),
+      pageSize: int("Rows per page (1-100).", { minimum: 1, maximum: 100, default: 20 }),
+    },
+    additionalProperties: false,
+  },
+  compare_campaigns: {
+    type: "object",
+    properties: {
+      campaignIds: arr("Campaign ids to compare (2 or more).", { type: "string" }),
+    },
+    required: ["campaignIds"],
+    additionalProperties: false,
+  },
+  get_date_range_report: {
+    type: "object",
+    properties: {
+      startDate: str("Range start (ISO date, e.g. 2026-10-01)."),
+      endDate: str("Range end (ISO date, e.g. 2026-10-31)."),
+    },
+    required: ["startDate", "endDate"],
+    additionalProperties: false,
+  },
+  get_performance_summary: { type: "object", properties: {}, additionalProperties: false },
+  get_usage_report: { type: "object", properties: {}, additionalProperties: false },
+  get_profile: { type: "object", properties: {}, additionalProperties: false },
+  search: {
+    type: "object",
+    properties: { query: str("Search text matched against lead and campaign names, emails and companies.") },
+    required: ["query"],
+    additionalProperties: false,
+  },
+  fetch: {
+    type: "object",
+    properties: { id: str("Lead id or campaign id.") },
+    required: ["id"],
+    additionalProperties: false,
+  },
+  render_campaigns_widget: {
+    type: "object",
+    properties: {
+      campaignIds: arr("Campaign ids to render, from list_campaigns.", { type: "string" }),
+      campaigns: arr("Campaign summaries from list_campaigns (id, name, status, type, enrollments).", {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          status: { type: "string" },
+          type: { type: "string" },
+          enrollments: { type: "integer" },
+        },
+        required: ["id", "name"],
+        additionalProperties: true,
+      }),
+      summary: { type: "object", description: "Optional aggregate summary (from get_campaign_performance or get_performance_summary)." },
+    },
+    required: ["campaignIds"],
     additionalProperties: false,
   },
 };

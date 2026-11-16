@@ -6,10 +6,17 @@
  * (getDataMode() === "demo" → null, fail closed): the demo persona
  * has userId null and must never be served to Muse.
  *
+ * RFC 8707 audience: the expected resource is derived from the
+ * request URL — /api/mcp/chatgpt expects a token bound to the
+ * ChatGPT MCP resource, /api/mcp expects one bound to the Muse
+ * resource. A token issued for one resource NEVER verifies for the
+ * other. Legacy tokens (stored with no resource) verify against
+ * the Muse resource only.
+ *
  * Return shape (stable — do not change without telling the MCP
- * worker): `{ userId, workspaceId, scopes, clientId, grantId } | null`.
- * `grantId` is the `client_id:user_id` pair (there is no separate
- * grant row; see tokens.ts).
+ * worker): `{ userId, workspaceId, scopes, clientId, grantId,
+ * resource } | null`. `grantId` is the `client_id:user_id` pair
+ * (there is no separate grant row; see tokens.ts).
  */
 
 import { getDataMode, type DataMode } from "@/lib/data/mode";
@@ -17,11 +24,17 @@ import { createAdminClient } from "@/lib/supabase/server";
 import type { MuseOAuthStore } from "./store";
 import { createSupabaseMuseOAuthStore } from "./store";
 import { verifyMuseAccessToken, type MuseAccessContext } from "./tokens";
+import { getMcpResourceUrl, resourcePlatform } from "./config";
 
 export interface ResolveMuseContextDeps {
   store?: MuseOAuthStore;
   mode?: DataMode;
   now?: Date;
+  /**
+   * Override the expected resource (audience). When omitted it is
+   * derived from the request URL (see below).
+   */
+  resource?: string | null;
 }
 
 export async function resolveMuseContext(
@@ -36,7 +49,23 @@ export async function resolveMuseContext(
   if (!token) return null;
   const store = deps.store ?? (await getMuseOAuthStore());
   if (!store) return null;
-  return verifyMuseAccessToken(token, { store, mode, now: deps.now });
+  const url = new URL(req.url);
+  const origin = url.origin;
+  // Expected audience from the resource being called. A request
+  // outside the two MCP resources carries no audience expectation
+  // (no enforcement, context still reports the token's audience).
+  let expectedResource: string | null = deps.resource ?? null;
+  if (deps.resource === undefined) {
+    const platform = resourcePlatform(url.href);
+    expectedResource = platform ? getMcpResourceUrl(origin, platform) : null;
+  }
+  return verifyMuseAccessToken(token, {
+    store,
+    mode,
+    now: deps.now,
+    resource: expectedResource,
+    origin,
+  });
 }
 
 async function getMuseOAuthStore(): Promise<MuseOAuthStore | null> {

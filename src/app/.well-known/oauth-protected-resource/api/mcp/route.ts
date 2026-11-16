@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getMusePublicUrl, MUSE_SCOPES } from "@/lib/muse-connector/oauth";
+import { getMusePublicUrl, ALL_OAUTH_SCOPES } from "@/lib/muse-connector/oauth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -25,7 +25,7 @@ export async function GET(req: Request) {
   return NextResponse.json({
     resource: `${origin}/api/mcp`,
     authorization_servers: [origin],
-    scopes_supported: [...MUSE_SCOPES],
+    scopes_supported: [...ALL_OAUTH_SCOPES],
     bearer_methods_supported: ["header"],
   });
 }

@@ -5,20 +5,30 @@
  * meaningful. Not exported to production code.
  */
 
-import type { Lead, Campaign, CampaignStep } from "@/types";
+import type { Lead, Campaign, CampaignStep, ConnectedAccount } from "@/types";
 import type {
   LeadsRepository,
   CampaignsRepository,
   InboxRepository,
   UsageRepository,
   IntegrationsRepository,
+  AccountsRepository,
+  SafetySettingsRepository,
+  ScheduledRepliesRepository,
   WorkspaceUsage,
   CreateLeadInput,
   ActivityEntry,
   EnrollmentRecord,
   CampaignStepDraft,
   CreateCampaignInput,
+  SafetySettings,
+  ScheduledReply,
+  CreateAccountInput,
+  UpdateAccountPatch,
 } from "@/lib/data";
+import { DEFAULT_SAFETY_SETTINGS } from "@/lib/data";
+import type { WarmupUsageCounts } from "@/lib/linkedin/warmup";
+import type { StepExecutionRecord } from "@/lib/executor/types";
 import type {
   InboxConversation,
   InboxMessage,
@@ -403,6 +413,194 @@ export class FakeIntegrationsRepository implements IntegrationsRepository {
   async listIntegrations(workspaceId: string): Promise<Integration[]> {
     return this.integrations.filter((i) => i.workspace_id === workspaceId);
   }
+}
+
+export function makeAccount(over: Partial<ConnectedAccount> & { workspace_id: string }): ConnectedAccount {
+  return {
+    id: over.id ?? nextId("acc"),
+    workspace_id: over.workspace_id,
+    channel: over.channel ?? "linkedin",
+    provider: over.provider ?? "linkedin",
+    display_name: over.display_name ?? "Test LinkedIn",
+    handle_or_email: over.handle_or_email ?? "test-linkedin",
+    avatar_url: over.avatar_url ?? null,
+    status: over.status ?? "connected",
+    provider_account_id: over.provider_account_id ?? null,
+    auth_status: over.auth_status ?? "ok",
+    last_sync_at: over.last_sync_at ?? null,
+    last_error: over.last_error ?? null,
+    warmup_enabled: over.warmup_enabled ?? false,
+    daily_limits: over.daily_limits ?? {
+      connection_requests: 5,
+      messages: 10,
+      profile_views: 20,
+      like_post: 20,
+      endorse_skills: 20,
+      find_email: 20,
+    },
+    warmup_status: over.warmup_status ?? "not_started",
+    warmup_preset: over.warmup_preset ?? null,
+    warmup_schedule: over.warmup_schedule ?? null,
+    warmup_overrides: over.warmup_overrides ?? null,
+    warmup_started_at: over.warmup_started_at ?? null,
+    warmup_paused_at: over.warmup_paused_at ?? null,
+    warmup_paused_ms: over.warmup_paused_ms ?? 0,
+    warmup_graduated_at: over.warmup_graduated_at ?? null,
+    warmup_history: over.warmup_history ?? [],
+    sender_first_name: over.sender_first_name ?? "Test",
+    sender_last_name: over.sender_last_name ?? "User",
+    sender_job_title: over.sender_job_title ?? "",
+    sender_company: over.sender_company ?? "",
+    created_at: over.created_at ?? new Date().toISOString(),
+    updated_at: over.updated_at ?? new Date().toISOString(),
+  };
+}
+
+export class FakeAccountsRepository implements AccountsRepository {
+  readonly mode = "demo" as const;
+  accounts: ConnectedAccount[] = [];
+  /** Per-account counted usage returned by countLinkedInActionsToday. */
+  usedToday: Record<string, WarmupUsageCounts> = {};
+
+  async listAccounts(workspaceId: string): Promise<ConnectedAccount[]> {
+    return this.accounts.filter((a) => a.workspace_id === workspaceId);
+  }
+  async getAccount(workspaceId: string, id: string): Promise<ConnectedAccount | null> {
+    return this.accounts.find((a) => a.id === id && a.workspace_id === workspaceId) ?? null;
+  }
+  async createAccount(workspaceId: string, input: CreateAccountInput): Promise<ConnectedAccount> {
+    const account = makeAccount({
+      workspace_id: workspaceId,
+      channel: input.channel,
+      provider: input.provider,
+      display_name: input.display_name,
+      handle_or_email: input.handle_or_email,
+    });
+    this.accounts.unshift(account);
+    return account;
+  }
+  async updateAccount(id: string, patch: UpdateAccountPatch): Promise<ConnectedAccount> {
+    const idx = this.accounts.findIndex((a) => a.id === id);
+    if (idx < 0) throw new Error(`Account not found: ${id}`);
+    this.accounts[idx] = { ...this.accounts[idx], ...patch };
+    return this.accounts[idx];
+  }
+  async deleteAccount(workspaceId: string, id: string): Promise<void> {
+    this.accounts = this.accounts.filter((a) => !(a.id === id && a.workspace_id === workspaceId));
+  }
+  async countLinkedInActionsToday(
+    _workspaceId: string,
+    accountId: string
+  ): Promise<WarmupUsageCounts> {
+    return (
+      this.usedToday[accountId] ?? {
+        connection_requests: 0,
+        messages: 0,
+        profile_views: 0,
+        like_post: 0,
+        endorse_skills: 0,
+        find_email: 0,
+      }
+    );
+  }
+}
+
+export class FakeSafetySettingsRepository implements SafetySettingsRepository {
+  readonly mode = "demo" as const;
+  settings: Record<string, SafetySettings> = {};
+
+  async get(workspaceId: string): Promise<SafetySettings> {
+    return (
+      this.settings[workspaceId] ?? {
+        workspace_id: workspaceId,
+        daily_connection_cap: DEFAULT_SAFETY_SETTINGS.daily_connection_cap,
+        working_hours_start: DEFAULT_SAFETY_SETTINGS.working_hours_start,
+        working_hours_end: DEFAULT_SAFETY_SETTINGS.working_hours_end,
+        working_days: [...DEFAULT_SAFETY_SETTINGS.working_days],
+        ramp_up_enabled: DEFAULT_SAFETY_SETTINGS.ramp_up_enabled,
+      }
+    );
+  }
+  async save(workspaceId: string, patch: Partial<SafetySettings>): Promise<SafetySettings> {
+    const next = { ...(await this.get(workspaceId)), ...patch, workspace_id: workspaceId };
+    this.settings[workspaceId] = next;
+    return next;
+  }
+}
+
+export function makeScheduledReply(over: Partial<ScheduledReply> & { workspace_id: string }): ScheduledReply {
+  return {
+    id: over.id ?? nextId("sr"),
+    workspace_id: over.workspace_id,
+    conversation_id: over.conversation_id ?? nextId("conv"),
+    body: over.body ?? "Follow-up",
+    scheduled_at: over.scheduled_at ?? new Date().toISOString(),
+    status: over.status ?? "scheduled",
+    created_at: over.created_at ?? new Date().toISOString(),
+  };
+}
+
+export class FakeScheduledRepliesRepository implements ScheduledRepliesRepository {
+  readonly mode = "demo" as const;
+  replies: ScheduledReply[] = [];
+
+  async schedule(workspaceId: string, input: { conversation_id: string; body: string; scheduled_at: string }): Promise<ScheduledReply> {
+    const reply = makeScheduledReply({ workspace_id: workspaceId, ...input });
+    this.replies.push(reply);
+    return reply;
+  }
+  async listUpcoming(workspaceId: string): Promise<ScheduledReply[]> {
+    return this.replies
+      .filter((r) => r.workspace_id === workspaceId && r.status === "scheduled")
+      .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
+  }
+  async listDue(): Promise<ScheduledReply[]> {
+    return this.replies.filter((r) => r.status === "scheduled");
+  }
+  async cancel(id: string): Promise<ScheduledReply> {
+    const r = this.replies.find((x) => x.id === id);
+    if (!r) throw new Error(`Scheduled reply not found: ${id}`);
+    r.status = "cancelled";
+    return r;
+  }
+  async markStatus(id: string, status: ScheduledReply["status"]): Promise<ScheduledReply> {
+    const r = this.replies.find((x) => x.id === id);
+    if (!r) throw new Error(`Scheduled reply not found: ${id}`);
+    r.status = status;
+    return r;
+  }
+  async markSent(id: string): Promise<ScheduledReply> {
+    return this.markStatus(id, "sent");
+  }
+  async markSimulated(id: string): Promise<ScheduledReply> {
+    return this.markStatus(id, "simulated");
+  }
+  async markFailed(id: string): Promise<ScheduledReply> {
+    return this.markStatus(id, "failed");
+  }
+}
+
+export function makeExecution(over: Partial<StepExecutionRecord> & { workspace_id: string; campaign_id: string }): StepExecutionRecord {
+  return {
+    id: over.id ?? nextId("exec"),
+    workspace_id: over.workspace_id,
+    campaign_id: over.campaign_id,
+    enrollment_id: over.enrollment_id ?? nextId("enr"),
+    lead_id: over.lead_id ?? nextId("lead"),
+    step_order: over.step_order ?? 1,
+    step_type: over.step_type ?? "email",
+    channel: over.channel ?? "email",
+    status: over.status ?? "sent",
+    detail: over.detail ?? "",
+    account_id: over.account_id ?? null,
+    message_id: over.message_id ?? null,
+    provider: over.provider ?? null,
+    provider_message_id: over.provider_message_id ?? null,
+    idempotency_key: over.idempotency_key ?? nextId("idem"),
+    simulated: over.simulated ?? false,
+    created_at: over.created_at ?? new Date().toISOString(),
+    updated_at: over.updated_at ?? new Date().toISOString(),
+  };
 }
 
 export class FakeEmailAdapter implements EmailProviderAdapter {

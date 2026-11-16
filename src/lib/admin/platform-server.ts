@@ -75,8 +75,10 @@ import { getBillingState } from "@/lib/billing/state";
 import {
   isMuseMcpEnabled,
   getMusePublicUrl,
+  isChatGptMcpEnabled,
+  getChatGptPublicUrl,
 } from "@/lib/muse-connector/oauth/config";
-import { countActiveMuseGrants } from "@/lib/muse-connector/grants";
+import { countActiveMuseGrants, countActiveGrantsByOrigin } from "@/lib/muse-connector/grants";
 import { PLAN_CATALOG } from "@/lib/billing/plans";
 import {
   mapBillingEventToTransaction,
@@ -1190,6 +1192,68 @@ export async function getSystemHealth(mode: DataMode): Promise<HealthSummary> {
           museGrants === 0
             ? `Muse MCP surface is configured at ${musePublicUrl}; no active grants yet (no Muse user has connected).`
             : `Muse MCP surface is configured at ${musePublicUrl}; ${museGrants} active grant(s) platform-wide.`,
+      });
+    }
+  }
+
+  // ── ChatGPT connector (MCP + OAuth) ─────────────────────────────────
+  // Same shape as the Muse check: configured when the ChatGPT flag
+  // is on and a public URL is set; zero grants is normal, not a
+  // failure; a null grant count means the migration 023 tables
+  // could not be read.
+  if (mode === "demo") {
+    checks.push({
+      id: "chatgpt-mcp",
+      label: "ChatGPT connector (MCP + OAuth)",
+      status: "warning",
+      required: false,
+      message:
+        "Demo Mode: the ChatGPT OAuth + MCP surface is unavailable — no grants can be issued or used.",
+    });
+  } else {
+    const chatgptEnabled = isChatGptMcpEnabled();
+    const chatgptPublicUrl = getChatGptPublicUrl();
+    let chatgptGrants: number | null = null;
+    const chatgptAdmin = createAdminClient();
+    if (chatgptAdmin) {
+      const byOrigin = await countActiveGrantsByOrigin(chatgptAdmin).catch(() => null);
+      chatgptGrants = byOrigin ? byOrigin.chatgpt : null;
+    }
+    if (!chatgptEnabled) {
+      checks.push({
+        id: "chatgpt-mcp",
+        label: "ChatGPT connector (MCP + OAuth)",
+        status: "warning",
+        required: false,
+        message: "ChatGPT MCP surface is disabled (CHATGPT_MCP_ENABLED — or its MUSE_MCP_ENABLED fallback — is false).",
+      });
+    } else if (!chatgptPublicUrl) {
+      checks.push({
+        id: "chatgpt-mcp",
+        label: "ChatGPT connector (MCP + OAuth)",
+        status: "warning",
+        required: false,
+        message:
+          "ChatGPT MCP surface is enabled but no public URL is set (CHATGPT_MCP_PUBLIC_URL, MUSE_MCP_PUBLIC_URL or NEXT_PUBLIC_APP_URL).",
+      });
+    } else if (chatgptGrants === null) {
+      checks.push({
+        id: "chatgpt-mcp",
+        label: "ChatGPT connector (MCP + OAuth)",
+        status: "warning",
+        required: false,
+        message: `ChatGPT MCP surface is configured at ${chatgptPublicUrl}, but the OAuth tables could not be read — migration 023 may not be applied to this project.`,
+      });
+    } else {
+      checks.push({
+        id: "chatgpt-mcp",
+        label: "ChatGPT connector (MCP + OAuth)",
+        status: "ok",
+        required: false,
+        message:
+          chatgptGrants === 0
+            ? `ChatGPT MCP surface is configured at ${chatgptPublicUrl}; no active grants yet (no ChatGPT user has connected).`
+            : `ChatGPT MCP surface is configured at ${chatgptPublicUrl}; ${chatgptGrants} active grant(s) platform-wide.`,
       });
     }
   }

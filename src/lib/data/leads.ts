@@ -106,6 +106,30 @@ export async function getLeadById(
   return leads.find((l) => l.id === id) ?? null;
 }
 
+/**
+ * Server-side lead search over the workspace-scoped list: matches a
+ * case-insensitive substring against name, email or company. Same
+ * matching as the adapter's list_leads query filter, exposed so MCP
+ * tools (search_leads, search) share one implementation. No new
+ * repository method: the list is already workspace-scoped by the
+ * repository, so this can never return another workspace's lead.
+ * An empty/blank query returns the whole workspace list.
+ */
+export async function searchLeads(
+  repo: LeadsRepository,
+  workspaceId: string,
+  query: string
+): Promise<Lead[]> {
+  const leads = await repo.listLeads(workspaceId);
+  const q = query.trim().toLowerCase();
+  if (!q) return leads;
+  return leads.filter((l) =>
+    `${l.first_name ?? ""} ${l.last_name ?? ""} ${l.email ?? ""} ${l.company ?? ""}`
+      .toLowerCase()
+      .includes(q)
+  );
+}
+
 // ============================================================================
 // Demo backend
 // ============================================================================

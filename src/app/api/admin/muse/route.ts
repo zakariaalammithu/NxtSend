@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { resolveAdminGate } from "@/lib/admin/platform-server";
 import { createAdminClient } from "@/lib/supabase/server";
-import { countActiveMuseGrants } from "@/lib/muse-connector/grants";
+import { countActiveMuseGrants, countActiveGrantsByOrigin, EMPTY_GRANTS_BY_ORIGIN, type GrantsByOrigin } from "@/lib/muse-connector/grants";
 import {
   isMuseMcpEnabled,
   getMusePublicUrl,
+  isChatGptMcpEnabled,
+  getChatGptPublicUrl,
 } from "@/lib/muse-connector/oauth/config";
 
 export const dynamic = "force-dynamic";
@@ -23,13 +25,17 @@ export interface AdminMuseEvent {
 }
 
 /**
- * GET /api/admin/muse — platform-admin Muse overview (behind
+ * GET /api/admin/muse — platform-admin MCP overview (behind
  * resolveAdminGate; demo mode returns labelled zeros).
  *
  * Live mode reads, through the service role only:
  *   - active grant count (distinct client + user pairs with a live
  *     refresh token; null when the migration 023 tables cannot be
  *     read, reported as `grantCount: null` = unknown, never zero);
+ *   - the same grants split by client origin (`grantsByOrigin`:
+ *     Muse vs ChatGPT vs Other — see countActiveGrantsByOrigin in
+ *     src/lib/muse-connector/grants.ts);
+ *   - whether the ChatGPT MCP surface is enabled + its public URL;
  *   - MCP tool-call counts from audit_logs (`muse.tool.*` actions);
  *   - recent Muse errors: Muse audit entries whose detail mentions
  *     a failure/denial, plus OAuth denies — labelled as what they
@@ -50,11 +56,14 @@ export async function GET() {
       mode: "demo",
       mcpEnabled: isMuseMcpEnabled(),
       publicUrl: getMusePublicUrl(),
+      chatgptMcpEnabled: isChatGptMcpEnabled(),
+      chatgptPublicUrl: getChatGptPublicUrl(),
       grantCount: 0,
+      grantsByOrigin: { ...EMPTY_GRANTS_BY_ORIGIN } as GrantsByOrigin,
       toolCounts: [] as AdminMuseToolCount[],
       recentErrors: [] as AdminMuseEvent[],
       recentEvents: [] as AdminMuseEvent[],
-      note: "Demo Mode: the Muse OAuth + MCP surface is unavailable — no grants or tool calls exist.",
+      note: "Demo Mode: the Muse and ChatGPT OAuth + MCP surfaces are unavailable — no grants or tool calls exist.",
     });
   }
 
@@ -67,6 +76,7 @@ export async function GET() {
   }
 
   const grantCount = await countActiveMuseGrants(admin, {});
+  const grantsByOrigin = await countActiveGrantsByOrigin(admin);
 
   let toolCounts: AdminMuseToolCount[] = [];
   let recentErrors: AdminMuseEvent[] = [];
@@ -126,7 +136,10 @@ export async function GET() {
     mode: gate.mode,
     mcpEnabled: isMuseMcpEnabled(),
     publicUrl: getMusePublicUrl(),
+    chatgptMcpEnabled: isChatGptMcpEnabled(),
+    chatgptPublicUrl: getChatGptPublicUrl(),
     grantCount,
+    grantsByOrigin,
     toolCounts,
     recentErrors,
     recentEvents,

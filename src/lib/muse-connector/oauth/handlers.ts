@@ -14,7 +14,9 @@
 import { NextResponse } from "next/server";
 import { SUPPORT_BODY_LIMIT_BYTES } from "@/lib/support/route-helpers";
 import { verifyCodeChallenge } from "./pkce";
-import { parseMuseScopes } from "./scopes";
+import { ALL_OAUTH_SCOPES } from "./scopes";
+import { isCimdClientId, resolveCimdClient } from "./cimd";
+import { getOAuthIssuer } from "./config";
 import {
   hashToken,
   issueMuseTokens,
@@ -82,9 +84,23 @@ interface ClientAuth {
   client: MuseOAuthClientRow | null;
   clientId: string | null;
   clientSecret: string | null;
+  /**
+   * True when the resolved CIMD document declared
+   * `private_key_jwt`: the client is treated as public, and any
+   * client assertion is refused (see handleMuseTokenRequest).
+   */
+  privateKeyJwtDeclared?: boolean;
 }
 
-/** Client auth from body params or HTTP Basic (RFC 6749 §2.3.1). */
+/**
+ * Client auth from body params or HTTP Basic (RFC 6749 §2.3.1).
+ * A `client_id` that is an https URL is resolved as a CIMD client
+ * (./cimd.ts) when no registered client matches — the ephemeral
+ * row is returned, never stored. `private_key_jwt` is NOT
+ * supported: a CIMD document declaring it resolves as a public
+ * client, and a presented `client_assertion` is refused by the
+ * token handler with `invalid_client`.
+ */
 export async function authenticateMuseClient(
   store: MuseOAuthStore,
   req: Request,
@@ -107,7 +123,19 @@ export async function authenticateMuseClient(
   }
   if (!clientId) return { client: null, clientId: null, clientSecret };
   const client = await store.getClient(clientId);
-  return { client, clientId, clientSecret };
+  if (client) return { client, clientId, clientSecret };
+  if (isCimdClientId(clientId)) {
+    const resolved = await resolveCimdClient(clientId);
+    if (resolved.ok) {
+      return {
+        client: resolved.client,
+        clientId,
+        clientSecret,
+        privateKeyJwtDeclared: resolved.privateKeyJwtDeclared,
+      };
+    }
+  }
+  return { client: null, clientId, clientSecret };
 }
 
 function invalidClient(): MuseHandlerResult {
@@ -119,7 +147,8 @@ function invalidClient(): MuseHandlerResult {
 async function exchangeCode(
   deps: MuseTokenHandlerDeps,
   client: MuseOAuthClientRow,
-  params: URLSearchParams
+  params: URLSearchParams,
+  issuer: string
 ): Promise<MuseHandlerResult> {
   const now = deps.now ?? new Date();
   const code = params.get("code");
@@ -142,6 +171,15 @@ async function exchangeCode(
   if (row.redirect_uri !== redirectUri) {
     return oauthError(400, "invalid_grant", "redirect_uri does not match the authorize request.");
   }
+  // RFC 8707: the resource presented here must equal the resource
+  // the code was issued for (byte-for-byte). A code issued without
+  // a resource (legacy) accepts no resource parameter at all.
+  const presentedResource = params.get("resource");
+  if (presentedResource !== null) {
+    if (!row.resource || presentedResource !== row.resource) {
+      return oauthError(400, "invalid_target", "resource does not match the authorization request.");
+    }
+  }
   if (!verifyCodeChallenge(verifier, row.code_challenge)) {
     return oauthError(400, "invalid_grant", "PKCE code_verifier does not match the code_challenge.");
   }
@@ -151,6 +189,7 @@ async function exchangeCode(
     userId: row.user_id,
     workspaceId: row.workspace_id,
     scopes: row.scopes,
+    resource: row.resource,
   };
   const tokens = await issueMuseTokens(deps.store, grant, now);
   await deps.audit?.({
@@ -160,16 +199,18 @@ async function exchangeCode(
     resource: `muse_oauth_client:${row.client_id}`,
     details: `Authorization code exchanged for tokens (scopes: ${row.scopes.join(" ")}).`,
   });
-  return { status: 200, body: tokenResponseBody(tokens) };
+  return { status: 200, body: tokenResponseBody(tokens, issuer) };
 }
 
-function tokenResponseBody(tokens: MuseIssuedTokens): Record<string, unknown> {
+function tokenResponseBody(tokens: MuseIssuedTokens, issuer: string): Record<string, unknown> {
   return {
     access_token: tokens.access_token,
     token_type: tokens.token_type,
     expires_in: tokens.expires_in,
     refresh_token: tokens.refresh_token,
     scope: tokens.scope,
+    /** RFC 9207: the authorization server issuer. */
+    iss: issuer,
   };
 }
 
@@ -177,7 +218,11 @@ function tokenResponseBody(tokens: MuseIssuedTokens): Record<string, unknown> {
  * POST /api/muse/oauth/token — grant_types `authorization_code`
  * (single-use code + PKCE S256 verifier) and `refresh_token`
  * (rotates on every use; reuse of an already-rotated refresh token
- * revokes the whole grant).
+ * revokes the whole grant). Public clients send no secret;
+ * confidential clients authenticate with client_secret (body or
+ * HTTP Basic); CIMD clients authenticate as public clients.
+ * `private_key_jwt` is NOT supported — any `client_assertion` is
+ * refused with `invalid_client`. Responses carry RFC 9207 `iss`.
  */
 export async function handleMuseTokenRequest(
   req: Request,
@@ -189,12 +234,22 @@ export async function handleMuseTokenRequest(
   if (grantType !== "authorization_code" && grantType !== "refresh_token") {
     return oauthError(400, "unsupported_grant_type", "Only authorization_code and refresh_token are supported.");
   }
+  // private_key_jwt is not implemented: refuse any JWT bearer
+  // client assertion outright, before any client lookup.
+  if (params.get("client_assertion") || params.get("client_assertion_type")) {
+    return oauthError(
+      401,
+      "invalid_client",
+      "private_key_jwt client authentication is not supported by this authorization server. Use a public client with PKCE (token_endpoint_auth_method \"none\") or register a confidential client via Dynamic Client Registration."
+    );
+  }
+  const issuer = getOAuthIssuer(new URL(req.url).origin);
   const { client, clientSecret } = await authenticateMuseClient(deps.store, req, params);
   if (!client) return invalidClient();
   if (!verifyClientSecret(client, clientSecret)) return invalidClient();
 
   if (grantType === "authorization_code") {
-    return exchangeCode(deps, client, params);
+    return exchangeCode(deps, client, params, issuer);
   }
   const refreshToken = params.get("refresh_token");
   if (!refreshToken) {
@@ -223,7 +278,7 @@ export async function handleMuseTokenRequest(
     resource: `muse_oauth_client:${result.grant.clientId}`,
     details: "Refresh token rotated.",
   });
-  return { status: 200, body: tokenResponseBody(result.tokens) };
+  return { status: 200, body: tokenResponseBody(result.tokens, issuer) };
 }
 
 // ── Revoke endpoint ─────────────────────────────────────────────────────────
@@ -366,7 +421,7 @@ export async function handleMuseRegisterRequest(
     token_endpoint_auth_method: confidential ? "client_secret_post" : "none",
     grant_types: ["authorization_code", "refresh_token"],
     response_types: ["code"],
-    scope: parseMuseScopes(null)?.join(" ") ?? "muse.read",
+    scope: [...ALL_OAUTH_SCOPES].join(" "),
   };
   if (result.clientSecret) {
     response.client_secret = result.clientSecret;

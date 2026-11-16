@@ -10,7 +10,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { MuseScope } from "./scopes";
+import type { OAuthScope } from "./scopes";
 
 export interface MuseOAuthClientRow {
   id: string;
@@ -27,9 +27,11 @@ export interface MuseOAuthCodeRow {
   client_id: string;
   user_id: string;
   workspace_id: string;
-  scopes: MuseScope[];
+  scopes: OAuthScope[];
   code_challenge: string;
   redirect_uri: string;
+  /** RFC 8707 resource the code is bound to (full MCP resource URL), or null for legacy rows. */
+  resource: string | null;
   expires_at: string;
   used_at: string | null;
 }
@@ -40,7 +42,9 @@ export interface MuseOAuthTokenRow {
   client_id: string;
   user_id: string;
   workspace_id: string;
-  scopes: MuseScope[];
+  scopes: OAuthScope[];
+  /** RFC 8707 audience the token is bound to (full MCP resource URL), or null for legacy rows. */
+  resource: string | null;
   expires_at: string;
   revoked_at: string | null;
   rotated_from_hash: string | null;
@@ -71,8 +75,12 @@ export interface MuseOAuthStore {
 
 type Row = Record<string, unknown>;
 
-function scopesOf(value: unknown): MuseScope[] {
-  return Array.isArray(value) ? (value as MuseScope[]) : [];
+function scopesOf(value: unknown): OAuthScope[] {
+  return Array.isArray(value) ? (value as OAuthScope[]) : [];
+}
+
+function resourceOf(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 export function createMemoryMuseOAuthStore(nowFn: () => Date = () => new Date()): MuseOAuthStore {
@@ -175,6 +183,7 @@ function rowToCode(row: Row): MuseOAuthCodeRow {
     scopes: scopesOf(row.scopes),
     code_challenge: String(row.code_challenge ?? ""),
     redirect_uri: String(row.redirect_uri ?? ""),
+    resource: resourceOf(row.resource),
     expires_at: String(row.expires_at),
     used_at: (row.used_at as string | null) ?? null,
   };
@@ -188,10 +197,38 @@ function rowToToken(row: Row): MuseOAuthTokenRow {
     user_id: String(row.user_id),
     workspace_id: String(row.workspace_id),
     scopes: scopesOf(row.scopes),
+    resource: resourceOf(row.resource),
     expires_at: String(row.expires_at),
     revoked_at: (row.revoked_at as string | null) ?? null,
     rotated_from_hash: (row.rotated_from_hash as string | null) ?? null,
   };
+}
+
+/**
+ * Inserts a row carrying a `resource` value. Migration 024 adds
+ * the `resource` column; when a deployment has not applied it yet
+ * the insert fails on the unknown column — in that case retry
+ * without the column so issuance keeps working (the token then
+ * carries no audience and verifies against the default Muse
+ * resource, exactly like a legacy token). Any other error is
+ * rethrown.
+ */
+async function insertWithResourceFallback(
+  admin: SupabaseClient,
+  table: "muse_oauth_codes" | "muse_oauth_tokens",
+  row: Record<string, unknown>,
+  failureLabel: string
+): Promise<void> {
+  const { error } = await admin.from(table).insert(row);
+  if (!error) return;
+  if (typeof error.message === "string" && error.message.includes("resource")) {
+    const { resource: _dropped, ...withoutResource } = row;
+    void _dropped;
+    const retry = await admin.from(table).insert(withoutResource);
+    if (!retry.error) return;
+    throw new Error(`Failed to store ${failureLabel}: ${retry.error.message}`);
+  }
+  throw new Error(`Failed to store ${failureLabel}: ${error.message}`);
 }
 
 export function createSupabaseMuseOAuthStore(admin: SupabaseClient): MuseOAuthStore {
@@ -255,7 +292,7 @@ export function createSupabaseMuseOAuthStore(admin: SupabaseClient): MuseOAuthSt
       return Boolean(token);
     },
     async insertCode(row) {
-      const { error } = await admin.from("muse_oauth_codes").insert({
+      await insertWithResourceFallback(admin, "muse_oauth_codes", {
         code_hash: row.code_hash,
         client_id: row.client_id,
         user_id: row.user_id,
@@ -263,9 +300,9 @@ export function createSupabaseMuseOAuthStore(admin: SupabaseClient): MuseOAuthSt
         scopes: row.scopes,
         code_challenge: row.code_challenge,
         redirect_uri: row.redirect_uri,
+        resource: row.resource,
         expires_at: row.expires_at,
-      });
-      if (error) throw new Error(`Failed to store Muse authorization code: ${error.message}`);
+      }, "Muse authorization code");
     },
     async getCode(codeHash) {
       const { data, error } = await admin
@@ -284,18 +321,18 @@ export function createSupabaseMuseOAuthStore(admin: SupabaseClient): MuseOAuthSt
       if (error) throw new Error(`Failed to mark Muse authorization code used: ${error.message}`);
     },
     async insertToken(row) {
-      const { error } = await admin.from("muse_oauth_tokens").insert({
+      await insertWithResourceFallback(admin, "muse_oauth_tokens", {
         token_hash: row.token_hash,
         kind: row.kind,
         client_id: row.client_id,
         user_id: row.user_id,
         workspace_id: row.workspace_id,
         scopes: row.scopes,
+        resource: row.resource,
         expires_at: row.expires_at,
         revoked_at: row.revoked_at,
         rotated_from_hash: row.rotated_from_hash,
-      });
-      if (error) throw new Error(`Failed to store Muse OAuth token: ${error.message}`);
+      }, "Muse OAuth token");
     },
     async getToken(tokenHash) {
       const { data, error } = await admin

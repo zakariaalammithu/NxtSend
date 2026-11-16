@@ -331,6 +331,48 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     verifySupported: false,
   },
   {
+    id: "chatgpt",
+    name: "ChatGPT (OpenAI)",
+    category: "AI providers",
+    tagline: "OpenAI's ChatGPT — NxtSend is the server in this relationship.",
+    description:
+      "ChatGPT (chatgpt.com) connects to NxtSend through OpenAI's connector platform in the opposite direction from the AI-drafting entry: NxtSend exposes its own OAuth 2.1 server (authorization code + PKCE S256, Dynamic Client Registration and Client ID Metadata Documents) and a hosted MCP server for ChatGPT (Streamable HTTP, JSON-RPC 2.0, 54 tools at /api/mcp/chatgpt), and ChatGPT calls INTO NxtSend on behalf of a signed-in NxtSend user. That surface is IMPLEMENTED in this codebase (src/lib/muse-connector/oauth/, src/app/api/mcp/chatgpt/, migrations 023 + 024) and testable today in ChatGPT's Developer Mode — but it has NOT been submitted to OpenAI and is NOT approved, so it does not appear in ChatGPT's connector directory. The MCP connection itself needs NO OpenAI API key: the existing OpenAI/Anthropic/Meta AI providers are reused only for message drafting via draftOutreachMessage.",
+    docsUrl: "https://developers.openai.com/apps-sdk",
+    kind: "adapter",
+    envVars: [
+      { name: "CHATGPT_MCP_ENABLED", required: false, visibility: "server-only", purpose: "Set to \"false\" to disable the ChatGPT MCP surface. Unset means the MUSE_MCP_ENABLED value applies; both unset means enabled. It does NOT gate the OAuth routes. " + VERCEL_HINT },
+      { name: "CHATGPT_MCP_PUBLIC_URL", required: false, visibility: "server-only", purpose: "Public origin advertised for the ChatGPT surface when it lives somewhere other than MUSE_MCP_PUBLIC_URL or NEXT_PUBLIC_APP_URL. " + VERCEL_HINT },
+      { name: "TOKEN_ENCRYPTION_KEY", required: true, visibility: "server-only", purpose: "AES-256 key (base64 of 32 bytes; generate: openssl rand -base64 32) reused to sign the authorize-state token. Without it the authorize endpoint returns 503. Shared with the Gmail/Outlook and Muse.ai entries. " + VERCEL_HINT },
+    ],
+    capabilities: [
+      "OAuth 2.1 server: authorization code + PKCE (S256 only), refresh-token rotation with reuse detection, RFC 7009 revocation, RFC 7591 Dynamic Client Registration and CIMD client documents (public clients by default)",
+      "Hosted MCP server for ChatGPT (Streamable HTTP, JSON-RPC 2.0): 54 tools — 36 Read, 14 Write, 4 Sensitive write — with per-grant scope enforcement (nxtsend.read / nxtsend.write / nxtsend.send)",
+      "ChatGPT Apps SDK widget: the campaigns widget (ui://widget/campaigns.html) renders from list_campaigns data via render_campaigns_widget",
+      "Per-user grant management: list and revoke your ChatGPT grants from this page (never exposes token values)",
+      "Read-only (nxtsend.read) grants offered as the recommended default on the consent screen",
+    ],
+    setupSteps: [
+      "Apply migrations 023 and 024 (supabase/migrations/023_muse_oauth.sql and 024_chatgpt_oauth_resource.sql) to the Supabase project — they create muse_oauth_clients, muse_oauth_codes and muse_oauth_tokens (RLS enabled, zero policies, service-role only) and add the RFC 8707 resource column.",
+      "Set TOKEN_ENCRYPTION_KEY (openssl rand -base64 32) — without it the authorize endpoint returns 503.",
+      "Set NEXT_PUBLIC_APP_URL to the deployment's public origin (https://nxtsend.com in production); set CHATGPT_MCP_PUBLIC_URL only when the ChatGPT surface lives somewhere else; leave CHATGPT_MCP_ENABLED unset (enabled) unless you want the ChatGPT MCP surface off.",
+      "In ChatGPT, turn on Developer Mode (ChatGPT Settings → Connectors → Advanced → Developer mode) and add NxtSend as a connector with the MCP endpoint URL shown below. ChatGPT identifies itself with a CIMD client_id URL or registers via Dynamic Client Registration — no pre-registered client secret exists, and there is NO CHATGPT_OAUTH_CLIENT_SECRET to set.",
+      "Sign in on NxtSend's consent screen and choose the scopes. Pick nxtsend.read only unless ChatGPT genuinely needs to change or send things.",
+      "For directory listing (optional, separate step): submit to OpenAI for review. Submission and approval are NOT done by this codebase and are not claimed here.",
+    ],
+    troubleshooting: [
+      "Status 'Not Connected' / 'Configuration Required': CHATGPT_MCP_ENABLED (or its MUSE_MCP_ENABLED fallback) is false, or no public URL is set (CHATGPT_MCP_PUBLIC_URL, MUSE_MCP_PUBLIC_URL or NEXT_PUBLIC_APP_URL).",
+      "Authorize returns 503: TOKEN_ENCRYPTION_KEY is missing or malformed — the authorize-state token cannot be signed.",
+      "MCP calls return 401: the access token is unknown, expired, revoked, bound to the other platform's resource (RFC 8707), or the app is in Demo Mode (demo refuses all ChatGPT tokens).",
+      "MCP returns 503 not_configured in Demo Mode: expected — the MCP server serves no demo data, ever.",
+      "A grant shows as inactive: its refresh token expired (60 days) or was revoked — reconnect from ChatGPT to create a fresh grant.",
+      "ChatGPT cannot add the connector: Developer Mode is off, or the workspace admin has disabled custom connectors — Developer Mode is labelled high-risk by OpenAI and its availability changes often; re-check the live ChatGPT settings. Business/Enterprise/Edu plans are the documented path; reports exist of free personal accounts also working.",
+      "Files that implement this surface: src/lib/muse-connector/oauth/ (server), src/app/api/muse/oauth/ + src/app/api/muse/grants/ (routes), src/app/api/mcp/chatgpt/ (MCP server), src/lib/muse-connector/adapter.ts (tool implementations), src/lib/muse-connector/widget.ts (campaigns widget), supabase/migrations/023_muse_oauth.sql + 024_chatgpt_oauth_resource.sql.",
+    ],
+    notImplementedNote:
+      "Not submitted to OpenAI: the OAuth + MCP surface is implemented and testable in ChatGPT Developer Mode, but no submission has been made to OpenAI and OpenAI has not approved anything. The campaigns widget has not been rendered inside a live ChatGPT client yet. LinkedIn-send tools are not supported (no authorized LinkedIn provider; the official LinkedIn API exposes no connection-request/DM endpoints to standard developers).",
+    verifySupported: false,
+  },
+  {
     id: "meta-pixel",
     name: "Meta Pixel",
     category: "Marketing",

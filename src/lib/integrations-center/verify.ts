@@ -42,6 +42,8 @@ import { isPixelConfigured } from "@/lib/analytics/pixel";
 import {
   isMuseMcpEnabled,
   getMusePublicUrl,
+  isChatGptMcpEnabled,
+  getChatGptPublicUrl,
 } from "@/lib/muse-connector/oauth/config";
 import type { CenterStatus, VerifyOutcome } from "./types";
 
@@ -156,6 +158,15 @@ export async function verifyIntegration(
         false,
         false,
         "Demo Mode: the Muse OAuth + MCP surface is unavailable in Demo Mode — no grant can be issued or verified here. Configure Supabase, then check again in live mode."
+      );
+    }
+    if (id === "chatgpt") {
+      return outcome(
+        id,
+        "Demo Mode",
+        false,
+        false,
+        "Demo Mode: the ChatGPT OAuth + MCP surface is unavailable in Demo Mode — no grant can be issued or verified here. Configure Supabase, then check again in live mode."
       );
     }
     return outcome(
@@ -452,6 +463,23 @@ export async function verifyIntegration(
         museEnabled
           ? "Muse MCP surface is not fully configured: no public URL is set (MUSE_MCP_PUBLIC_URL or NEXT_PUBLIC_APP_URL). Set one, redeploy, and check the grants panel on this page."
           : "Muse MCP surface is disabled (MUSE_MCP_ENABLED is false). The OAuth + MCP routes stay available, but Muse cannot reach the connector.");
+    }
+
+    case "chatgpt": {
+      // No safe read-only verification call exists for a connector:
+      // proving it works needs a real ChatGPT OAuth grant (see the
+      // grants panel on the detail page). Configuration alone never
+      // counts as verified, and no outbound call is made here.
+      const chatgptEnabled = isChatGptMcpEnabled(env);
+      const chatgptPublicUrl = getChatGptPublicUrl(undefined, env);
+      if (chatgptEnabled && chatgptPublicUrl) {
+        return outcome(id, "Connected but Not Verified", false, false,
+          "ChatGPT MCP surface is configured (CHATGPT_MCP_ENABLED / MUSE_MCP_ENABLED + public URL are set), but Test Connection cannot prove the connector works — that needs a real ChatGPT OAuth grant, listed in the grants panel on this page. Configuration alone never counts as verified.");
+      }
+      return outcome(id, chatgptEnabled ? "Configuration Required" : "Not Connected", false, false,
+        chatgptEnabled
+          ? "ChatGPT MCP surface is not fully configured: no public URL is set (CHATGPT_MCP_PUBLIC_URL, MUSE_MCP_PUBLIC_URL or NEXT_PUBLIC_APP_URL). Set one, redeploy, and check the grants panel on this page."
+          : "ChatGPT MCP surface is disabled (CHATGPT_MCP_ENABLED — or MUSE_MCP_ENABLED as its fallback — is false). The OAuth + MCP routes stay available, but ChatGPT cannot reach the connector.");
     }
 
     case "google-sheets":

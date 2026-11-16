@@ -10,11 +10,16 @@ import {
 } from "@/lib/muse-connector/oauth/authorize";
 import {
   createSupabaseMuseOAuthStore,
-  MUSE_SCOPE_DESCRIPTIONS,
+  getOAuthIssuer,
+  isCimdClientId,
+  platformLabel,
   recordMuseOAuthEvent,
+  resolveCimdClient,
+  SCOPE_DESCRIPTIONS,
   signMuseAuthorizeState,
   verifyMuseAuthorizeState,
-  type MuseScope,
+  type MuseOAuthClientRow,
+  type OAuthScope,
 } from "@/lib/muse-connector/oauth";
 
 export const dynamic = "force-dynamic";
@@ -58,7 +63,9 @@ function errorPage(title: string, message: string, status = 400): NextResponse {
 
 function consentPage(input: {
   clientName: string;
-  scopes: MuseScope[];
+  clientOrigin: string | null;
+  platform: "muse" | "chatgpt";
+  scopes: OAuthScope[];
   workspaceLabel: string;
   userLabel: string;
   signedState: string;
@@ -66,18 +73,23 @@ function consentPage(input: {
   const scopeItems = input.scopes
     .map(
       (scope) =>
-        `<li style="margin:0 0 10px;line-height:1.5;"><strong style="color:#f2f1fb;">${escapeHtml(scope)}</strong><br><span style="color:#bdbdd1;">${escapeHtml(MUSE_SCOPE_DESCRIPTIONS[scope])}</span></li>`
+        `<li style="margin:0 0 10px;line-height:1.5;"><strong style="color:#f2f1fb;">${escapeHtml(scope)}</strong><br><span style="color:#bdbdd1;">${escapeHtml(SCOPE_DESCRIPTIONS[scope])}</span></li>`
     )
     .join("");
+  const platformName = platformLabel(input.platform);
+  const originLine = input.clientOrigin
+    ? `<p style="margin:0 0 20px;color:#bdbdd1;line-height:1.6;">Connecting from <strong style="color:#f2f1fb;">${escapeHtml(input.clientOrigin)}</strong> (${escapeHtml(platformName)}).</p>`
+    : "";
   const html =
     `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Connect to NxtSend</title></head>` +
     `<body style="margin:0;background:#070614;color:#f2f1fb;font-family:Manrope,ui-sans-serif,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;">` +
     `<main style="max-width:520px;width:100%;background:#191825;border:1px solid #2a2942;border-radius:16px;padding:32px;">` +
     `<p style="margin:0 0 4px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#8a7aff;">NxtSend</p>` +
     `<h1 style="margin:0 0 8px;font-size:22px;">Connect <span style="color:#8a7aff;">${escapeHtml(input.clientName)}</span> to NxtSend?</h1>` +
-    `<p style="margin:0 0 20px;color:#bdbdd1;line-height:1.6;">This app is asking to access your NxtSend account <strong style="color:#f2f1fb;">${escapeHtml(input.userLabel)}</strong> in workspace <strong style="color:#f2f1fb;">${escapeHtml(input.workspaceLabel)}</strong>. It will be able to:</p>` +
+    `<p style="margin:0 0 8px;color:#bdbdd1;line-height:1.6;">${escapeHtml(platformName)} is asking to access your NxtSend account <strong style="color:#f2f1fb;">${escapeHtml(input.userLabel)}</strong> in workspace <strong style="color:#f2f1fb;">${escapeHtml(input.workspaceLabel)}</strong>. It will be able to:</p>` +
+    originLine +
     `<ul style="margin:0 0 20px;padding-left:20px;">${scopeItems}</ul>` +
-    `<p style="margin:0 0 24px;color:#898ca2;font-size:13px;line-height:1.6;">You can revoke this access at any time. Sending email and deleting leads always need your approval in Muse, every time.</p>` +
+    `<p style="margin:0 0 24px;color:#898ca2;font-size:13px;line-height:1.6;">You can revoke this access at any time. Sending email and deleting leads always need your approval in ${escapeHtml(platformName)}, every time.</p>` +
     `<form method="post" action="/api/muse/oauth/authorize" style="display:flex;gap:12px;">` +
     `<input type="hidden" name="muse_state" value="${escapeHtml(input.signedState)}">` +
     `<button type="submit" name="decision" value="approve" style="flex:1;background:#642cff;color:#fff;border:0;border-radius:10px;padding:12px 16px;font-size:15px;font-weight:600;cursor:pointer;">Allow access</button>` +
@@ -112,6 +124,7 @@ export async function GET(req: Request) {
   }
   const store = createSupabaseMuseOAuthStore(admin);
   const url = new URL(req.url);
+  const origin = getOAuthIssuer(url.origin);
   const params = {
     client_id: url.searchParams.get("client_id"),
     redirect_uri: url.searchParams.get("redirect_uri"),
@@ -120,9 +133,24 @@ export async function GET(req: Request) {
     state: url.searchParams.get("state"),
     code_challenge: url.searchParams.get("code_challenge"),
     code_challenge_method: url.searchParams.get("code_challenge_method"),
+    resource: url.searchParams.get("resource"),
   };
-  const client = params.client_id ? await store.getClient(params.client_id) : null;
-  const validation = validateAuthorizeRequest(params, client);
+  // Client lookup: a registered (DCR) client first; a `client_id`
+  // that is an https URL is resolved as a CIMD client (ephemeral —
+  // validated per request, never stored). A CIMD fetch/validation
+  // failure has no verified redirect URI, so it is a plain error
+  // page, never a redirect.
+  let client: MuseOAuthClientRow | null = params.client_id
+    ? await store.getClient(params.client_id)
+    : null;
+  if (!client && params.client_id && isCimdClientId(params.client_id)) {
+    const resolved = await resolveCimdClient(params.client_id);
+    if (!resolved.ok) {
+      return errorPage("Invalid authorization request", resolved.detail);
+    }
+    client = resolved.client;
+  }
+  const validation = validateAuthorizeRequest(params, client, { origin });
   if (!validation.ok) {
     if (validation.redirectUri) {
       return NextResponse.redirect(
@@ -130,7 +158,8 @@ export async function GET(req: Request) {
           validation.redirectUri,
           validation.error,
           validation.errorDescription,
-          validation.clientState
+          validation.clientState,
+          origin
         )
       );
     }
@@ -145,6 +174,9 @@ export async function GET(req: Request) {
     clientState: request.clientState,
     userId: ctx.userId,
     workspaceId: ctx.workspaceId,
+    resource: request.resource,
+    platform: request.platform,
+    clientOrigin: request.clientOrigin,
   });
   if (!signedState) {
     return errorPage(
@@ -155,6 +187,8 @@ export async function GET(req: Request) {
   }
   return consentPage({
     clientName: request.client.name,
+    clientOrigin: request.clientOrigin,
+    platform: request.platform,
     scopes: request.scopes,
     workspaceLabel: ctx.workspaceId,
     userLabel: ctx.userId,
@@ -183,10 +217,12 @@ export async function POST(req: Request) {
   if (!claims) {
     return errorPage(
       "Authorization expired",
-      "This consent request has expired or is no longer valid. Please start the connection again from Muse.",
+      "This consent request has expired or is no longer valid. Please start the connection again.",
       400
     );
   }
+  const platformName = platformLabel(claims.platform ?? "muse");
+  const issuer = getOAuthIssuer(new URL(req.url).origin);
   const admin = createAdminClient();
   if (!admin) {
     return errorPage(
@@ -202,21 +238,30 @@ export async function POST(req: Request) {
       actorId: ctx.userId,
       action: "MUSE_OAUTH_DENY",
       resource: `muse_oauth_client:${claims.clientId}`,
-      details: "User denied the Muse authorization request.",
+      details: `User denied the ${platformName} authorization request.`,
     });
     return NextResponse.redirect(
       buildOAuthErrorRedirect(
         claims.redirectUri,
         "access_denied",
         "The user denied the authorization request.",
-        claims.clientState
+        claims.clientState,
+        issuer
       )
     );
   }
   if (decision !== "approve") {
     return errorPage("Invalid request", "Unknown consent decision.", 400);
   }
-  const client = await store.getClient(claims.clientId);
+  // CIMD clients are ephemeral (never stored): re-resolve the
+  // document; registered clients are looked up in the store.
+  let client: MuseOAuthClientRow | null = null;
+  if (isCimdClientId(claims.clientId)) {
+    const resolved = await resolveCimdClient(claims.clientId);
+    client = resolved.ok ? resolved.client : null;
+  } else {
+    client = await store.getClient(claims.clientId);
+  }
   if (!client) {
     return errorPage("Invalid authorization request", "The client is no longer registered.", 400);
   }
@@ -227,15 +272,16 @@ export async function POST(req: Request) {
     scopes: claims.scopes,
     codeChallenge: claims.codeChallenge,
     redirectUri: claims.redirectUri,
+    resource: claims.resource ?? null,
   });
   await recordMuseOAuthEvent({
     workspaceId: ctx.workspaceId,
     actorId: ctx.userId,
     action: "MUSE_OAUTH_GRANT",
     resource: `muse_oauth_client:${claims.clientId}`,
-    details: `User approved Muse access (scopes: ${claims.scopes.join(" ")}).`,
+    details: `User approved ${platformName} access (scopes: ${claims.scopes.join(" ")}).`,
   });
   return NextResponse.redirect(
-    buildOAuthSuccessRedirect(claims.redirectUri, code, claims.clientState)
+    buildOAuthSuccessRedirect(claims.redirectUri, code, claims.clientState, issuer)
   );
 }

@@ -14,7 +14,8 @@
 
 import { createHash, randomBytes } from "crypto";
 import { getDataMode, type DataMode } from "@/lib/data/mode";
-import type { MuseScope } from "./scopes";
+import { DEFAULT_OAUTH_ORIGIN, getMcpResourceUrl } from "./config";
+import type { OAuthScope } from "./scopes";
 import type { MuseOAuthStore } from "./store";
 
 export const MUSE_ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -34,7 +35,9 @@ export interface MuseGrant {
   clientId: string;
   userId: string;
   workspaceId: string;
-  scopes: MuseScope[];
+  scopes: OAuthScope[];
+  /** RFC 8707 resource the grant is bound to (full MCP resource URL), or null for legacy grants. */
+  resource?: string | null;
 }
 
 export interface MuseIssuedTokens {
@@ -49,6 +52,9 @@ export interface MuseIssuedTokens {
  * Issues a fresh access + refresh pair for a grant and stores both
  * as hashes. The returned plaintext values are shown to the caller
  * exactly once — the token endpoint response — and never again.
+ * Both tokens are stored bound to the grant's `resource` (audience);
+ * a grant with no resource stores null (legacy behaviour — see
+ * verifyMuseAccessToken for how such tokens verify).
  */
 export async function issueMuseTokens(
   store: MuseOAuthStore,
@@ -57,6 +63,7 @@ export async function issueMuseTokens(
 ): Promise<MuseIssuedTokens> {
   const accessToken = randomTokenValue();
   const refreshToken = randomTokenValue();
+  const resource = grant.resource ?? null;
   await store.insertToken({
     token_hash: hashToken(accessToken),
     kind: "access",
@@ -64,6 +71,7 @@ export async function issueMuseTokens(
     user_id: grant.userId,
     workspace_id: grant.workspaceId,
     scopes: grant.scopes,
+    resource,
     expires_at: new Date(now.getTime() + MUSE_ACCESS_TOKEN_TTL_MS).toISOString(),
     revoked_at: null,
     rotated_from_hash: null,
@@ -75,6 +83,7 @@ export async function issueMuseTokens(
     user_id: grant.userId,
     workspace_id: grant.workspaceId,
     scopes: grant.scopes,
+    resource,
     expires_at: new Date(now.getTime() + MUSE_REFRESH_TOKEN_TTL_MS).toISOString(),
     revoked_at: null,
     rotated_from_hash: null,
@@ -91,7 +100,7 @@ export async function issueMuseTokens(
 export interface MuseAccessContext {
   userId: string;
   workspaceId: string;
-  scopes: MuseScope[];
+  scopes: OAuthScope[];
   clientId: string;
   /**
    * Grant identifier — the client + user pair this token belongs to.
@@ -99,18 +108,37 @@ export interface MuseAccessContext {
    * grant, and revoking a grant revokes every token for the pair.
    */
   grantId: string;
+  /**
+   * Effective audience of this token (the RFC 8707 resource it is
+   * bound to). Legacy tokens stored with no resource report the
+   * canonical Muse resource for the origin.
+   */
+  resource: string;
 }
 
 export interface VerifyMuseAccessDeps {
   store: MuseOAuthStore;
   mode?: DataMode;
   now?: Date;
+  /**
+   * Expected audience (the resource being called, e.g.
+   * `https://nxtsend.com/api/mcp/chatgpt`). When provided, a token
+   * whose audience differs is refused. When omitted, no audience
+   * check is done and the token's effective audience is reported
+   * in the context. Callers at an MCP boundary MUST pass it.
+   */
+  resource?: string | null;
+  /** Origin used to resolve the audience of legacy (resource-less) tokens. */
+  origin?: string;
 }
 
 /**
  * Verifies a Muse access token by hash lookup: kind must be
- * `access`, not revoked, not expired. Returns null for ANY problem,
- * including demo mode — fail closed, never serve the demo persona.
+ * `access`, not revoked, not expired, and (when an expected
+ * resource is given) bound to that resource. Returns null for ANY
+ * problem, including demo mode — fail closed, never serve the demo
+ * persona. A token issued for /api/mcp/chatgpt never verifies for
+ * /api/mcp, and vice versa.
  */
 export async function verifyMuseAccessToken(
   token: string | null | undefined,
@@ -125,12 +153,19 @@ export async function verifyMuseAccessToken(
   if (row.kind !== "access") return null;
   if (row.revoked_at) return null;
   if (new Date(row.expires_at).getTime() <= now.getTime()) return null;
+  // Effective audience: the stored resource, or — for legacy tokens
+  // issued before resource binding — the canonical Muse resource
+  // for this origin.
+  const origin = deps.origin ?? DEFAULT_OAUTH_ORIGIN;
+  const effectiveResource = row.resource ?? getMcpResourceUrl(origin, "muse");
+  if (deps.resource && deps.resource !== effectiveResource) return null;
   return {
     userId: row.user_id,
     workspaceId: row.workspace_id,
     scopes: row.scopes,
     clientId: row.client_id,
     grantId: `${row.client_id}:${row.user_id}`,
+    resource: effectiveResource,
   };
 }
 
@@ -179,6 +214,7 @@ export async function rotateRefreshToken(
           userId: row.user_id,
           workspaceId: row.workspace_id,
           scopes: row.scopes,
+          resource: row.resource,
         },
       };
     }
@@ -192,6 +228,7 @@ export async function rotateRefreshToken(
     userId: row.user_id,
     workspaceId: row.workspace_id,
     scopes: row.scopes,
+    resource: row.resource,
   };
   await deps.store.revokeToken(hash, now.toISOString());
   const tokens = await issueMuseTokens(deps.store, grant, now);

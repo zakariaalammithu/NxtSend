@@ -21,6 +21,9 @@ import {
   FakeInboxRepository,
   FakeUsageRepository,
   FakeIntegrationsRepository,
+  FakeAccountsRepository,
+  FakeSafetySettingsRepository,
+  FakeScheduledRepliesRepository,
   FakeEmailAdapter,
   makeLead,
   makeCampaign,
@@ -71,6 +74,9 @@ describe("NxtSendMuseConnectorAdapter", () => {
       inbox,
       usage,
       integrations,
+      accounts: new FakeAccountsRepository(),
+      safetySettings: new FakeSafetySettingsRepository(),
+      scheduledReplies: new FakeScheduledRepliesRepository(),
       emailAdapter: email,
       draftFn: async (input) => ({
         status: "simulated",
@@ -347,7 +353,7 @@ describe("NxtSendMuseConnectorAdapter", () => {
   it("healthCheck is honest about mode and OAuth state", async () => {
     const health = okData(await adapter.healthCheck());
     expect(health.mode).toBe("demo");
-    expect(health.toolCount).toBe(18);
+    expect(health.toolCount).toBe(54);
     expect(health.oauthConfigured).toBe(false);
     expect(health.email).toBe("demo");
   });

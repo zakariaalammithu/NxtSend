@@ -78,13 +78,13 @@ describe("POST /api/mcp", () => {
 });
 
 describe("GET /api/mcp/health", () => {
-  it("is public and honest: demo mode, 18 tools, OAuth not configured", async () => {
+  it("is public and honest: demo mode, 54 tools, OAuth not configured", async () => {
     const res = await healthGet();
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.mode).toBe("demo");
     expect(body.mcpEnabled).toBe(true);
-    expect(body.toolCount).toBe(18);
+    expect(body.toolCount).toBe(54);
     expect(body.oauthConfigured).toBe(false);
     expect(body.protocolVersion).toBe("2025-06-18");
   });

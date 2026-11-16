@@ -102,6 +102,7 @@ describe("getIntegrationStatuses", () => {
       expect(statusOf(entries, id), id).toBe("Demo Mode");
     }
     expect(statusOf(entries, "muse-ai")).toBe("Demo Mode");
+    expect(statusOf(entries, "chatgpt")).toBe("Demo Mode");
     expect(statusOf(entries, "google-sheets")).toBe("Not Connected");
     expect(statusOf(entries, "crm")).toBe("Not Connected");
     expect(statusOf(entries, "email-verification")).toBe("Not Connected");
@@ -179,6 +180,105 @@ describe("getIntegrationStatuses", () => {
         "muse-ai"
       )
     ).toBe("Connected but Not Verified");
+  });
+
+  it("chatgpt: same rule as muse-ai, on the ChatGPT surface (CHATGPT_* vars, nxtsend.* grants)", () => {
+    // No public URL anywhere: enabled by default, but unreachable.
+    expect(
+      statusOf(getIntegrationStatuses({ env: {}, mode: "supabase" }), "chatgpt")
+    ).toBe("Configuration Required");
+    // Disabled outright via the ChatGPT flag.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { CHATGPT_MCP_ENABLED: "false", CHATGPT_MCP_PUBLIC_URL: "https://example.com" },
+          mode: "supabase",
+        }),
+        "chatgpt"
+      )
+    ).toBe("Not Connected");
+    // Disabled via the MUSE_* fallback when the ChatGPT flag is unset.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { MUSE_MCP_ENABLED: "false", NEXT_PUBLIC_APP_URL: "https://example.com" },
+          mode: "supabase",
+        }),
+        "chatgpt"
+      )
+    ).toBe("Not Connected");
+    // Enabled + public URL, but no ChatGPT grant: configured, not connected.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { CHATGPT_MCP_PUBLIC_URL: "https://example.com" },
+          mode: "supabase",
+        }),
+        "chatgpt"
+      )
+    ).toBe("Connected but Not Verified");
+    // A Muse grant does NOT connect the ChatGPT entry.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { CHATGPT_MCP_PUBLIC_URL: "https://example.com" },
+          mode: "supabase",
+          museGrantsActive: 1,
+          chatgptGrantsActive: 0,
+        }),
+        "chatgpt"
+      )
+    ).toBe("Connected but Not Verified");
+    // A real active ChatGPT grant is the ONLY thing that yields Connected.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { CHATGPT_MCP_PUBLIC_URL: "https://example.com" },
+          mode: "supabase",
+          museGrantsActive: 0,
+          chatgptGrantsActive: 1,
+        }),
+        "chatgpt"
+      )
+    ).toBe("Connected and Verified");
+    // Unknown grant count (migration 023 not applied) never invents a grant.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { CHATGPT_MCP_PUBLIC_URL: "https://example.com" },
+          mode: "supabase",
+          chatgptGrantsActive: null,
+        }),
+        "chatgpt"
+      )
+    ).toBe("Connected but Not Verified");
+  });
+
+  it("chatgpt registry entry: adapter kind, ChatGPT env vars, no claimed submission", () => {
+    const entry = INTEGRATION_REGISTRY.find((d) => d.id === "chatgpt");
+    expect(entry).toBeDefined();
+    expect(entry?.kind).toBe("adapter");
+    expect(entry?.envVars.map((v) => v.name)).toContain("CHATGPT_MCP_ENABLED");
+    expect(entry?.envVars.map((v) => v.name)).toContain("CHATGPT_MCP_PUBLIC_URL");
+    expect(entry?.envVars.map((v) => v.name)).not.toContain("CHATGPT_OAUTH_CLIENT_SECRET");
+    expect(entry?.verifySupported).toBe(false);
+    expect(entry?.notImplementedNote).toContain("Not submitted to OpenAI");
+    expect(entry?.description).toContain("/api/mcp/chatgpt");
+    expect(entry?.description).toContain("Developer Mode");
+  });
+
+  it("grants UI scope descriptions: every issued scope has a plain-words description (muse.* and nxtsend.*)", async () => {
+    const { SCOPE_DESCRIPTIONS, ALL_OAUTH_SCOPES } = await import(
+      "../../muse-connector/oauth/scopes"
+    );
+    for (const scope of ALL_OAUTH_SCOPES) {
+      expect(SCOPE_DESCRIPTIONS[scope], scope).toBeTruthy();
+      expect(SCOPE_DESCRIPTIONS[scope].length).toBeGreaterThan(10);
+    }
+    // The two prefixes describe the same tiers in their own platform's words.
+    expect(SCOPE_DESCRIPTIONS["nxtsend.read"]).toContain("no changes are made");
+    expect(SCOPE_DESCRIPTIONS["nxtsend.send"]).toContain("ChatGPT");
+    expect(SCOPE_DESCRIPTIONS["muse.send"]).toContain("Muse");
   });
 
   it("partial configuration maps to Configuration Required", () => {
@@ -517,6 +617,35 @@ describe("verifyIntegration — live provider checks (fakes)", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("chatgpt: Test Connection never pretends — no safe read-only verification call exists", async () => {
+    const fetchSpy = fakeFetch(200);
+    // Demo mode: honest demo result, nothing attempted.
+    const demo = await verifyIntegration("chatgpt", {
+      env: FAKE_ENV,
+      mode: "demo",
+      fetchFn: fetchSpy as unknown as typeof fetch,
+    });
+    expect(demo?.status).toBe("Demo Mode");
+    expect(demo?.attempted).toBe(false);
+    // Live, configured, no grant: Connected but Not Verified, nothing attempted.
+    const configured = await verifyIntegration("chatgpt", {
+      env: { CHATGPT_MCP_PUBLIC_URL: "https://example.com" },
+      mode: "supabase",
+      fetchFn: fetchSpy as unknown as typeof fetch,
+    });
+    expect(configured?.status).toBe("Connected but Not Verified");
+    expect(configured?.attempted).toBe(false);
+    expect(configured?.message).toContain("real ChatGPT OAuth grant");
+    // Live, disabled: Not Connected, nothing attempted.
+    const disabled = await verifyIntegration("chatgpt", {
+      env: { CHATGPT_MCP_ENABLED: "false", CHATGPT_MCP_PUBLIC_URL: "https://example.com" },
+      mode: "supabase",
+      fetchFn: fetchSpy as unknown as typeof fetch,
+    });
+    expect(disabled?.status).toBe("Not Connected");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("static entries never pretend: linkedin / muse-ai / not-implemented", async () => {
     expect((await verifyIntegration("linkedin", { env: FAKE_ENV, mode: "supabase" }))?.status).toBe(
       "Configuration Required"
@@ -559,7 +688,7 @@ describe("registry consistency", () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of [
       "supabase", "resend", "stripe", "openai", "anthropic", "meta-model",
-      "muse-ai", "meta-pixel", "webhooks", "jobs", "linkedin",
+      "muse-ai", "chatgpt", "meta-pixel", "webhooks", "jobs", "linkedin",
       "google-sheets", "crm", "email-verification",
     ]) {
       expect(ids).toContain(id);

@@ -1,7 +1,7 @@
 /**
  * GET /api/mcp/health — public MCP health (no secrets, no auth).
  * Reports the real config state: mode, whether MCP is enabled,
- * the manifest tool count (18), whether Muse OAuth is configured
+ * the manifest tool count (54), whether Muse OAuth is configured
  * (Worker A's server), and the server version.
  */
 

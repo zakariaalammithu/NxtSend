@@ -30,8 +30,8 @@ import {
   MUSE_READINESS_CHECKLIST,
   MUSE_CONNECTOR_MANIFEST_STATUS,
 } from "@/lib/muse-connector";
-import { MUSE_SCOPE_DESCRIPTIONS } from "@/lib/muse-connector/oauth/scopes";
-import type { MuseScope } from "@/lib/muse-connector/oauth/scopes";
+import { SCOPE_DESCRIPTIONS } from "@/lib/muse-connector/oauth/scopes";
+import type { OAuthScope } from "@/lib/muse-connector/oauth/scopes";
 import EmailAuthPanel from "@/components/integrations/EmailAuthPanel";
 import EmailRoutingPanel from "@/components/integrations/EmailRoutingPanel";
 import OAuthMailboxPanel from "@/components/integrations/OAuthMailboxPanel";
@@ -314,6 +314,11 @@ export default function IntegrationDetailPage() {
         <MuseLivePanels origin={origin} status={entry.status} mode={data?.mode ?? "demo"} />
       )}
 
+      {/* ChatGPT live surface: same machinery, ChatGPT copy + nxtsend.* scopes */}
+      {d.id === "chatgpt" && (
+        <ChatGptLivePanels origin={origin} status={entry.status} mode={data?.mode ?? "demo"} />
+      )}
+
       {/* Environment variables */}
       {d.envVars.length > 0 && (
         <Section title="Required configuration (environment variables)">
@@ -405,6 +410,8 @@ export default function IntegrationDetailPage() {
               ? "Use the Disconnect button in the Connected mailbox panel above: it deletes the stored (encrypted) OAuth tokens and marks the account disconnected — for Gmail it also revokes the grant at Google (best effort, reported in the result); Microsoft offers no revocation endpoint, so remove the app's consent in the Microsoft account too if you want it gone there. Removing the env variables additionally prevents NEW connections. Past message records are kept."
               : d.id === "muse-ai"
               ? "Revoke individual grants from the “Your Muse grants” panel above — revoking removes Muse's access for that grant immediately (every token for that client + user is revoked). Removing the environment variables additionally prevents NEW grants. Past audit entries are kept."
+              : d.id === "chatgpt"
+              ? "Revoke individual grants from the “Your ChatGPT grants” panel above — revoking removes ChatGPT's access for that grant immediately (every token for that client + user is revoked). Removing the environment variables additionally prevents NEW grants. Past audit entries are kept."
               : d.kind === "info"
               ? "Nothing is connected, so there is nothing to disconnect. This entry documents the limitation and what implementing it would require."
               : "Remove (or replace) the environment variables listed above in Vercel and redeploy. The status returns to Not Connected, and any stored verification stops applying because the configuration it verified is gone. No data is deleted by disconnecting."}
@@ -453,7 +460,7 @@ function CopyButton({ text }: { text: string }) {
 interface MuseGrant {
   clientId: string;
   clientName: string;
-  scopes: MuseScope[];
+  scopes: OAuthScope[];
   createdAt: string;
   refreshExpiresAt: string | null;
   active: boolean;
@@ -467,23 +474,177 @@ interface MuseActivityEntry {
   created_at: string;
 }
 
+type ConnectorPlatform = "muse" | "chatgpt";
+
 /**
- * Live Muse panels (detail page only). Everything here comes from
- * the real implementation: endpoint URLs from this deployment's
- * origin, scopes from the OAuth module, grants + activity from the
- * grants/activity APIs. No state is ever shown as "Connected"
- * unless a real grant exists — the header badge already reflects
- * that (derived from the grants count in GET /api/integrations/status).
+ * Per-platform copy for the live panels. The machinery (grants +
+ * activity APIs, revoke, endpoints rendering) is shared; only the
+ * words, the MCP path, the scope prefix and the connect steps
+ * differ. The ChatGPT panel lists only grants whose scopes carry
+ * the nxtsend.* prefix (or whose client_id is a chatgpt.com CIMD
+ * URL); the Muse panel lists only muse.* grants. A grant holding
+ * both prefixes appears in both — it genuinely is a grant for both.
  */
-function MuseLivePanels({
+const CONNECTOR_COPY: Record<
+  ConnectorPlatform,
+  {
+    label: string;
+    mcpPath: string;
+    mcpNote: string;
+    scopePrefix: "muse" | "nxtsend";
+    endpoints: { label: string; path: string; note: string }[];
+    connectSteps: string[];
+    grantsTitle: string;
+    grantsEmpty: string;
+    activityEmpty: string;
+    securityNotes: string[];
+  }
+> = {
+  muse: {
+    label: "Muse",
+    mcpPath: "/api/mcp",
+    mcpNote: "Streamable HTTP, JSON-RPC 2.0. Give this URL to Muse as a Custom Connector.",
+    scopePrefix: "muse",
+    endpoints: [
+      {
+        label: "MCP endpoint",
+        path: "/api/mcp",
+        note: "Streamable HTTP, JSON-RPC 2.0. Give this URL to Muse as a Custom Connector.",
+      },
+      {
+        label: "Authorize (consent screen)",
+        path: "/api/muse/oauth/authorize",
+        note: "GET shows the consent screen; POST approves or denies.",
+      },
+      { label: "Token", path: "/api/muse/oauth/token", note: "authorization_code + refresh_token." },
+      { label: "Revoke", path: "/api/muse/oauth/revoke", note: "RFC 7009 token revocation." },
+      {
+        label: "Register (Dynamic Client Registration)",
+        path: "/api/muse/oauth/register",
+        note: "RFC 7591 — public clients by default; no pre-registered client secret exists.",
+      },
+      {
+        label: "Protected-resource metadata",
+        path: "/.well-known/oauth-protected-resource/api/mcp",
+        note: "RFC 9728 metadata for the MCP resource.",
+      },
+    ],
+    connectSteps: [
+      "In Muse, add NxtSend as a Custom Connector with the MCP endpoint URL above. Muse registers itself via Dynamic Client Registration — there is no client secret to copy (clients are public by default).",
+      "Sign in on NxtSend's consent screen and choose the scopes. Pick muse.read only unless Muse genuinely needs to change or send things.",
+      "Use NxtSend from inside Muse. Sensitive writes (sending email, deleting a lead) need your approval in Muse every single time — they can never be set to “Always allow”.",
+      "Directory listing is a separate step: submit at muse.ai/platform for Meta's review. That submission has NOT been made and no approval is claimed — the Custom Connector path above works without it.",
+    ],
+    grantsTitle: "Your Muse grants",
+    grantsEmpty:
+      "No Muse grants for your account. A grant appears here after you approve Muse on the consent screen — until then, nothing is connected.",
+    activityEmpty:
+      "No Muse activity recorded for this workspace yet — MCP tool calls and OAuth grant/revoke events appear here (newest first, up to 50).",
+    securityNotes: [
+      "Tokens and authorization codes are stored as SHA-256 hashes only — a database read can never yield a usable token, and no token value is ever logged or shown in the UI.",
+      "Refresh tokens rotate on every use; presenting an already-rotated refresh token revokes the whole grant.",
+      "The OAuth tables (migration 023) have RLS enabled with zero policies — only the service role can read or write them; the browser cannot reach them at all.",
+      "A grant is scoped to one user and one workspace. MCP tool calls are workspace-scoped and scope-enforced; a muse.read token cannot call a write tool.",
+      "Sensitive writes (send_email, send_inbox_reply, delete_lead) need approval in Muse every time. There is no LinkedIn-send tool: no authorized LinkedIn provider exists, and the official LinkedIn API exposes no connection-request/DM endpoints to standard developers.",
+      "Every MCP tool call and OAuth grant/revoke event is written to the audit log for this workspace (see the activity history above).",
+      "Demo Mode refuses the whole Muse surface (OAuth 503/400, MCP 503) — the demo persona is never served to Muse.",
+    ],
+  },
+  chatgpt: {
+    label: "ChatGPT",
+    mcpPath: "/api/mcp/chatgpt",
+    mcpNote:
+      "Streamable HTTP, JSON-RPC 2.0. Add this URL in ChatGPT with Developer Mode on (Settings → Connectors → Advanced → Developer mode).",
+    scopePrefix: "nxtsend",
+    endpoints: [
+      {
+        label: "MCP endpoint",
+        path: "/api/mcp/chatgpt",
+        note: "Streamable HTTP, JSON-RPC 2.0. Add this URL in ChatGPT with Developer Mode on (Settings → Connectors → Advanced → Developer mode).",
+      },
+      {
+        label: "Authorize (consent screen)",
+        path: "/api/muse/oauth/authorize",
+        note: "GET shows the consent screen; POST approves or denies.",
+      },
+      { label: "Token", path: "/api/muse/oauth/token", note: "authorization_code + refresh_token." },
+      { label: "Revoke", path: "/api/muse/oauth/revoke", note: "RFC 7009 token revocation." },
+      {
+        label: "Register (Dynamic Client Registration)",
+        path: "/api/muse/oauth/register",
+        note: "RFC 7591 — public clients by default; no pre-registered client secret exists.",
+      },
+      {
+        label: "Authorization-server metadata",
+        path: "/.well-known/oauth-authorization-server",
+        note: "RFC 8414 metadata: issuer, authorize/token/revoke/register endpoints (PKCE S256 only).",
+      },
+      {
+        label: "Protected-resource metadata (root)",
+        path: "/.well-known/oauth-protected-resource",
+        note: "RFC 9728 root metadata for both MCP resources.",
+      },
+      {
+        label: "Protected-resource metadata (ChatGPT resource)",
+        path: "/.well-known/oauth-protected-resource/api/mcp/chatgpt",
+        note: "RFC 9728 metadata for the ChatGPT MCP resource.",
+      },
+    ],
+    connectSteps: [
+      "In ChatGPT, turn on Developer Mode: ChatGPT Settings → Connectors → Advanced → Developer mode. Developer Mode is labelled high-risk by OpenAI and its availability changes often — if the setting is missing, check the live ChatGPT settings (a workspace admin may have disabled custom connectors).",
+      "Add NxtSend as a connector with the MCP endpoint URL above. ChatGPT identifies itself with a CIMD client_id URL or registers via Dynamic Client Registration — there is no client secret to copy (clients are public by default).",
+      "Sign in on NxtSend's consent screen and choose the scopes. Pick nxtsend.read only unless ChatGPT genuinely needs to change or send things.",
+      "Use NxtSend from inside ChatGPT. Sensitive writes (sending email, deleting a lead or a campaign) need your approval in ChatGPT every single time — they can never be set to “Always allow”.",
+      "Directory listing is a separate step: submit to OpenAI for review. That submission has NOT been made and no approval is claimed — the Developer Mode path above works without it.",
+    ],
+    grantsTitle: "Your ChatGPT grants",
+    grantsEmpty:
+      "No ChatGPT grants for your account. A grant appears here after you approve ChatGPT on the consent screen — until then, nothing is connected.",
+    activityEmpty:
+      "No ChatGPT activity recorded for this workspace yet — MCP tool calls and OAuth grant/revoke events appear here (newest first, up to 50).",
+    securityNotes: [
+      "Tokens and authorization codes are stored as SHA-256 hashes only — a database read can never yield a usable token, and no token value is ever logged or shown in the UI.",
+      "Refresh tokens rotate on every use; presenting an already-rotated refresh token revokes the whole grant.",
+      "The OAuth tables (migrations 023 + 024) have RLS enabled with zero policies — only the service role can read or write them; the browser cannot reach them at all.",
+      "A grant is scoped to one user and one workspace and bound to one MCP resource (RFC 8707): a token issued for /api/mcp/chatgpt does not validate for /api/mcp, and vice versa. MCP tool calls are workspace-scoped and scope-enforced; a nxtsend.read token cannot call a write tool.",
+      "Sensitive writes (send_email, send_inbox_reply, delete_lead, delete_campaign) need approval in ChatGPT every time. There is no LinkedIn-send tool: no authorized LinkedIn provider exists, and the official LinkedIn API exposes no connection-request/DM endpoints to standard developers.",
+      "private_key_jwt client authentication is NOT supported: a client document declaring it is still accepted, but the client is treated as public (PKCE) and any client_assertion at the token endpoint is refused with invalid_client — verifying JWT bearer assertions needs JWKS fetch + RS256/ES256 verification + aud/exp/jti replay protection, a trust surface this server does not implement.",
+      "Every MCP tool call and OAuth grant/revoke event is written to the audit log for this workspace (see the activity history above).",
+      "Demo Mode refuses the whole ChatGPT surface (OAuth 503/400, MCP 503) — the demo persona is never served to ChatGPT.",
+    ],
+  },
+};
+
+/** True when a grant belongs to this platform (scope prefix or CIMD client origin). */
+function grantBelongsToPlatform(grant: MuseGrant, platform: ConnectorPlatform): boolean {
+  const prefix = CONNECTOR_COPY[platform].scopePrefix;
+  if (grant.scopes.some((s) => s.startsWith(`${prefix}.`))) return true;
+  if (platform === "chatgpt" && grant.clientId.startsWith("https://chatgpt.com")) return true;
+  if (platform === "muse" && grant.clientId.startsWith("https://agent.meta.ai")) return true;
+  return false;
+}
+
+/**
+ * Live connector panels (detail page only). Everything here comes from
+ * the real implementation: endpoint URLs from this deployment's
+ * origin, scopes from the OAuth module (SCOPE_DESCRIPTIONS — both
+ * muse.* and nxtsend.*), grants + activity from the grants/activity
+ * APIs. No state is ever shown as "Connected" unless a real grant
+ * exists — the header badge already reflects that (derived from the
+ * grants count in GET /api/integrations/status).
+ */
+function ConnectorLivePanels({
+  platform,
   origin,
   status,
   mode,
 }: {
+  platform: ConnectorPlatform;
   origin: string;
   status: string;
   mode: string;
 }) {
+  const copy = CONNECTOR_COPY[platform];
   const [grants, setGrants] = React.useState<MuseGrant[] | null>(null);
   const [grantsError, setGrantsError] = React.useState<string | null>(null);
   const [activity, setActivity] = React.useState<MuseActivityEntry[] | null>(null);
@@ -502,7 +663,7 @@ function MuseLivePanels({
       setGrants(body?.grants ?? []);
       setGrantsError(null);
     } catch (err) {
-      setGrantsError(err instanceof Error ? err.message : "Failed to load Muse grants.");
+      setGrantsError(err instanceof Error ? err.message : `Failed to load ${copy.label} grants.`);
     }
   }, []);
 
@@ -516,7 +677,7 @@ function MuseLivePanels({
       setActivity(body?.entries ?? []);
       setActivityError(null);
     } catch (err) {
-      setActivityError(err instanceof Error ? err.message : "Failed to load Muse activity.");
+      setActivityError(err instanceof Error ? err.message : `Failed to load ${copy.label} activity.`);
     }
   }, []);
 
@@ -535,7 +696,7 @@ function MuseLivePanels({
       });
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
       if (!res.ok) throw new Error(body?.error ?? `Revoke failed (HTTP ${res.status})`);
-      setRevokeNotice(`Grant for “${clientId}” revoked — Muse can no longer use it.`);
+      setRevokeNotice(`Grant for “${clientId}” revoked — ${copy.label} can no longer use it.`);
       await loadGrants();
       await loadActivity();
     } catch (err) {
@@ -545,30 +706,11 @@ function MuseLivePanels({
     }
   };
 
-  const endpoints: { label: string; path: string; note: string }[] = [
-    {
-      label: "MCP endpoint",
-      path: "/api/mcp",
-      note: "Streamable HTTP, JSON-RPC 2.0. Give this URL to Muse as a Custom Connector.",
-    },
-    {
-      label: "Authorize (consent screen)",
-      path: "/api/muse/oauth/authorize",
-      note: "GET shows the consent screen; POST approves or denies.",
-    },
-    { label: "Token", path: "/api/muse/oauth/token", note: "authorization_code + refresh_token." },
-    { label: "Revoke", path: "/api/muse/oauth/revoke", note: "RFC 7009 token revocation." },
-    {
-      label: "Register (Dynamic Client Registration)",
-      path: "/api/muse/oauth/register",
-      note: "RFC 7591 — public clients by default; no pre-registered client secret exists.",
-    },
-    {
-      label: "Protected-resource metadata",
-      path: "/.well-known/oauth-protected-resource/api/mcp",
-      note: "RFC 9728 metadata for the MCP resource.",
-    },
-  ];
+  const endpoints = copy.endpoints;
+  // Grants are fetched for the whole account (the grants API is
+  // platform-agnostic); this panel shows only this platform's
+  // grants — see grantBelongsToPlatform.
+  const platformGrants = grants === null ? null : grants.filter((g) => grantBelongsToPlatform(g, platform));
 
   return (
     <>
@@ -576,12 +718,12 @@ function MuseLivePanels({
         <p className="text-13 text-black-300 leading-relaxed">
           Current status: <strong className="text-white">{status}</strong>.{" "}
           {status === "Connected and Verified"
-            ? "At least one active Muse OAuth grant exists for this workspace — Muse can call the MCP server on behalf of the granting user(s)."
+            ? `At least one active ${copy.label} OAuth grant exists for this workspace — ${copy.label} can call the MCP server on behalf of the granting user(s).`
             : status === "Connected but Not Verified"
-              ? "The MCP surface is configured, but no active Muse grant exists yet — configuration alone is not a connection. Connect from Muse (steps below) to create a grant."
+              ? `The MCP surface is configured, but no active ${copy.label} grant exists yet — configuration alone is not a connection. Connect from ${copy.label} (steps below) to create a grant.`
               : status === "Demo Mode"
-                ? "Demo Mode: the Muse OAuth + MCP surface refuses demo outright — no grant can be issued or used here."
-                : "The Muse surface is not fully configured on this deployment — see the environment variables above."}
+                ? `Demo Mode: the ${copy.label} OAuth + MCP surface refuses demo outright — no grant can be issued or used here.`
+                : `The ${copy.label} surface is not fully configured on this deployment — see the environment variables above.`}
         </p>
         {mode === "demo" && (
           <p className="text-12 text-black-400 leading-relaxed">
@@ -609,41 +751,36 @@ function MuseLivePanels({
         </div>
       </Section>
 
-      <Section title="Scopes — what a Muse grant can ask for">
+      <Section title={`Scopes — what a ${copy.label} grant can ask for`}>
         <p className="text-13 text-black-300 leading-relaxed">
-          A <code className="font-mono text-black-100">muse.read</code>-only grant is the
-          recommended default — it lets Muse look things up without changing anything. The consent
+          A <code className="font-mono text-black-100">{copy.scopePrefix}.read</code>-only grant is the
+          recommended default — it lets {copy.label} look things up without changing anything. The consent
           screen offers it, and a requested scope outside these three is refused, never silently
           widened.
         </p>
         <div className="divide-y divide-black-700/60">
-          {(Object.entries(MUSE_SCOPE_DESCRIPTIONS) as [MuseScope, string][]).map(
-            ([scope, description]) => (
+          {(Object.entries(SCOPE_DESCRIPTIONS) as [OAuthScope, string][])
+            .filter(([scope]) => scope.startsWith(`${copy.scopePrefix}.`))
+            .map(([scope, description]) => (
               <div key={scope} className="py-3 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <code className="font-mono text-13 text-white">{scope}</code>
-                  {scope === "muse.read" && (
+                  {scope === `${copy.scopePrefix}.read` && (
                     <Badge variant="blue" size="sm">Recommended default</Badge>
                   )}
-                  {scope === "muse.send" && (
+                  {scope === `${copy.scopePrefix}.send` && (
                     <Badge variant="error" size="sm">Sensitive</Badge>
                   )}
                 </div>
                 <p className="text-12 text-black-300 leading-relaxed">{description}</p>
               </div>
-            )
-          )}
+            ))}
         </div>
       </Section>
 
-      <Section title="Connect to Muse">
+      <Section title={`Connect to ${copy.label}`}>
         <ol className="space-y-2 list-none">
-          {[
-            "In Muse, add NxtSend as a Custom Connector with the MCP endpoint URL above. Muse registers itself via Dynamic Client Registration — there is no client secret to copy (clients are public by default).",
-            "Sign in on NxtSend's consent screen and choose the scopes. Pick muse.read only unless Muse genuinely needs to change or send things.",
-            "Use NxtSend from inside Muse. Sensitive writes (sending email, deleting a lead) need your approval in Muse every single time — they can never be set to “Always allow”.",
-            "Directory listing is a separate step: submit at muse.ai/platform for Meta's review. That submission has NOT been made and no approval is claimed — the Custom Connector path above works without it.",
-          ].map((step, i) => (
+          {copy.connectSteps.map((step, i) => (
             <li key={step} className="flex items-start gap-3 text-13 text-black-300">
               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-600/20 border border-purple-500/30 text-11 font-bold text-purple-300 mt-0.5">
                 {i + 1}
@@ -654,22 +791,21 @@ function MuseLivePanels({
         </ol>
       </Section>
 
-      <Section title="Your Muse grants">
+      <Section title={copy.grantsTitle}>
         {grantsError && (
           <p className="text-13 text-rose-200 leading-relaxed">{grantsError}</p>
         )}
-        {!grantsError && grants === null && (
+        {!grantsError && platformGrants === null && (
           <p className="text-13 text-black-400">Loading grants…</p>
         )}
-        {!grantsError && grants !== null && grants.length === 0 && (
+        {!grantsError && platformGrants !== null && platformGrants.length === 0 && (
           <p className="text-13 text-black-300 leading-relaxed">
-            No Muse grants for your account. A grant appears here after you approve Muse on the
-            consent screen — until then, nothing is connected.
+            {copy.grantsEmpty}
           </p>
         )}
-        {grants !== null && grants.length > 0 && (
+        {platformGrants !== null && platformGrants.length > 0 && (
           <div className="divide-y divide-black-700/60">
-            {grants.map((g) => (
+            {platformGrants.map((g) => (
               <div key={g.clientId} className="py-3 space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-13 font-semibold text-white">{g.clientName}</span>
@@ -681,6 +817,21 @@ function MuseLivePanels({
                 <p className="text-12 text-black-300">
                   Scopes: {g.scopes.length > 0 ? g.scopes.join(", ") : "—"}
                 </p>
+                {/* Scope descriptions come from SCOPE_DESCRIPTIONS, so
+                    nxtsend.* grants list with descriptions exactly
+                    like muse.* grants — never a bare scope string. */}
+                {g.scopes.length > 0 && (
+                  <ul className="space-y-0.5">
+                    {g.scopes.map((scope) => (
+                      <li key={scope} className="text-12 text-black-400 leading-relaxed">
+                        <code className="font-mono text-black-200">{scope}</code>
+                        {SCOPE_DESCRIPTIONS[scope]
+                          ? ` — ${SCOPE_DESCRIPTIONS[scope]}`
+                          : " — unknown scope (refused at issue time; report it as a bug)."}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <p className="text-12 text-black-400">
                   Created {new Date(g.createdAt).toLocaleString()}
                   {g.refreshExpiresAt
@@ -706,12 +857,18 @@ function MuseLivePanels({
         {revokeNotice && <p className="text-13 text-green-300">{revokeNotice}</p>}
         {revokeError && <p className="text-13 text-rose-200">{revokeError}</p>}
         <p className="text-12 text-black-400 leading-relaxed">
-          Revoking removes Muse&apos;s access for that grant immediately. Token values are never
+          Revoking removes {copy.label}&apos;s access for that grant immediately. Token values are never
           shown here — grants are identified by client name and scopes only.
         </p>
       </Section>
 
       <Section title="Integration activity history">
+        {platform === "chatgpt" && (
+          <p className="text-12 text-black-400 leading-relaxed">
+            The audit log is shared with the Muse connector — entries here cover MCP tool calls
+            and OAuth events from both platforms (actions are recorded as muse.tool.* for both).
+          </p>
+        )}
         {activityError && (
           <p className="text-13 text-rose-200 leading-relaxed">{activityError}</p>
         )}
@@ -720,8 +877,7 @@ function MuseLivePanels({
         )}
         {!activityError && activity !== null && activity.length === 0 && (
           <p className="text-13 text-black-300 leading-relaxed">
-            No Muse activity recorded for this workspace yet — MCP tool calls and OAuth
-            grant/revoke events appear here (newest first, up to 50).
+            {copy.activityEmpty}
           </p>
         )}
         {activity !== null && activity.length > 0 && (
@@ -746,15 +902,7 @@ function MuseLivePanels({
 
       <Section title="Security & privacy notes">
         <ul className="space-y-1.5">
-          {[
-            "Tokens and authorization codes are stored as SHA-256 hashes only — a database read can never yield a usable token, and no token value is ever logged or shown in the UI.",
-            "Refresh tokens rotate on every use; presenting an already-rotated refresh token revokes the whole grant.",
-            "The OAuth tables (migration 023) have RLS enabled with zero policies — only the service role can read or write them; the browser cannot reach them at all.",
-            "A grant is scoped to one user and one workspace. MCP tool calls are workspace-scoped and scope-enforced; a muse.read token cannot call a write tool.",
-            "Sensitive writes (send_email, send_inbox_reply, delete_lead) need approval in Muse every time. There is no LinkedIn-send tool: no authorized LinkedIn provider exists, and the official LinkedIn API exposes no connection-request/DM endpoints to standard developers.",
-            "Every MCP tool call and OAuth grant/revoke event is written to the audit log for this workspace (see the activity history above).",
-            "Demo Mode refuses the whole Muse surface (OAuth 503/400, MCP 503) — the demo persona is never served to Muse.",
-          ].map((note) => (
+          {copy.securityNotes.map((note) => (
             <li key={note} className="flex items-start gap-2 text-13 text-black-300">
               <Shield className="h-4 w-4 shrink-0 text-purple-400 mt-0.5" />
               <span className="leading-relaxed">{note}</span>
@@ -764,6 +912,30 @@ function MuseLivePanels({
       </Section>
     </>
   );
+}
+
+function MuseLivePanels({
+  origin,
+  status,
+  mode,
+}: {
+  origin: string;
+  status: string;
+  mode: string;
+}) {
+  return <ConnectorLivePanels platform="muse" origin={origin} status={status} mode={mode} />;
+}
+
+function ChatGptLivePanels({
+  origin,
+  status,
+  mode,
+}: {
+  origin: string;
+  status: string;
+  mode: string;
+}) {
+  return <ConnectorLivePanels platform="chatgpt" origin={origin} status={status} mode={mode} />;
 }
 
 function BackLink() {

@@ -18,7 +18,8 @@
 
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { getTokenEncryptionKey, type TokenVaultEnv } from "@/lib/oauth/crypto";
-import type { MuseScope } from "./scopes";
+import { DEFAULT_OAUTH_ORIGIN, getMcpResourceUrl } from "./config";
+import type { OAuthScope } from "./scopes";
 
 export const MUSE_AUTHORIZE_STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -27,12 +28,18 @@ const MUSE_STATE_LABEL = "nxtsend:muse-oauth-state:v1";
 export interface MuseAuthorizeStateClaims {
   clientId: string;
   redirectUri: string;
-  scopes: MuseScope[];
+  scopes: OAuthScope[];
   codeChallenge: string;
   /** The OAuth client's own opaque `state` value, echoed back on redirect. */
   clientState: string | null;
   userId: string;
   workspaceId: string;
+  /** RFC 8707 resource the grant is bound to (full MCP resource URL). */
+  resource?: string;
+  /** Which platform the client is (consent-screen wording). */
+  platform?: "muse" | "chatgpt";
+  /** Origin of a CIMD client_id URL, else null. */
+  clientOrigin?: string | null;
 }
 
 interface MuseStatePayload extends MuseAuthorizeStateClaims {
@@ -121,5 +128,14 @@ export function verifyMuseAuthorizeState(
     clientState: parsed.clientState ?? null,
     userId: parsed.userId,
     workspaceId: parsed.workspaceId,
+    // States minted before resource binding carry no resource: they
+    // default to the canonical Muse resource, exactly like a
+    // legacy (resource-less) token.
+    resource:
+      typeof parsed.resource === "string" && parsed.resource.length > 0
+        ? parsed.resource
+        : getMcpResourceUrl(DEFAULT_OAUTH_ORIGIN, "muse"),
+    platform: parsed.platform === "chatgpt" ? "chatgpt" : "muse",
+    clientOrigin: parsed.clientOrigin ?? null,
   };
 }

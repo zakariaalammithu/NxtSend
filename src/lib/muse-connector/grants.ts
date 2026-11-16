@@ -22,13 +22,184 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MuseOAuthClientRow, MuseOAuthStore } from "./oauth/store";
-import type { MuseScope } from "./oauth/scopes";
+import type { OAuthScope } from "./oauth/scopes";
+import {
+  CHATGPT_OAUTH_CALLBACK,
+  MUSE_OAUTH_CALLBACK,
+} from "./oauth/clients";
+
+/**
+ * Which platform a grant's client belongs to, for the admin MCP
+ * overview (grants by client origin). Classification is by the
+ * client's identity, never by scope prefix alone:
+ *   - a CIMD client_id is an https URL — chatgpt.com → ChatGPT,
+ *     agent.meta.ai → Muse;
+ *   - otherwise the registered redirect URIs decide (ChatGPT
+ *     callback → ChatGPT, Muse callback → Muse);
+ *   - anything else (e.g. loopback-only clients) is "Other".
+ * A client carrying the ChatGPT callback wins over Muse when both
+ * are listed (ChatGPT clients register both callbacks in practice
+ * only when they serve both platforms; the ChatGPT one is the
+ * distinguishing signal).
+ */
+export type GrantOrigin = "Muse" | "ChatGPT" | "Other";
+
+export function grantOriginForClient(
+  clientId: string,
+  redirectUris: string[] = []
+): GrantOrigin {
+  if (redirectUris.includes(CHATGPT_OAUTH_CALLBACK)) return "ChatGPT";
+  if (clientId.startsWith("https://")) {
+    try {
+      const origin = new URL(clientId).hostname.toLowerCase();
+      if (origin === "chatgpt.com" || origin.endsWith(".chatgpt.com")) return "ChatGPT";
+      if (origin === "agent.meta.ai" || origin.endsWith(".agent.meta.ai")) return "Muse";
+    } catch {
+      // Not a parseable URL — fall through to the redirect check.
+    }
+  }
+  if (redirectUris.includes(MUSE_OAUTH_CALLBACK)) return "Muse";
+  return "Other";
+}
+
+/** Active-grant counts split by client origin (admin overview). */
+export interface GrantsByOrigin {
+  muse: number;
+  chatgpt: number;
+  other: number;
+  /** Distinct client + user pairs with a live refresh token, all origins. */
+  total: number;
+}
+
+export const EMPTY_GRANTS_BY_ORIGIN: GrantsByOrigin = {
+  muse: 0,
+  chatgpt: 0,
+  other: 0,
+  total: 0,
+};
+
+/** Minimal live-token row the by-origin count needs (client + user pair). */
+export interface GrantCountRow {
+  client_id: string;
+  user_id: string;
+  kind: "access" | "refresh";
+  expires_at: string;
+  revoked_at: string | null;
+  /** Granted scopes — fallback signal when the client origin is unknown (e.g. loopback-only clients). */
+  scopes: string[];
+}
+
+/**
+ * Pure grouping: live refresh-token rows (+ client rows) -> active
+ * grant counts by origin (distinct client + user pairs). A CIMD
+ * client has no stored client row, so its client_id URL is what
+ * classifies it — see grantOriginForClient. Expired/revoked tokens
+ * and access tokens never count.
+ */
+export function summarizeGrantsByOrigin(
+  tokenRows: GrantCountRow[],
+  clientRows: MuseOAuthClientRow[],
+  now: Date = new Date()
+): GrantsByOrigin {
+  const redirectByClient = new Map(
+    clientRows.map((c) => [c.client_id, c.redirect_uris ?? []])
+  );
+  const nowMs = now.getTime();
+  const pairs = new Map<string, GrantOrigin>();
+  for (const row of tokenRows) {
+    if (row.kind !== "refresh") continue;
+    if (row.revoked_at) continue;
+    if (new Date(row.expires_at).getTime() <= nowMs) continue;
+    const key = `${row.client_id}:${row.user_id}`;
+    if (!pairs.has(key)) {
+      // Client origin first; when it is unknown (e.g. a
+      // loopback-only client with no stored platform signal),
+      // the scope prefix is the fallback — nxtsend.* grants
+      // belong to ChatGPT, muse.* grants to Muse.
+      let origin = grantOriginForClient(row.client_id, redirectByClient.get(row.client_id) ?? []);
+      if (origin === "Other") {
+        if (row.scopes.some((s) => s.startsWith("nxtsend."))) origin = "ChatGPT";
+        else if (row.scopes.some((s) => s.startsWith("muse."))) origin = "Muse";
+      }
+      pairs.set(key, origin);
+    }
+  }
+  const out: GrantsByOrigin = { ...EMPTY_GRANTS_BY_ORIGIN };
+  pairs.forEach((origin) => {
+    if (origin === "Muse") out.muse += 1;
+    else if (origin === "ChatGPT") out.chatgpt += 1;
+    else out.other += 1;
+  });
+  out.total = pairs.size;
+  return out;
+}
+
+/**
+ * Counts ACTIVE grants (distinct client + user pairs with a live
+ * refresh token) split by client origin. Optional workspace/user
+ * filter, like countActiveMuseGrants. Returns null when the tables
+ * cannot be read (e.g. migration 023 not applied); callers treat
+ * null as "unknown", never as zero.
+ */
+export async function countActiveGrantsByOrigin(
+  admin: SupabaseClient,
+  filter: { workspaceId?: string; userId?: string } = {},
+  now: Date = new Date()
+): Promise<GrantsByOrigin | null> {
+  try {
+    let tokensQuery = admin
+      .from("muse_oauth_tokens")
+      .select("client_id, user_id, kind, scopes, expires_at, revoked_at")
+      .eq("kind", "refresh")
+      .is("revoked_at", null)
+      .gt("expires_at", now.toISOString())
+      .limit(1000);
+    if (filter.workspaceId) tokensQuery = tokensQuery.eq("workspace_id", filter.workspaceId);
+    if (filter.userId) tokensQuery = tokensQuery.eq("user_id", filter.userId);
+    const [tokens, clients] = await Promise.all([
+      tokensQuery,
+      admin
+        .from("muse_oauth_clients")
+        .select("id, client_id, client_secret_hash, name, redirect_uris, created_at")
+        .order("created_at", { ascending: true }),
+    ]);
+    if (tokens.error || clients.error) return null;
+    const rows: GrantCountRow[] = (tokens.data ?? []).map((r) => {
+      const row = r as Record<string, unknown>;
+      return {
+        client_id: String(row.client_id),
+        user_id: String(row.user_id),
+        kind: "refresh" as const,
+        expires_at: String(row.expires_at),
+        revoked_at: (row.revoked_at as string | null) ?? null,
+        scopes: Array.isArray(row.scopes) ? (row.scopes as string[]) : [],
+      };
+    });
+    const clientRows: MuseOAuthClientRow[] = (clients.data ?? []).map((r) => {
+      const row = r as Record<string, unknown>;
+      return {
+        id: String(row.id),
+        client_id: String(row.client_id),
+        client_secret_hash:
+          typeof row.client_secret_hash === "string" && row.client_secret_hash
+            ? row.client_secret_hash
+            : null,
+        name: String(row.name ?? ""),
+        redirect_uris: Array.isArray(row.redirect_uris) ? (row.redirect_uris as string[]) : [],
+        created_at: String(row.created_at ?? new Date().toISOString()),
+      };
+    });
+    return summarizeGrantsByOrigin(rows, clientRows, now);
+  } catch {
+    return null;
+  }
+}
 
 /** The safe token-row subset the grants source reads (no hashes). */
 export interface MuseGrantTokenRow {
   client_id: string;
   kind: "access" | "refresh";
-  scopes: MuseScope[];
+  scopes: OAuthScope[];
   expires_at: string;
   revoked_at: string | null;
   created_at: string;
@@ -38,7 +209,7 @@ export interface MuseGrantSummary {
   clientId: string;
   /** Client display name from muse_oauth_clients, or the client_id when unknown. */
   clientName: string;
-  scopes: MuseScope[];
+  scopes: OAuthScope[];
   /** Earliest token creation for this grant (ISO). */
   createdAt: string;
   /** Latest live refresh-token expiry for this grant (ISO), or null when none is live. */
@@ -76,7 +247,7 @@ export function summarizeMuseGrants(
   byClient.forEach((rows, clientId) => {
     const scopes = Array.from(
       new Set(rows.flatMap((r) => r.scopes))
-    ).sort() as MuseScope[];
+    ).sort() as OAuthScope[];
     const createdAt = rows
       .map((r) => r.created_at)
       .sort()
@@ -112,8 +283,8 @@ export interface MuseGrantsDataSource {
   revokeGrant(clientId: string, userId: string, revokedAt: string): Promise<void>;
 }
 
-function scopesOf(value: unknown): MuseScope[] {
-  return Array.isArray(value) ? (value as MuseScope[]) : [];
+function scopesOf(value: unknown): OAuthScope[] {
+  return Array.isArray(value) ? (value as OAuthScope[]) : [];
 }
 
 /** Supabase-backed source (service role; migration 023 tables). */

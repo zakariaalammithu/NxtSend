@@ -2,7 +2,7 @@
  * MCP handler tests (Worker B) — handleMcpRequest with injected fakes.
  *
  * Covers: initialize handshake, ping, notifications no-op, tools/list
- * (18 manifest tools with classifications), read/write/sensitive tool
+ * (54 manifest tools with classifications), read/write/sensitive tool
  * calls, missing scope -> isError naming the scope, unknown tool ->
  * -32601, invalid params -> -32602, unauthenticated -> 401 with
  * WWW-Authenticate, user isolation across workspaces, rate limit
@@ -20,6 +20,9 @@ import {
   FakeInboxRepository,
   FakeUsageRepository,
   FakeIntegrationsRepository,
+  FakeAccountsRepository,
+  FakeSafetySettingsRepository,
+  FakeScheduledRepliesRepository,
   FakeEmailAdapter,
   makeLead,
   makeCampaign,
@@ -34,6 +37,7 @@ const CTX_A: MuseGrantContext = {
   scopes: ["muse.read", "muse.write", "muse.send"],
   clientId: "client_1",
   grantId: "grant_a",
+  resource: "https://nxtsend.com/api/mcp",
 };
 const CTX_B: MuseGrantContext = {
   userId: "user_b",
@@ -41,6 +45,7 @@ const CTX_B: MuseGrantContext = {
   scopes: ["muse.read", "muse.write", "muse.send"],
   clientId: "client_1",
   grantId: "grant_b",
+  resource: "https://nxtsend.com/api/mcp",
 };
 
 // Test helpers: JSON-RPC payloads are untyped JSON by design.
@@ -82,6 +87,9 @@ describe("handleMcpRequest", () => {
           inbox: new FakeInboxRepository(),
           usage: new FakeUsageRepository(),
           integrations: new FakeIntegrationsRepository(),
+          accounts: new FakeAccountsRepository(),
+          safetySettings: new FakeSafetySettingsRepository(),
+          scheduledReplies: new FakeScheduledRepliesRepository(),
           emailAdapter: email,
           draftFn: async () => ({
             status: "simulated",
@@ -141,12 +149,12 @@ describe("handleMcpRequest", () => {
     expect(notif.body).toBeNull();
   });
 
-  it("tools/list returns the 18 manifest tools with classifications in the description", async () => {
+  it("tools/list returns the 54 manifest tools with classifications in the description", async () => {
     const res = await handleMcpRequest(
       baseOpts({ body: { jsonrpc: "2.0", id: 2, method: "tools/list" } })
     );
     const result = rpcResult(res.body);
-    expect(result.tools.length).toBe(18);
+    expect(result.tools.length).toBe(54);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tools = result.tools as Array<Record<string, any>>;
     const byName = new Map(tools.map((t) => [t.name as string, t]));
@@ -258,7 +266,7 @@ describe("handleMcpRequest", () => {
     expect(rpcError(invalid.body).code).toBe(-32602);
 
     const method = await handleMcpRequest(
-      baseOpts({ body: { jsonrpc: "2.0", id: 9, method: "resources/list" } })
+      baseOpts({ body: { jsonrpc: "2.0", id: 9, method: "resources/subscribe" } })
     );
     expect(rpcError(method.body).code).toBe(-32601);
   });

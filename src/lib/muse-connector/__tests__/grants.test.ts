@@ -283,7 +283,7 @@ describe("summarizeGrantsByOrigin", () => {
       clients,
       NOW
     );
-    expect(out).toEqual({ muse: 2, chatgpt: 2, claude: 0, zapier: 0, other: 0, total: 4 });
+    expect(out).toEqual({ muse: 2, chatgpt: 2, claude: 0, zapier: 0, n8n: 0, other: 0, total: 4 });
   });
 
   it("splits Claude grants by origin, including the claude.* scope fallback", () => {
@@ -313,7 +313,7 @@ describe("summarizeGrantsByOrigin", () => {
       clients,
       NOW
     );
-    expect(out).toEqual({ muse: 0, chatgpt: 0, claude: 3, zapier: 0, other: 0, total: 3 });
+    expect(out).toEqual({ muse: 0, chatgpt: 0, claude: 3, zapier: 0, n8n: 0, other: 0, total: 3 });
   });
 
   it("ignores expired, revoked and access tokens, and falls back to scope prefix for loopback-only clients", () => {
@@ -329,7 +329,7 @@ describe("summarizeGrantsByOrigin", () => {
       CLIENTS,
       NOW
     );
-    expect(out).toEqual({ muse: 1, chatgpt: 1, claude: 0, zapier: 0, other: 0, total: 2 });
+    expect(out).toEqual({ muse: 1, chatgpt: 1, claude: 0, zapier: 0, n8n: 0, other: 0, total: 2 });
   });
 
   it("splits Zapier grants by origin, including the zapier.* scope fallback", () => {
@@ -360,6 +360,6 @@ describe("summarizeGrantsByOrigin", () => {
       clients,
       NOW
     );
-    expect(out).toEqual({ muse: 0, chatgpt: 0, claude: 0, zapier: 3, other: 0, total: 3 });
+    expect(out).toEqual({ muse: 0, chatgpt: 0, claude: 0, zapier: 3, n8n: 0, other: 0, total: 3 });
   });
 });

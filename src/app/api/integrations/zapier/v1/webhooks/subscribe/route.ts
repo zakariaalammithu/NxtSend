@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { withZapierRoute, readZapierJsonBody } from "@/lib/integrations/zapier/route-helpers";
-import { zapierSubscribeWebhook } from "@/lib/integrations/zapier/api";
+import { withRestRoute, readRestJsonBody } from "@/lib/integrations/rest/route-helpers";
+import { ZAPIER_PLATFORM } from "@/lib/integrations/rest/config";
+import { restSubscribeWebhook } from "@/lib/integrations/rest/api";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -12,7 +13,7 @@ export const runtime = "nodejs";
  * returned. A duplicate active subscription returns the existing id.
  */
 export async function POST(req: Request) {
-  const body = await readZapierJsonBody(req);
+  const body = await readRestJsonBody(req);
   if (!body) return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  return withZapierRoute(req, "write", (ctx, deps) => zapierSubscribeWebhook(ctx, deps, body));
+  return withRestRoute(req, ZAPIER_PLATFORM, "write", (ctx, deps) => restSubscribeWebhook(ctx, deps, body));
 }

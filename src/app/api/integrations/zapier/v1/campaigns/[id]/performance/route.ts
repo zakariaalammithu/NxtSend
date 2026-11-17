@@ -1,12 +1,13 @@
-import { withZapierRoute } from "@/lib/integrations/zapier/route-helpers";
-import { zapierCampaignPerformance } from "@/lib/integrations/zapier/api";
+import { withRestRoute } from "@/lib/integrations/rest/route-helpers";
+import { ZAPIER_PLATFORM } from "@/lib/integrations/rest/config";
+import { restCampaignPerformance } from "@/lib/integrations/rest/api";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /** GET /v1/campaigns/:id/performance — real stats; `accepted` is always null (no data source). */
 export async function GET(req: Request, { params }: { params: { id: string } }) {
-  return withZapierRoute(req, "read", (ctx, deps) =>
-    zapierCampaignPerformance(ctx, deps, params.id)
+  return withRestRoute(req, ZAPIER_PLATFORM, "read", (ctx, deps) =>
+    restCampaignPerformance(ctx, deps, params.id)
   );
 }

@@ -13,7 +13,8 @@
  * for this origin byte-for-byte, else `invalid_target`. When no
  * resource is sent, it defaults to the canonical resource for the
  * client's platform (Muse → /api/mcp, ChatGPT → /api/mcp/chatgpt,
- * Claude → /api/mcp/claude)
+ * Claude → /api/mcp/claude, Zapier → /api/integrations/zapier,
+ * n8n → /api/integrations/n8n)
  * and is recorded on the code, so the token is audience-bound
  * either way. RFC 9207 `iss` (the authorization server issuer) is
  * added to success and error redirects by the route.
@@ -102,7 +103,17 @@ export function validateAuthorizeRequest(
   const redirectUri =
     typeof params.redirect_uri === "string" ? params.redirect_uri : null;
   const origin = opts.origin ?? DEFAULT_OAUTH_ORIGIN;
-  const platform: OAuthClientPlatform = client ? clientPlatform(client) : "muse";
+  // Platform detection takes the requested scopes + resource as
+  // hints (see clientPlatform): n8n clients have arbitrary
+  // callback hosts, so redirect-host detection alone cannot find
+  // them — a request for `n8n.*` scopes (or the n8n resource) is
+  // the signal.
+  const platform: OAuthClientPlatform = client
+    ? clientPlatform(client, {
+        scopes: typeof params.scope === "string" ? params.scope.trim().split(/\s+/) : [],
+        resource: params.resource ?? null,
+      })
+    : "muse";
   let clientOrigin: string | null = null;
   if (client && client.client_id.startsWith("https://")) {
     try {
@@ -168,7 +179,7 @@ export function validateAuthorizeRequest(
   }
   // Scopes: when the client asks for none, default to the
   // least-privilege scope for its platform (muse.read / nxtsend.read /
-  // claude.read).
+  // claude.read / zapier.read / n8n.read).
   const scopes =
     params.scope && params.scope.trim()
       ? normalizeScopes(params.scope)
@@ -188,7 +199,9 @@ export function validateAuthorizeRequest(
     // exception: Zapier's standard OAuth2 client sends no PKCE —
     // its canonical CLI example has no code_challenge field and no
     // official source shows Zapier sending one — so requiring PKCE
-    // would make the Zapier integration unusable. A confidential
+    // would make the Zapier integration unusable. The same
+    // exception covers confidential n8n clients (an n8n OAuth2
+    // credential may be configured without PKCE). A confidential
     // client authenticates the code exchange with its client_secret
     // (verified in the token handler), which is the same
     // authentication OAuth 2.0 relied on before PKCE existed; the

@@ -1,28 +1,23 @@
 /**
  * Server-side Zapier emit path.
  *
- * The browser decorator path (src/lib/data/webhook-emission.ts →
- * ./client.ts → POST /api/integrations/zapier/emit) covers
- * dashboard mutations made in the browser. Server-side mutations
- * (Zapier REST routes, the Stripe webhook, the inbox reply route)
- * call `emitZapierEvent` directly with the service-role store —
- * the browser notifier is a no-op on the server
- * (`typeof window === "undefined"`), so without this helper
- * server-side repo calls would emit NOTHING (the gap the generic
- * webhook system has today).
+ * Thin wrapper over the shared platform emit
+ * (src/lib/integrations/rest/emit.ts): a Zapier emit fans out to
+ * EVERY platform's active subscriptions — Zapier hooks AND n8n
+ * webhooks subscribed to the same event. That is the intended
+ * fan-out, not a leak: both platforms subscribed to the event.
+ * See rest/emit.ts for the never-throws contract.
  *
- * `emitZapierEvent` never throws and never fails the caller's
- * mutation: the enqueue is attempted, the immediate delivery
- * attempt is fire-and-forget (void — a slow or failing hook must
- * not stall the response), and any error is logged, not raised.
- * The outbox row is the record of truth: a failed immediate
- * attempt is retried by the `zapier_webhook_retry` job.
+ * The browser decorator path (src/lib/data/webhook-emission.ts →
+ * ./client.ts → POST /api/integrations/zapier/emit) and the
+ * server-side call sites (the Stripe webhook, the inbox reply
+ * route) all flow through here, so server-side repo calls emit
+ * exactly like browser ones.
  */
 
 import type { ZapierSubscriptionStore, ZapierOutboxStore } from "./outbox";
-import { attemptZapierDelivery, enqueueZapierEvent } from "./outbox";
+import { emitZapierEvent as emitZapierEventRest } from "@/lib/integrations/rest/emit";
 import type { ZapierWebhookEventType } from "./events";
-import { buildZapierEventEnvelope } from "./events";
 
 export interface EmitZapierEventDeps {
   store: ZapierSubscriptionStore & ZapierOutboxStore;
@@ -35,17 +30,5 @@ export async function emitZapierEvent(
   workspaceId: string,
   data: Record<string, unknown>
 ): Promise<void> {
-  try {
-    const envelope = buildZapierEventEnvelope(type, workspaceId, data);
-    const deliveries = await enqueueZapierEvent(deps.store, envelope);
-    for (const delivery of deliveries) {
-      // Best-effort immediate attempt: fire-and-forget, never
-      // awaited by the mutation, never allowed to throw.
-      void attemptZapierDelivery({ store: deps.store, fetchFn: deps.fetchFn }, delivery).catch(
-        (err) => console.error("[NxtSend] Zapier immediate delivery failed:", err)
-      );
-    }
-  } catch (err) {
-    console.error("[NxtSend] Zapier emit failed (mutation unaffected):", err);
-  }
+  return emitZapierEventRest(deps, type, workspaceId, data);
 }

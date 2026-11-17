@@ -1,0 +1,76 @@
+{
+  "name": "NxtSend: New Conversation Reply \u2192 Slack",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "webhook",
+        "event": "conversation.reply_created"
+      },
+      "id": "0360a921-13de-48bf-a759-1494fb37cf1a",
+      "name": "New Conversation Reply",
+      "type": "n8n-nodes-nxtsend.nxtSendTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "credentials": {
+        "nxtSendApi": {
+          "id": null,
+          "name": "NxtSend API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": "#inbox",
+        "text": "=New reply in conversation {{ $json.conversationId }}: {{ $json.content }}",
+        "otherOptions": {}
+      },
+      "id": "80b32fce-48ea-44e4-8ff0-fe6d060f5a38",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Setup\n1. Connect your NxtSend API credential on the trigger.\n2. Connect Slack and set the channel (or replace the Slack node with an Email Send node).\n3. The trigger emits the reply's fields plus `event` and `eventId`.",
+        "height": 200,
+        "width": 440
+      },
+      "id": "e7f3ef2c-fd89-46a6-bec4-2de03b5d7df4",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        80
+      ]
+    }
+  ],
+  "connections": {
+    "New Conversation Reply": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "staticData": null
+}

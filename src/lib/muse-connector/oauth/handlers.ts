@@ -162,8 +162,8 @@ async function exchangeCode(
   // PKCE: a stored challenge MUST be satisfied by a matching
   // verifier (public clients always have one; confidential clients
   // that sent a challenge at authorize time do too). A code issued
-  // WITHOUT a challenge (confidential client only — Zapier sends
-  // no PKCE; see authorize.ts) exchanges on the client_secret
+  // WITHOUT a challenge (confidential client only — Zapier / n8n
+  // send no PKCE; see authorize.ts) exchanges on the client_secret
   // alone, which authenticateMuseClient + verifyClientSecret
   // already verified above. A verifier presented without a stored
   // challenge is ignored — there is nothing to check it against.
@@ -228,12 +228,12 @@ function tokenResponseBody(tokens: MuseIssuedTokens, issuer: string): Record<str
 /**
  * POST /api/muse/oauth/token — grant_types `authorization_code`
  * (single-use code + PKCE S256 verifier, except confidential
- * clients whose code was issued without a challenge — Zapier —
+ * clients whose code was issued without a challenge — Zapier / n8n —
  * which exchange on client_secret alone) and `refresh_token`
  * (rotates on every use; reuse of an already-rotated refresh token
- * revokes the whole grant, except a Zapier re-presentation inside
- * the 10-minute grace window, which rotates again — see
- * tokens.ts). Public clients send no secret; confidential clients
+ * revokes the whole grant, except a grace-platform (n8n / Zapier)
+ * re-presentation inside the 10-minute grace window, which rotates
+ * again — see tokens.ts). Public clients send no secret; confidential clients
  * authenticate with client_secret (body or HTTP Basic); CIMD
  * clients authenticate as public clients.
  * `private_key_jwt` is NOT supported — any `client_assertion` is
@@ -382,10 +382,14 @@ export interface MuseRegisterHandlerDeps {
 
 /**
  * POST /api/muse/oauth/register (RFC 7591). Accepts `client_name`
- * + `redirect_uris` only — every other field is ignored. Default
- * public client (no secret); a confidential client is created only
- * when `token_endpoint_auth_method` is explicitly
- * `client_secret_post` or `client_secret_basic`.
+ * + `redirect_uris` only — every other field is ignored, except
+ * `scope`: when the client declares a platform scope (e.g.
+ * `n8n.read`) it is passed through so redirect URIs are validated
+ * against that platform's rule — this is how an n8n client
+ * registers an instance-specific https callback. Default public
+ * client (no secret); a confidential client is created only when
+ * `token_endpoint_auth_method` is explicitly `client_secret_post`
+ * or `client_secret_basic`.
  */
 export async function handleMuseRegisterRequest(
   req: Request,
@@ -420,6 +424,7 @@ export async function handleMuseRegisterRequest(
       name: body.client_name,
       redirectUris: body.redirect_uris,
       confidential,
+      scopes: body.scope,
     },
     now
   );

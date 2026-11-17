@@ -31,11 +31,11 @@ import {
 import { sendInboxReply } from "@/lib/inbox/reply";
 import { resolveZapierContext } from "./auth";
 import { isZapierEnabled } from "./config";
-import { emitZapierEvent } from "./emit";
+import { emitPlatformEvent } from "@/lib/integrations/rest/emit";
 import {
-  createSupabaseZapierStore,
-  getDemoZapierStore,
-} from "./outbox";
+  createPlatformStore,
+  getDemoPlatformStore,
+} from "@/lib/integrations/rest/outbox";
 import { recordZapierAudit } from "./audit";
 import type { ZapierApiDeps, ZapierApiResult } from "./api";
 
@@ -58,7 +58,10 @@ export async function buildZapierApiDeps(
   admin: SupabaseClient | null
 ): Promise<ZapierApiDeps> {
   const mode = getDataMode();
-  const zapierStore = admin ? createSupabaseZapierStore(admin) : getDemoZapierStore();
+  // Platform store bound to zapier: Zapier API subscription
+  // management stays Zapier-only, while emit fans out to both
+  // platforms (see rest/outbox.ts for the split).
+  const zapierStore = admin ? createPlatformStore(admin, "zapier") : getDemoPlatformStore();
   const inboxRepo = createInboxRepository(mode, admin);
   return {
     leads: createLeadsRepository(mode),
@@ -68,7 +71,7 @@ export async function buildZapierApiDeps(
     usage: createUsageRepository(mode),
     mode,
     zapierStore,
-    emit: (type, workspaceId, data) => emitZapierEvent({ store: zapierStore }, type, workspaceId, data),
+    emit: (type, workspaceId, data) => emitPlatformEvent({ store: zapierStore }, type, workspaceId, data),
     sendReply: (args) => {
       const adapter =
         admin != null

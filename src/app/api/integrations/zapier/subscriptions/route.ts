@@ -58,6 +58,7 @@ export async function GET() {
       .from("zapier_webhook_subscriptions")
       .select("id, event, target_url, active, created_at, updated_at")
       .eq("workspace_id", ctx.workspaceId)
+      .eq("platform", "zapier")
       .order("created_at", { ascending: false });
     if (subsError) {
       return NextResponse.json(
@@ -71,6 +72,7 @@ export async function GET() {
         "id, event, subscription_id, status, attempts, max_attempts, last_error, next_retry_at, created_at"
       )
       .eq("workspace_id", ctx.workspaceId)
+      .eq("platform", "zapier")
       .order("created_at", { ascending: false })
       .limit(20);
     if (deliveriesError) {

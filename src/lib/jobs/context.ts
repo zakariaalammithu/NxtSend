@@ -16,9 +16,9 @@ import {
 } from "@/lib/webhooks/store";
 import { runDeliveryAttempt } from "@/lib/webhooks/dispatch";
 import {
-  attemptZapierDelivery,
-  createSupabaseZapierStore,
-} from "@/lib/integrations/zapier/outbox";
+  attemptPlatformDelivery,
+  createPlatformStore,
+} from "@/lib/integrations/rest/outbox";
 import { resolveWorkspaceEntitlement } from "@/lib/billing/entitlement";
 import { SupabaseExecutorStore } from "@/lib/executor/supabase-store";
 import { createCampaignRoutingAdapter } from "@/lib/email";
@@ -103,9 +103,40 @@ export function createSupabaseJobsContext(admin: SupabaseClient): JobsContext {
       return { status: updated.status };
     },
     // ── Zapier REST Hook outbox (migration 025) ──────────────────
+    // Platform-parameterised methods first (migration 029); the
+    // Zapier-specific methods below delegate to them so both
+    // spellings stay available.
+    async listDuePlatformRetries(platform, nowIso) {
+      const store = createPlatformStore(admin, platform);
+      const due = await store.listDueDeliveries(nowIso);
+      return due.map((d) => ({
+        id: d.id,
+        workspace_id: d.workspace_id,
+        status: d.status,
+        attempts: d.attempts,
+        max_attempts: d.max_attempts,
+      }));
+    },
+    async retryPlatformDelivery(platform, deliveryId) {
+      const store = createPlatformStore(admin, platform);
+      const delivery = await store.getDelivery(deliveryId);
+      if (!delivery) return { status: "missing" };
+      const result = await attemptPlatformDelivery({ store }, delivery);
+      return { status: result.status };
+    },
+    async cleanupStalePlatformSubscriptions(platform, olderThanIso) {
+      const store = createPlatformStore(admin, platform);
+      const stale = await store.listStaleInactive(olderThanIso);
+      for (const sub of stale) {
+        await store.deleteSubscription(sub.id);
+      }
+      return stale.length;
+    },
     async listDueZapierRetries(nowIso) {
-      const zapierStore = createSupabaseZapierStore(admin);
-      const due = await zapierStore.listDueDeliveries(nowIso);
+      // Legacy spelling — delegates to the platform method so
+      // Zapier retries stay platform-filtered (migration 029).
+      const store = createPlatformStore(admin, "zapier");
+      const due = await store.listDueDeliveries(nowIso);
       return due.map((d) => ({
         id: d.id,
         workspace_id: d.workspace_id,
@@ -115,17 +146,17 @@ export function createSupabaseJobsContext(admin: SupabaseClient): JobsContext {
       }));
     },
     async retryZapierDelivery(deliveryId) {
-      const zapierStore = createSupabaseZapierStore(admin);
-      const delivery = await zapierStore.getDelivery(deliveryId);
+      const store = createPlatformStore(admin, "zapier");
+      const delivery = await store.getDelivery(deliveryId);
       if (!delivery) return { status: "missing" };
-      const result = await attemptZapierDelivery({ store: zapierStore }, delivery);
+      const result = await attemptPlatformDelivery({ store }, delivery);
       return { status: result.status };
     },
     async cleanupStaleZapierSubscriptions(olderThanIso) {
-      const zapierStore = createSupabaseZapierStore(admin);
-      const stale = await zapierStore.listStaleInactive(olderThanIso);
+      const store = createPlatformStore(admin, "zapier");
+      const stale = await store.listStaleInactive(olderThanIso);
       for (const sub of stale) {
-        await zapierStore.deleteSubscription(sub.id);
+        await store.deleteSubscription(sub.id);
       }
       return stale.length;
     },

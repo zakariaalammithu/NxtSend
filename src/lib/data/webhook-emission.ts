@@ -14,11 +14,20 @@
  *  - notifyWebhookEvent (the generic one-endpoint webhooks system)
  *  - notifyZapierEvent (Zapier REST Hooks, POST /api/integrations/zapier/emit)
  *
+ * The Zapier emit route fans out to EVERY platform's active
+ * subscriptions via emitPlatformEvent (src/lib/integrations/rest),
+ * so notifyZapierEvent is also the n8n path: there is NO separate
+ * /api/integrations/n8n/emit route and no separate n8n browser
+ * notifier — one notifier serves both platforms. The three events
+ * that used to be Zapier-only (lead.updated,
+ * lead.added_to_campaign, lead.removed_from_campaign) now also
+ * fire notifyWebhookEvent, closing the generic-system gap for
+ * them, and they reach n8n subscriptions through the same fan-out.
  * Both notifiers are fire-and-forget and no-ops outside the
  * browser, so emission can never break a data operation (or a unit
- * test). Server-side mutations (Zapier REST routes, the Stripe
+ * test). Server-side mutations (Zapier/n8n REST routes, the Stripe
  * webhook, the inbox reply route) emit through the server-side
- * helper instead (src/lib/integrations/zapier/emit.ts) — the
+ * helper instead (src/lib/integrations/rest/emit.ts) — the
  * browser notifier alone would leave server-side repo calls
  * emitting nothing.
  */
@@ -74,10 +83,17 @@ export function withLeadWebhookEvents(repo: LeadsRepository): LeadsRepository {
       }
       if (prop === "updateLead") {
         // lead.updated fires on ANY successful update, with the
-        // list of fields the caller actually changed.
+        // list of fields the caller actually changed. It fires
+        // BOTH notifiers (the generic gap is closed here) and
+        // reaches n8n through the emit route's fan-out.
         return async (id: string, patch: Partial<Lead>) => {
           const updated = await target.updateLead(id, patch);
           const changedFields = Object.keys(patch);
+          notifyWebhookEvent("lead.updated", {
+            source: "manual",
+            leadId: updated.id,
+            changed_fields: changedFields,
+          });
           notifyZapierEvent("lead.updated", {
             source: "manual",
             leadId: updated.id,
@@ -141,6 +157,11 @@ export function withCampaignWebhookEvents(
         ) => {
           const result = await target.enrollLeads(workspaceId, campaignId, leadIds);
           if (result.enrolled > 0) {
+            notifyWebhookEvent("lead.added_to_campaign", {
+              campaignId,
+              leadIds,
+              enrolled: result.enrolled,
+            });
             notifyZapierEvent("lead.added_to_campaign", {
               campaignId,
               leadIds,
@@ -153,6 +174,10 @@ export function withCampaignWebhookEvents(
       if (prop === "removeEnrollment") {
         return async (campaignId: string, leadId: string) => {
           await target.removeEnrollment(campaignId, leadId);
+          notifyWebhookEvent("lead.removed_from_campaign", {
+            campaignId,
+            leadId,
+          });
           notifyZapierEvent("lead.removed_from_campaign", {
             campaignId,
             leadId,

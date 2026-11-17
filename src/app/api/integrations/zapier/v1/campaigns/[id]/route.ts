@@ -1,18 +1,19 @@
 import { NextResponse } from "next/server";
-import { withZapierRoute, readZapierJsonBody } from "@/lib/integrations/zapier/route-helpers";
-import { zapierGetCampaign, zapierUpdateCampaign } from "@/lib/integrations/zapier/api";
+import { withRestRoute, readRestJsonBody } from "@/lib/integrations/rest/route-helpers";
+import { ZAPIER_PLATFORM } from "@/lib/integrations/rest/config";
+import { restGetCampaign, restUpdateCampaign } from "@/lib/integrations/rest/api";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /** GET /v1/campaigns/:id (includes steps). */
 export async function GET(req: Request, { params }: { params: { id: string } }) {
-  return withZapierRoute(req, "read", (ctx, deps) => zapierGetCampaign(ctx, deps, params.id));
+  return withRestRoute(req, ZAPIER_PLATFORM, "read", (ctx, deps) => restGetCampaign(ctx, deps, params.id));
 }
 
 /** PATCH /v1/campaigns/:id — name/type/description; status moves use the action endpoints' rules. */
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const body = await readZapierJsonBody(req);
+  const body = await readRestJsonBody(req);
   if (!body) return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  return withZapierRoute(req, "write", (ctx, deps) => zapierUpdateCampaign(ctx, deps, params.id, body));
+  return withRestRoute(req, ZAPIER_PLATFORM, "write", (ctx, deps) => restUpdateCampaign(ctx, deps, params.id, body));
 }

@@ -1,0 +1,98 @@
+{
+  "name": "NxtSend: Campaign Status Changed \u2192 Google Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "webhook",
+        "event": "campaign.status_changed"
+      },
+      "id": "62b0d5e9-2802-4a19-9b31-884e232cb153",
+      "name": "Campaign Status Changed",
+      "type": "n8n-nodes-nxtsend.nxtSendTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "credentials": {
+        "nxtSendApi": {
+          "id": null,
+          "name": "NxtSend API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SPREADSHEET_ID",
+          "mode": "url",
+          "cachedResultUrl": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Campaign": "={{ $json.name }}",
+            "Status": "={{ $json.status }}",
+            "Updated": "={{ $json.updated_at }}"
+          },
+          "matchingColumns": [
+            "Campaign"
+          ],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "7989dec5-739e-42a7-973a-f177538cd9fb",
+      "name": "Update Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Setup\n1. Connect your NxtSend API credential on the trigger.\n2. Point the Google Sheets node at a sheet with a \"Campaign\" column (replace\nYOUR_SPREADSHEET_ID). Rows are matched on the Campaign column and updated in place.",
+        "height": 200,
+        "width": 440
+      },
+      "id": "9d51cea9-133a-4c1b-822e-ae16057a32e6",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        80
+      ]
+    }
+  ],
+  "connections": {
+    "Campaign Status Changed": {
+      "main": [
+        [
+          {
+            "node": "Update Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "staticData": null
+}

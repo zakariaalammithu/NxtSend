@@ -146,6 +146,8 @@ describe("claude.* scopes", () => {
       "claude.send",
       "zapier.read",
       "zapier.write",
+      "n8n.read",
+      "n8n.write",
     ]);
   });
 

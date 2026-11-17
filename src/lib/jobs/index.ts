@@ -20,6 +20,11 @@ export type {
 export { runDueJobs } from "./runner";
 export type { RunSummary } from "./runner";
 export { createJobHandlers, monthPeriodStart } from "./handlers";
-export { enqueueFollowUpScan, followUpScanKey } from "./producer";
+export {
+  enqueueFollowUpScan,
+  followUpScanKey,
+  platformWebhookRetryKey,
+  enqueueDailyPlatformWebhookRetries,
+} from "./producer";
 export { createSupabaseJobStore, InMemoryJobStore } from "./store";
 export { createSupabaseJobsContext } from "./context";

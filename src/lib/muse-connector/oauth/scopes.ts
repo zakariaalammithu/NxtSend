@@ -8,7 +8,7 @@
  * dropped or widened.
  *
  * Three prefixes, one meaning: `muse.read`, `nxtsend.read`,
- * `claude.read` and `zapier.read` grant exactly the same tier of access. The prefix records which platform
+ * `claude.read`, `zapier.read` and `n8n.read` grant exactly the same tier of access. The prefix records which platform
  * the grant belongs to (so the consent screen and the scope string
  * round-trip honestly); authorization decisions MUST go through
  * `grantHasTier`, never through a string prefix check, so a grant
@@ -32,15 +32,26 @@ export const CLAUDE_SCOPES = ["claude.read", "claude.write", "claude.send"] as c
  */
 export const ZAPIER_SCOPES = ["zapier.read", "zapier.write"] as const;
 
-/** Every scope this authorization server issues, all four platforms. */
-export const ALL_OAUTH_SCOPES = [...MUSE_SCOPES, ...NXT_SEND_SCOPES, ...CLAUDE_SCOPES, ...ZAPIER_SCOPES] as const;
+/**
+ * n8n scopes. Only read + write exist — there is NO `n8n.send`
+ * tier: n8n never sends LinkedIn messages (no provider exists),
+ * and email replies sent through the n8n API are covered by the
+ * write tier, documented as such — the same rule as Zapier.
+ * n8n grants must hold each tier they need, like every other
+ * platform.
+ */
+export const N8N_SCOPES = ["n8n.read", "n8n.write"] as const;
+
+/** Every scope this authorization server issues, all five platforms. */
+export const ALL_OAUTH_SCOPES = [...MUSE_SCOPES, ...NXT_SEND_SCOPES, ...CLAUDE_SCOPES, ...ZAPIER_SCOPES, ...N8N_SCOPES] as const;
 
 export type MuseScope = (typeof MUSE_SCOPES)[number];
 export type NxtSendScope = (typeof NXT_SEND_SCOPES)[number];
 export type ClaudeScope = (typeof CLAUDE_SCOPES)[number];
 export type ZapierScope = (typeof ZAPIER_SCOPES)[number];
+export type N8nScope = (typeof N8N_SCOPES)[number];
 /** Any scope this server issues, any platform prefix. */
-export type OAuthScope = MuseScope | NxtSendScope | ClaudeScope | ZapierScope;
+export type OAuthScope = MuseScope | NxtSendScope | ClaudeScope | ZapierScope | N8nScope;
 
 export type ScopeTier = "read" | "write" | "send";
 
@@ -61,6 +72,8 @@ export const SCOPE_TIER_MAP: Record<OAuthScope, ScopeTier> = {
   "claude.send": "send",
   "zapier.read": "read",
   "zapier.write": "write",
+  "n8n.read": "read",
+  "n8n.write": "write",
 };
 
 const SCOPE_SET = new Set<string>(ALL_OAUTH_SCOPES);
@@ -100,12 +113,20 @@ export const ZAPIER_SCOPE_DESCRIPTIONS: Record<ZapierScope, string> = {
     "Let Zapier create and change leads and draft campaigns, pause, resume or archive campaigns, enroll leads, and send email inbox replies. Zapier never sends LinkedIn messages.",
 };
 
+export const N8N_SCOPE_DESCRIPTIONS: Record<N8nScope, string> = {
+  "n8n.read":
+    "Let n8n read your leads, campaigns, inbox conversations and usage — no changes are made.",
+  "n8n.write":
+    "Let n8n create and change leads and draft campaigns, pause, resume or archive campaigns, enroll leads, and send email inbox replies. n8n never sends LinkedIn messages.",
+};
+
 /** Description for any issued scope, whichever prefix was requested. */
 export const SCOPE_DESCRIPTIONS: Record<OAuthScope, string> = {
   ...MUSE_SCOPE_DESCRIPTIONS,
   ...NXT_SEND_SCOPE_DESCRIPTIONS,
   ...CLAUDE_SCOPE_DESCRIPTIONS,
   ...ZAPIER_SCOPE_DESCRIPTIONS,
+  ...N8N_SCOPE_DESCRIPTIONS,
 };
 
 /** Plain-words description for one scope (unknown scopes have none). */
@@ -124,7 +145,7 @@ export function grantHasTier(scopes: string[], tier: ScopeTier): boolean {
 
 /**
  * Parses a space-separated scope string. Accepts any prefix
- * (`muse.*`, `nxtsend.*`, `claude.*` or `zapier.*`); returns the de-duplicated scopes in
+ * (`muse.*`, `nxtsend.*`, `claude.*`, `zapier.*` or `n8n.*`); returns the de-duplicated scopes in
  * request order, or null when any requested scope is unknown. An
  * empty/omitted scope defaults to read-only (`muse.read`) — the
  * least privilege. Callers that know the client platform should
@@ -159,9 +180,10 @@ export function isValidMuseScopeSubset(scopes: string[]): scopes is OAuthScope[]
 }
 
 /** Least-privilege default scope for a client platform. */
-export function defaultScopeForPlatform(platform: "muse" | "chatgpt" | "claude" | "zapier"): OAuthScope {
+export function defaultScopeForPlatform(platform: "muse" | "chatgpt" | "claude" | "zapier" | "n8n"): OAuthScope {
   if (platform === "chatgpt") return "nxtsend.read";
   if (platform === "claude") return "claude.read";
   if (platform === "zapier") return "zapier.read";
+  if (platform === "n8n") return "n8n.read";
   return "muse.read";
 }

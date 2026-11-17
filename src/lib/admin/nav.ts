@@ -69,6 +69,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { label: "Other APIs", href: "/admin/integrations/other", icon: "Blocks" },
       { label: "Muse.ai Integration", href: "/admin/integrations/muse-ai", icon: "Wand2" },
       { label: "Zapier Integration", href: "/admin/integrations/zapier", icon: "Zap" },
+      { label: "n8n Integration", href: "/admin/integrations/n8n", icon: "Workflow" },
       { label: "Integration Hub", href: "/admin/integration-hub", icon: "PlugZap" },
     ],
   },

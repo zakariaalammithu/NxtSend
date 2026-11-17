@@ -213,18 +213,21 @@ describe("Zapier resource", () => {
     const zapierCtx = await resolveMuseContext(req(`${ORIGIN}/api/integrations/zapier/v1/leads`), {
       store,
       mode: "supabase",
+      now: NOW,
       resource: ZAPIER_RESOURCE,
     });
     expect(zapierCtx?.workspaceId).toBe(WORKSPACE_ID);
     const museCtx = await resolveMuseContext(req(`${ORIGIN}/api/mcp`), {
       store,
       mode: "supabase",
+      now: NOW,
       resource: `${ORIGIN}/api/mcp`,
     });
     expect(museCtx).toBeNull();
     const direct = await verifyMuseAccessToken(access, {
       store,
       mode: "supabase",
+      now: NOW,
       resource: ZAPIER_RESOURCE,
     });
     expect(direct?.scopes).toEqual(["zapier.read", "zapier.write"]);

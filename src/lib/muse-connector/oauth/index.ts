@@ -12,11 +12,13 @@ export {
   NXT_SEND_SCOPES,
   CLAUDE_SCOPES,
   ZAPIER_SCOPES,
+  N8N_SCOPES,
   ALL_OAUTH_SCOPES,
   MUSE_SCOPE_DESCRIPTIONS,
   NXT_SEND_SCOPE_DESCRIPTIONS,
   CLAUDE_SCOPE_DESCRIPTIONS,
   ZAPIER_SCOPE_DESCRIPTIONS,
+  N8N_SCOPE_DESCRIPTIONS,
   SCOPE_DESCRIPTIONS,
   SCOPE_TIER_MAP,
   parseMuseScopes,
@@ -26,7 +28,7 @@ export {
   scopeDescription,
   defaultScopeForPlatform,
 } from "./scopes";
-export type { MuseScope, NxtSendScope, ClaudeScope, ZapierScope, OAuthScope, ScopeTier } from "./scopes";
+export type { MuseScope, NxtSendScope, ClaudeScope, ZapierScope, N8nScope, OAuthScope, ScopeTier } from "./scopes";
 export { computeCodeChallenge, verifyCodeChallenge, isS256Method } from "./pkce";
 export {
   hashToken,
@@ -35,7 +37,9 @@ export {
   rotateRefreshToken,
   revokeMuseToken,
   isZapierGrant,
+  isGraceGrant,
   ZAPIER_REFRESH_GRACE_MS,
+  REFRESH_REUSE_GRACE_MS,
   MUSE_ACCESS_TOKEN_TTL_MS,
   MUSE_REFRESH_TOKEN_TTL_MS,
   MUSE_CODE_TTL_MS,
@@ -57,6 +61,9 @@ export {
   isAllowedMuseRedirectUri,
   isAllowedClaudeRedirectUri,
   isZapierRedirectUri,
+  isN8nRedirectUri,
+  isPrivateOrLoopbackHost,
+  isLocalDeployment,
   isAllowedOAuthRedirectUri,
   isAllowedRedirectUriForPlatform,
   isLoopbackRedirectUri,
@@ -68,7 +75,7 @@ export {
   clientPlatform,
   platformLabel,
 } from "./clients";
-export type { OAuthClientPlatform } from "./clients";
+export type { OAuthClientPlatform, ClientPlatformHints } from "./clients";
 export {
   isCimdClientId,
   validateCimdDocument,
@@ -93,7 +100,7 @@ export { resolveMuseContext } from "./context";
 export type { ResolveMuseContextDeps } from "./context";
 export { recordMuseOAuthEvent } from "./audit";
 export type { MuseOAuthAuditAction } from "./audit";
-export { isMuseMcpEnabled, isChatGptMcpEnabled, isClaudeMcpEnabled, getMusePublicUrl, getChatGptPublicUrl, getClaudePublicUrl, getOAuthIssuer, getMcpResourceUrl, getZapierResourceUrl, canonicalMcpResources, resourcePlatform, DEFAULT_OAUTH_ORIGIN, MCP_RESOURCE_PATHS } from "./config";
+export { isMuseMcpEnabled, isChatGptMcpEnabled, isClaudeMcpEnabled, getMusePublicUrl, getChatGptPublicUrl, getClaudePublicUrl, getOAuthIssuer, getMcpResourceUrl, getZapierResourceUrl, getN8nResourceUrl, canonicalMcpResources, resourcePlatform, DEFAULT_OAUTH_ORIGIN, MCP_RESOURCE_PATHS } from "./config";
 export type { McpPlatform } from "./config";
 export {
   handleMuseTokenRequest,

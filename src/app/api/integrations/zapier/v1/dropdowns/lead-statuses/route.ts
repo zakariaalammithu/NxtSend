@@ -1,10 +1,11 @@
-import { withZapierRoute } from "@/lib/integrations/zapier/route-helpers";
-import { zapierDropdownLeadStatuses } from "@/lib/integrations/zapier/api";
+import { withRestRoute } from "@/lib/integrations/rest/route-helpers";
+import { ZAPIER_PLATFORM } from "@/lib/integrations/rest/config";
+import { restDropdownLeadStatuses } from "@/lib/integrations/rest/api";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /** GET /v1/dropdowns/lead-statuses — the lead status values. */
 export async function GET(req: Request) {
-  return withZapierRoute(req, "read", () => Promise.resolve(zapierDropdownLeadStatuses()));
+  return withRestRoute(req, ZAPIER_PLATFORM, "read", () => Promise.resolve(restDropdownLeadStatuses()));
 }

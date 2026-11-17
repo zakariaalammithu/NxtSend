@@ -1,0 +1,77 @@
+{
+  "name": "NxtSend: New Lead \u2192 AI Personalization (Placeholder)",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "polling",
+        "event": "lead.created"
+      },
+      "id": "68bbcae0-8b41-4bfc-88bc-7554fa99dbb2",
+      "name": "New Lead",
+      "type": "n8n-nodes-nxtsend.nxtSendTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "credentials": {
+        "nxtSendApi": {
+          "id": null,
+          "name": "NxtSend API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://example.com/personalize",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lead\": {{ JSON.stringify($json) }}\n}",
+        "options": {}
+      },
+      "id": "717fc3ae-d1ec-457d-a82a-845abe0fba30",
+      "name": "AI Personalization (configure me)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Setup \u2014 READ THIS FIRST\nThe HTTP Request node is a PLACEHOLDER for your own AI personalization\nendpoint. The AI step must be configured by the user: replace\nhttps://example.com/personalize with your real endpoint (OpenAI, Claude,\nor your own service) and map its response to the next step yourself.\nThe NxtSend node has NO AI-draft operation: nothing in this package writes message copy.\nDo not send the AI output anywhere until you have reviewed what the endpoint returns.",
+        "height": 200,
+        "width": 440
+      },
+      "id": "438585f3-77bb-413d-a497-aea78c247591",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        80
+      ]
+    }
+  ],
+  "connections": {
+    "New Lead": {
+      "main": [
+        [
+          {
+            "node": "AI Personalization (configure me)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "staticData": null
+}

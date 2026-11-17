@@ -1,0 +1,89 @@
+{
+  "name": "NxtSend: Form Submission \u2192 Import Lead",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "lead-form",
+        "formTitle": "New Lead",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "First Name"
+            },
+            {
+              "fieldLabel": "Last Name"
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8ba9a916-3542-408d-b3bc-afea7a06171b",
+      "name": "Lead Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "lead",
+        "operation": "import",
+        "leadsJson": "={{ [{first_name: $json['First Name'], last_name: $json['Last Name'], email: $json['Email']}] }}"
+      },
+      "id": "ae9f8666-22d0-43b5-af21-0ef3de53718e",
+      "name": "Import Lead",
+      "type": "n8n-nodes-nxtsend.nxtSend",
+      "typeVersion": 1,
+      "position": [
+        520,
+        300
+      ],
+      "credentials": {
+        "nxtSendApi": {
+          "id": null,
+          "name": "NxtSend API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Setup\n1. Connect your NxtSend API credential on the NxtSend node.\n2. Publish the form (n8n gives you a shareable URL) and embed or link it.\n3. Each submission imports one lead. The Import operation accepts up to 100 leads per call.",
+        "height": 200,
+        "width": 440
+      },
+      "id": "13a6b1b9-6411-4586-806e-fc6c8947e819",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        80
+      ]
+    }
+  ],
+  "connections": {
+    "Lead Form": {
+      "main": [
+        [
+          {
+            "node": "Import Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "staticData": null
+}

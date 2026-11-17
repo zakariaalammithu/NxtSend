@@ -8,7 +8,7 @@
  * a repeated cron tick can never double-execute a logical job.
  */
 
-export const JOB_TYPES = ["follow_up_due", "webhook_retry", "zapier_webhook_retry", "usage_rollup"] as const;
+export const JOB_TYPES = ["follow_up_due", "webhook_retry", "zapier_webhook_retry", "n8n_webhook_retry", "usage_rollup"] as const;
 export type JobType = (typeof JOB_TYPES)[number];
 
 export type JobStatus = "pending" | "running" | "completed" | "failed" | "skipped";
@@ -109,6 +109,38 @@ export interface JobsContext {
   retryZapierDelivery?(deliveryId: string): Promise<{ status: string }>;
   /** Deletes subscriptions inactive longer than `olderThanIso`; returns how many were removed. */
   cleanupStaleZapierSubscriptions?(olderThanIso: string): Promise<number>;
+  /**
+   * Platform-parameterised webhook outbox (migration 025 + 029).
+   * Preferred over the Zapier-specific methods above: one
+   * implementation serves both platforms, filtered by the
+   * `platform` column. The `zapier_webhook_retry` handler uses
+   * these when present and falls back to the Zapier-specific
+   * methods otherwise; `n8n_webhook_retry` requires them.
+   * Latency honesty (both platforms): the daily 06:00 cron is
+   * the retry tick, so a failed delivery may wait up to ~24h
+   * for its next attempt.
+   */
+  listDuePlatformRetries?(
+    platform: "zapier" | "n8n",
+    nowIso: string
+  ): Promise<
+    Array<{
+      id: string;
+      workspace_id: string;
+      status: string;
+      attempts: number;
+      max_attempts: number;
+    }>
+  >;
+  retryPlatformDelivery?(
+    platform: "zapier" | "n8n",
+    deliveryId: string
+  ): Promise<{ status: string }>;
+  /** Deletes platform subscriptions inactive longer than `olderThanIso`; returns how many were removed. */
+  cleanupStalePlatformSubscriptions?(
+    platform: "zapier" | "n8n",
+    olderThanIso: string
+  ): Promise<number>;
   /**
    * Sequence-executor capability for the follow_up_due handler
    * (Round-2 Stage F). Optional: contexts that cannot execute

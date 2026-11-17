@@ -1,5 +1,6 @@
-import { withZapierRoute } from "@/lib/integrations/zapier/route-helpers";
-import { zapierRemoveLeadFromCampaign } from "@/lib/integrations/zapier/api";
+import { withRestRoute } from "@/lib/integrations/rest/route-helpers";
+import { ZAPIER_PLATFORM } from "@/lib/integrations/rest/config";
+import { restRemoveLeadFromCampaign } from "@/lib/integrations/rest/api";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -9,7 +10,7 @@ export async function DELETE(
   req: Request,
   { params }: { params: { id: string; leadId: string } }
 ) {
-  return withZapierRoute(req, "write", (ctx, deps) =>
-    zapierRemoveLeadFromCampaign(ctx, deps, params.id, params.leadId)
+  return withRestRoute(req, ZAPIER_PLATFORM, "write", (ctx, deps) =>
+    restRemoveLeadFromCampaign(ctx, deps, params.id, params.leadId)
   );
 }

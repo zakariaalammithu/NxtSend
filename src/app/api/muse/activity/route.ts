@@ -17,7 +17,9 @@ export interface MuseActivityEntry {
  * history: audit_logs rows for Muse events (MCP tool calls
  * `muse.tool.*` and OAuth events `MUSE_OAUTH_*`), newest first,
  * capped at 50. `?platform=zapier` returns only the Zapier REST
- * API's `zapier.*` entries instead (used by the Zapier panel).
+ * API's `zapier.*` entries instead (used by the Zapier panel);
+ * `?platform=n8n` returns only the n8n REST API's `n8n.*`
+ * entries (used by the n8n panel).
  * Live Supabase session required (401 without one); Demo Mode
  * refuses (503). No token, code or secret material is ever stored
  * in these rows, so none can leak here — only the action, resource
@@ -37,7 +39,8 @@ export async function GET(req: Request) {
   }
   const platform = new URL(req.url).searchParams.get("platform");
   const isZapier = platform === "zapier";
-  const label = isZapier ? "Zapier" : "Muse";
+  const isN8n = platform === "n8n";
+  const label = isZapier ? "Zapier" : isN8n ? "n8n" : "Muse";
   try {
     const { data, error } = await ctx.admin
       .from("audit_logs")

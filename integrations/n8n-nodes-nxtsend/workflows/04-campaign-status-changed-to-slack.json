@@ -1,0 +1,76 @@
+{
+  "name": "NxtSend: Campaign Status Changed \u2192 Slack",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "webhook",
+        "event": "campaign.status_changed"
+      },
+      "id": "c6fdf425-259c-4613-b768-7f2515ac6997",
+      "name": "Campaign Status Changed",
+      "type": "n8n-nodes-nxtsend.nxtSendTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "credentials": {
+        "nxtSendApi": {
+          "id": null,
+          "name": "NxtSend API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": "#sales",
+        "text": "=Campaign {{ $json.name }} ({{ $json.id }}) changed status to {{ $json.status }}.",
+        "otherOptions": {}
+      },
+      "id": "4d589c10-007e-4b71-be00-166485f41c07",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Setup\n1. Connect your NxtSend API credential on the trigger (webhook mode needs a\nreachable n8n URL so NxtSend can deliver events).\n2. Connect Slack and set the channel. The trigger emits the campaign's fields plus\n`event` and `eventId`.",
+        "height": 200,
+        "width": 440
+      },
+      "id": "9951dc92-8a9c-4c99-8adf-8f8693daf4c3",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        80
+      ]
+    }
+  ],
+  "connections": {
+    "Campaign Status Changed": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "staticData": null
+}

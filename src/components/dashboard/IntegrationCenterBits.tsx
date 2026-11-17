@@ -27,6 +27,7 @@ import {
   Cog,
   MailCheck,
   Zap,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 import type { BadgeVariant } from "@/components/ui";
@@ -47,6 +48,7 @@ export const INTEGRATION_ICONS: Record<string, LucideIcon> = {
   "meta-pixel": Target,
   webhooks: Webhook,
   zapier: Zap,
+  n8n: Workflow,
   jobs: Cog,
   linkedin: Linkedin,
   "google-sheets": FileSpreadsheet,

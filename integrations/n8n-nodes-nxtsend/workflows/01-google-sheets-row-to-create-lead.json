@@ -1,0 +1,98 @@
+{
+  "name": "NxtSend: Google Sheets row \u2192 Create Lead",
+  "nodes": [
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SPREADSHEET_ID",
+          "mode": "url",
+          "cachedResultUrl": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2a6180e3-50f1-4bd7-b343-cb5b832dc868",
+      "name": "Google Sheets Trigger",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "lead",
+        "operation": "create",
+        "firstName": "={{ $json['First Name'] }}",
+        "lastName": "={{ $json['Last Name'] }}",
+        "email": "={{ $json['Email'] }}",
+        "company": "={{ $json['Company'] }}",
+        "jobTitle": "={{ $json['Job Title'] }}",
+        "linkedinUrl": "={{ $json['LinkedIn URL'] }}",
+        "tags": "={{ $json['Tags'] }}"
+      },
+      "id": "759e6bd9-f5af-4a62-9a48-37c6cac9ed72",
+      "name": "Create Lead",
+      "type": "n8n-nodes-nxtsend.nxtSend",
+      "typeVersion": 1,
+      "position": [
+        520,
+        300
+      ],
+      "credentials": {
+        "nxtSendApi": {
+          "id": null,
+          "name": "NxtSend API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Setup\n1. Connect your NxtSend API credential on the NxtSend node.\n2. Point the Google Sheets Trigger at your spreadsheet (replace YOUR_SPREADSHEET_ID).\n3. The sheet needs columns: First Name, Last Name, Email, Company, Job Title, LinkedIn URL, Tags.\nEach new row creates one NxtSend lead.",
+        "height": 200,
+        "width": 440
+      },
+      "id": "3a4151d2-32e9-49cd-a956-0ba6eec6b867",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        80
+      ]
+    }
+  ],
+  "connections": {
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "Create Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "staticData": null
+}

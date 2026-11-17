@@ -1,11 +1,12 @@
-import { withZapierRoute } from "@/lib/integrations/zapier/route-helpers";
-import { zapierSearchCampaigns } from "@/lib/integrations/zapier/api";
+import { withRestRoute } from "@/lib/integrations/rest/route-helpers";
+import { ZAPIER_PLATFORM } from "@/lib/integrations/rest/config";
+import { restSearchCampaigns } from "@/lib/integrations/rest/api";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  return withZapierRoute(req, "read", (ctx, deps) =>
-    zapierSearchCampaigns(ctx, deps, new URL(req.url).searchParams)
+  return withRestRoute(req, ZAPIER_PLATFORM, "read", (ctx, deps) =>
+    restSearchCampaigns(ctx, deps, new URL(req.url).searchParams)
   );
 }

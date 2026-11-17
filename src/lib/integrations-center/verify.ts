@@ -48,6 +48,7 @@ import {
   getClaudePublicUrl,
 } from "@/lib/muse-connector/oauth/config";
 import { isZapierEnabled, getZapierBaseUrl } from "@/lib/integrations/zapier/config";
+import { isN8nEnabled, getN8nBaseUrl } from "./status";
 import type { CenterStatus, VerifyOutcome } from "./types";
 
 export interface VerifyDeps {
@@ -188,6 +189,15 @@ export async function verifyIntegration(
         false,
         false,
         "Demo Mode: the Zapier REST API + webhook surface is unavailable in Demo Mode — no grant can be issued or verified here (Zapier calls receive 503). Configure Supabase, then check again in live mode."
+      );
+    }
+    if (id === "n8n") {
+      return outcome(
+        id,
+        "Demo Mode",
+        false,
+        false,
+        "Demo Mode: the n8n REST API + webhook surface is unavailable in Demo Mode — no grant can be issued or verified here (n8n calls receive 503). Configure Supabase, then check again in live mode."
       );
     }
     return outcome(
@@ -539,6 +549,28 @@ export async function verifyIntegration(
         zapierEnabled
           ? "Zapier REST surface is not fully configured: no public URL is set (ZAPIER_APP_BASE_URL or NEXT_PUBLIC_APP_URL). Set one, redeploy, and check the grants panel on this page."
           : "Zapier REST surface is disabled (ZAPIER_ENABLED is false). The OAuth routes stay available, but Zapier cannot call the REST API.");
+    }
+
+    case "n8n": {
+      // No safe read-only verification call exists for a connector:
+      // proving it works needs a real n8n OAuth grant or a
+      // recently-used API key (see the grants and API-key panels
+      // on the detail page). Configuration alone never counts as
+      // verified, and no outbound call is made here.
+      // (The public health endpoint GET /api/integrations/n8n/
+      // health only reports mode/n8nEnabled/version — it proves
+      // the route answers, not that n8n is connected — so it is
+      // shown in the live panel below, not used as a verification.)
+      const n8nEnabled = isN8nEnabled(env);
+      const n8nBaseUrl = getN8nBaseUrl(undefined, env);
+      if (n8nEnabled && n8nBaseUrl) {
+        return outcome(id, "Connected but Not Verified", false, false,
+          "n8n REST surface is configured (N8N_INTEGRATION_ENABLED + public URL are set), but Test Connection cannot prove the connector works — that needs a real n8n OAuth grant or a recently-used API key, listed in the grants and API-key panels on this page. Configuration alone never counts as verified.");
+      }
+      return outcome(id, n8nEnabled ? "Configuration Required" : "Not Connected", false, false,
+        n8nEnabled
+          ? "n8n REST surface is not fully configured: no public URL is set (N8N_API_BASE_URL or NEXT_PUBLIC_APP_URL). Set one, redeploy, and check the grants panel on this page."
+          : "n8n REST surface is disabled (N8N_INTEGRATION_ENABLED is false). The OAuth routes stay available, but n8n cannot call the REST API.");
     }
 
     case "google-sheets":

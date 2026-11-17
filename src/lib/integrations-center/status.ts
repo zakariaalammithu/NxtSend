@@ -45,6 +45,46 @@ function envFromProcess(): CenterEnv {
   return process.env as CenterEnv;
 }
 
+/**
+ * n8n env helpers — LOCAL to this file, mirroring
+ * src/lib/integrations/zapier/config.ts exactly (same flag parsing,
+ * same URL precedence N8N_API_BASE_URL → NEXT_PUBLIC_APP_URL →
+ * request origin). They live here because no shared helper exists
+ * for them: Worker B's src/lib/integrations/rest/config.ts (landed
+ * 2026-11-18) carries only per-platform metadata
+ * (N8N_PLATFORM: resource path, scope prefix, env var names) and
+ * no isPlatformEnabled / getPlatformBaseUrl functions, and
+ * Worker A's src/lib/integrations/n8n/config.ts has not landed.
+ * If either lands a helper, delete these two functions and import
+ * from there instead — the behaviour must stay identical.
+ */
+export function isN8nEnabled(env: CenterEnv = envFromProcess()): boolean {
+  const value = env.N8N_INTEGRATION_ENABLED?.trim().toLowerCase();
+  if (!value) return true;
+  return value !== "false" && value !== "0" && value !== "no" && value !== "off";
+}
+
+export function getN8nBaseUrl(
+  requestOrigin?: string,
+  env: CenterEnv = envFromProcess()
+): string | null {
+  const parse = (raw: string | undefined): string | null => {
+    if (!raw?.trim()) return null;
+    try {
+      const url = new URL(raw.trim());
+      if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+      return url.origin;
+    } catch {
+      return null;
+    }
+  };
+  return (
+    parse(env.N8N_API_BASE_URL) ??
+    parse(env.NEXT_PUBLIC_APP_URL) ??
+    parse(requestOrigin)
+  );
+}
+
 /** The core mapping: raw provider state -> Center vocabulary. */
 export function mapProviderState(state: ProviderState): CenterStatus {
   switch (state) {
@@ -126,6 +166,20 @@ export interface IntegrationStatusOptions {
    * and no separate subscription count is consulted here.
    */
   zapierGrantsActive?: number | null;
+  /**
+   * Number of ACTIVE n8n OAuth grants for the caller's workspace
+   * (live mode, counted from muse_oauth_tokens by client origin —
+   * see countActiveGrantsByOrigin). Same rule as the MCP entries:
+   * null = unknown, and a grant is the ONLY thing that can make
+   * the n8n entry "Connected". An n8n API key is a second,
+   * independent connection signal: a recently-used API key also
+   * counts as a connection (the panel reports it), but this status
+   * derivation only sees grant counts, so a key-only connection
+   * shows as "Connected but Not Verified" here until the grant
+   * count is consulted — the detail page states the key signal
+   * explicitly rather than letting this status claim it.
+   */
+  n8nGrantsActive?: number | null;
 }
 
 interface DerivedStatus {
@@ -144,7 +198,8 @@ function deriveStatus(
   museGrantsActive?: number | null,
   chatgptGrantsActive?: number | null,
   claudeGrantsActive?: number | null,
-  zapierGrantsActive?: number | null
+  zapierGrantsActive?: number | null,
+  n8nGrantsActive?: number | null
 ): DerivedStatus {
   const demo = mode === "demo";
   switch (id) {
@@ -567,6 +622,56 @@ function deriveStatus(
         configured: false,
       };
     }
+    case "n8n": {
+      // Same rule as the Zapier entry, for the n8n surface
+      // (REST API v1 + webhooks, n8n.* scopes, migrations
+      // 028–029): Demo Mode refuses the surface; a real, active
+      // n8n OAuth grant is the ONLY thing that yields
+      // "Connected" (and it is Verified — the grant exists only
+      // after a completed OAuth exchange); enabled + public URL
+      // set, no grant, is "Connected but Not Verified" —
+      // configuration alone is never a connection. A Muse,
+      // ChatGPT, Claude or Zapier grant never connects this
+      // entry: only the n8nGrantsActive count is consulted.
+      // `configured` stays false without a grant, so a stale
+      // verification record can never upgrade config to Verified.
+      // NOTE: a recently-used n8n API key is a second, real
+      // connection signal, but this derivation only sees grant
+      // counts — a key-only connection is reported by the detail
+      // page's API-key panel, not by this status.
+      if (demo) {
+        return {
+          status: "Demo Mode",
+          message:
+            "Demo Mode: the n8n REST API + webhook surface is unavailable — no grant can be issued or used (n8n calls receive 503).",
+          configured: false,
+        };
+      }
+      if (n8nGrantsActive != null && n8nGrantsActive > 0) {
+        return {
+          status: "Connected and Verified",
+          message: `${n8nGrantsActive} active n8n OAuth grant(s) exist for this workspace — n8n can call the REST API on behalf of the granting user(s). Manage them from the grants panel on the detail page.`,
+          configured: true,
+        };
+      }
+      const n8nEnabled = isN8nEnabled(env);
+      const n8nBaseUrl = getN8nBaseUrl(undefined, env);
+      if (n8nEnabled && n8nBaseUrl) {
+        return {
+          status: "Connected but Not Verified",
+          message:
+            "n8n REST surface is configured (N8N_INTEGRATION_ENABLED + public URL are set). That is configuration, not a connection — 'Connected' requires a real OAuth grant or a recently-used API key; see the grants and API-key panels on the detail page.",
+          configured: false,
+        };
+      }
+      return {
+        status: n8nEnabled ? "Configuration Required" : "Not Connected",
+        message: n8nEnabled
+          ? "n8n REST surface is enabled but no public URL is set (N8N_API_BASE_URL or NEXT_PUBLIC_APP_URL) — n8n cannot reach the API until one is set."
+          : "n8n REST surface is disabled (N8N_INTEGRATION_ENABLED is false).",
+        configured: false,
+      };
+    }
     case "google-sheets":
     case "crm":
     case "email-verification":
@@ -603,7 +708,8 @@ export function getIntegrationStatuses(
       options.museGrantsActive,
       options.chatgptGrantsActive,
       options.claudeGrantsActive,
-      options.zapierGrantsActive
+      options.zapierGrantsActive,
+      options.n8nGrantsActive
     );
     const record = verifications[descriptor.id] ?? null;
     let status = applyVerification(derived.status, derived.configured, record);

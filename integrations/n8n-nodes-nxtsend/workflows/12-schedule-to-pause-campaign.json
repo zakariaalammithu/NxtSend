@@ -1,0 +1,80 @@
+{
+  "name": "NxtSend: Schedule \u2192 Pause Campaign",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 18
+            }
+          ]
+        }
+      },
+      "id": "0ea1a559-3fb7-4536-aec8-7caf0f1b1744",
+      "name": "Daily Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "campaign",
+        "operation": "pause",
+        "campaignId": "YOUR_CAMPAIGN_ID"
+      },
+      "id": "76f51e2f-b6a8-45e9-a854-46bc842e4822",
+      "name": "Pause Campaign",
+      "type": "n8n-nodes-nxtsend.nxtSend",
+      "typeVersion": 1,
+      "position": [
+        520,
+        300
+      ],
+      "credentials": {
+        "nxtSendApi": {
+          "id": null,
+          "name": "NxtSend API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Setup\n1. Connect your NxtSend API credential on the NxtSend node.\n2. Replace YOUR_CAMPAIGN_ID with a real campaign (pick it from the dropdown once connected).\n3. The schedule pauses the campaign every day at 18:00. Use the Resume operation\ninstead of Pause for a morning \"start\" workflow. Campaigns are created as drafts and\ncan only be launched from the NxtSend dashboard.",
+        "height": 200,
+        "width": 440
+      },
+      "id": "6cf424b6-f347-4c22-8022-50d52a40b58a",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        80
+      ]
+    }
+  ],
+  "connections": {
+    "Daily Schedule": {
+      "main": [
+        [
+          {
+            "node": "Pause Campaign",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "staticData": null
+}

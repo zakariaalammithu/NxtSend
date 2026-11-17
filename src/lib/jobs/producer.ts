@@ -54,3 +54,61 @@ export async function enqueueFollowUpScan(
   }
   return (data ?? []).length > 0;
 }
+
+/**
+ * Daily webhook-retry jobs (Zapier + n8n).
+ *
+ * The 06:00 cron (POST /api/jobs/run) is the retry tick for both
+ * platforms' outboxes — but until now nothing ever enqueued the
+ * `zapier_webhook_retry` job rows (the handler existed, the
+ * enqueue did not), so failed deliveries were only retried if a
+ * job row happened to exist. These helpers enqueue one retry job
+ * per platform per UTC day (idempotency-keyed, insert-ignore —
+ * a repeated cron tick can never double-enqueue). The jobs/run
+ * route calls enqueueDailyPlatformWebhookRetries on every live
+ * tick before draining due jobs, so both platforms' failed
+ * deliveries get their daily attempt. Latency honesty: a failed
+ * delivery may wait up to ~24h for its next attempt.
+ */
+
+export function platformWebhookRetryKey(
+  platform: "zapier" | "n8n",
+  date: Date = new Date()
+): string {
+  const day = date.toISOString().slice(0, 10);
+  return `${platform}-webhook-retry:${day}`;
+}
+
+/**
+ * Enqueues today's `zapier_webhook_retry` and
+ * `n8n_webhook_retry` jobs (service role). Returns, per
+ * platform, true when a new job row was created, false when
+ * today's job was already enqueued/completed.
+ */
+export async function enqueueDailyPlatformWebhookRetries(
+  admin: SupabaseClient,
+  now: Date = new Date()
+): Promise<{ zapier: boolean; n8n: boolean }> {
+  const out: { zapier: boolean; n8n: boolean } = { zapier: false, n8n: false };
+  for (const platform of ["zapier", "n8n"] as const) {
+    const { data, error } = await admin
+      .from("jobs")
+      .upsert(
+        {
+          workspace_id: null,
+          type: `${platform}_webhook_retry`,
+          payload: { source: "daily_cron" },
+          idempotency_key: platformWebhookRetryKey(platform, now),
+          status: "pending",
+          run_after: now.toISOString(),
+        },
+        { onConflict: "idempotency_key", ignoreDuplicates: true }
+      )
+      .select("id");
+    if (error) {
+      throw new Error(`Failed to enqueue ${platform}_webhook_retry job: ${error.message}`);
+    }
+    out[platform] = (data ?? []).length > 0;
+  }
+  return out;
+}

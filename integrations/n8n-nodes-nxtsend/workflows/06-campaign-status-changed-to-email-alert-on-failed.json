@@ -1,0 +1,120 @@
+{
+  "name": "NxtSend: Campaign Status Changed \u2192 Email Alert on Failed",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "webhook",
+        "event": "campaign.status_changed"
+      },
+      "id": "794d1bd4-ccb6-418b-bec5-e667052f50a7",
+      "name": "Campaign Status Changed",
+      "type": "n8n-nodes-nxtsend.nxtSendTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "credentials": {
+        "nxtSendApi": {
+          "id": null,
+          "name": "NxtSend API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "1cc62ce2-d376-48ff-8eb2-6cb3ea41b38f",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "failed",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.string"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "50246633-b564-4c86-afb5-917c5e9d1f06",
+      "name": "Is Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "alerts@example.com",
+        "toEmail": "team@example.com",
+        "subject": "=Campaign {{ $json.name }} failed",
+        "emailType": "text",
+        "message": "=Campaign {{ $json.name }} ({{ $json.id }}) changed status to {{ $json.status }}."
+      },
+      "id": "371a7bad-2155-4f53-b96f-578edcf3ba05",
+      "name": "Email Alert",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        780,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Setup\n1. Connect your NxtSend API credential on the trigger.\n2. Connect an SMTP credential on the Email Send node and set the addresses.\n3. The IF node only passes the workflow on when the campaign status is \"failed\".\nAdjust the compared value if your workspace uses a different status string.",
+        "height": 200,
+        "width": 440
+      },
+      "id": "ea757256-24c7-4a6d-87ff-2b5dc54ea99a",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        80
+      ]
+    }
+  ],
+  "connections": {
+    "Campaign Status Changed": {
+      "main": [
+        [
+          {
+            "node": "Is Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Failed?": {
+      "main": [
+        [
+          {
+            "node": "Email Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "staticData": null
+}

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { withZapierRoute } from "@/lib/integrations/zapier/route-helpers";
-import { zapierCampaignAction } from "@/lib/integrations/zapier/api";
+import { withRestRoute } from "@/lib/integrations/rest/route-helpers";
+import { ZAPIER_PLATFORM } from "@/lib/integrations/rest/config";
+import { restCampaignAction } from "@/lib/integrations/rest/api";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,7 +24,7 @@ export async function POST(
       { status: 400 }
     );
   }
-  return withZapierRoute(req, "write", (ctx, deps) =>
-    zapierCampaignAction(ctx, deps, params.id, params.action as (typeof ACTIONS)[number])
+  return withRestRoute(req, ZAPIER_PLATFORM, "write", (ctx, deps) =>
+    restCampaignAction(ctx, deps, params.id, params.action as (typeof ACTIONS)[number])
   );
 }

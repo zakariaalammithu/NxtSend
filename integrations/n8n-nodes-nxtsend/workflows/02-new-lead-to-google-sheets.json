@@ -1,0 +1,97 @@
+{
+  "name": "NxtSend: New Lead \u2192 Google Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "polling",
+        "event": "lead.created"
+      },
+      "id": "93730054-78a4-491c-b80e-9bf0473d19db",
+      "name": "New Lead",
+      "type": "n8n-nodes-nxtsend.nxtSendTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "credentials": {
+        "nxtSendApi": {
+          "id": null,
+          "name": "NxtSend API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SPREADSHEET_ID",
+          "mode": "url",
+          "cachedResultUrl": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "First Name": "={{ $json.first_name }}",
+            "Last Name": "={{ $json.last_name }}",
+            "Email": "={{ $json.email }}",
+            "Company": "={{ $json.company }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "8b9cb749-e901-4ff8-b525-110ab5f24baa",
+      "name": "Append to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Setup\n1. Connect your NxtSend API credential on the trigger.\n2. Polling mode: the trigger checks for new leads on n8n's schedule. The first poll only\nestablishes a cursor and emits nothing, so activating the workflow does not replay history.\n3. Point the Google Sheets node at your spreadsheet (replace YOUR_SPREADSHEET_ID).",
+        "height": 200,
+        "width": 440
+      },
+      "id": "0a667ca9-8b05-4338-a9ce-24a87a058876",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        80
+      ]
+    }
+  ],
+  "connections": {
+    "New Lead": {
+      "main": [
+        [
+          {
+            "node": "Append to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "staticData": null
+}

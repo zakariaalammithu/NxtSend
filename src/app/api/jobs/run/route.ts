@@ -5,6 +5,7 @@ import { getDataMode } from "@/lib/data/mode";
 import { isConfiguredValue } from "@/lib/env";
 import { runDueJobs } from "@/lib/jobs/runner";
 import { createJobHandlers } from "@/lib/jobs/handlers";
+import { enqueueDailyPlatformWebhookRetries } from "@/lib/jobs/producer";
 import { createSupabaseJobStore, InMemoryJobStore } from "@/lib/jobs/store";
 import { createSupabaseJobsContext } from "@/lib/jobs/context";
 import { processDueScheduledRepliesLive } from "@/lib/scheduled-replies/process";
@@ -68,6 +69,23 @@ async function handle(req: Request) {
     });
   }
 
+  // Daily webhook-retry tick (both platforms): enqueue today's
+  // `zapier_webhook_retry` + `n8n_webhook_retry` jobs
+  // (idempotency-keyed per UTC day, so a repeated tick never
+  // double-enqueues) before draining due jobs. A failure here is
+  // reported, never fatal to the jobs summary — already-enqueued
+  // jobs still run.
+  let webhookRetryEnqueue: Record<string, unknown>;
+  try {
+    webhookRetryEnqueue = {
+      ...(await enqueueDailyPlatformWebhookRetries(admin)),
+    };
+  } catch (err) {
+    webhookRetryEnqueue = {
+      error: err instanceof Error ? err.message : "webhook-retry enqueue failed",
+    };
+  }
+
   const summary = await runDueJobs({
     store: createSupabaseJobStore(admin),
     ctx: createSupabaseJobsContext(admin),
@@ -87,7 +105,12 @@ async function handle(req: Request) {
       error: err instanceof Error ? err.message : "scheduled-replies run failed",
     };
   }
-  return NextResponse.json({ mode: "live", ...summary, scheduledReplies });
+  return NextResponse.json({
+    mode: "live",
+    ...summary,
+    webhookRetryEnqueue,
+    scheduledReplies,
+  });
 }
 
 function emptyContext(): JobsContext {

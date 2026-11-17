@@ -10,6 +10,13 @@
  *   zapier_webhook_retry — REAL: re-attempts due failed Zapier
  *                    REST Hook deliveries (migration 025 outbox)
  *                    and removes subscriptions inactive > 30 days.
+ *   n8n_webhook_retry    — REAL: the same, for n8n webhook
+ *                    deliveries (migration 029 platform column).
+ *                    Both share one factory (platformWebhookRetry)
+ *                    over the platform-parameterised context
+ *                    methods; Zapier falls back to its legacy
+ *                    context methods when the platform methods
+ *                    are absent.
  *   follow_up_due  — REAL (Round-2 Stage F): runs the sequence
  *                    executor (src/lib/executor) over due enrollments.
  *                    Email steps go through the email adapter
@@ -88,43 +95,76 @@ const webhookRetry: JobHandler = async (_job, ctx: JobsContext) => {
 };
 
 /**
- * Zapier REST Hook outbox retries (migration 025). Re-attempts due
- * failed Zapier deliveries through the same signed attempt path,
- * then deletes subscriptions inactive for over 30 days. Dead-letter
- * rows are kept for inspection — they are never deleted here.
- * Latency honesty: this job runs on the daily 06:00 cron, so a
- * failed delivery may wait up to ~24h for its next attempt.
+ * Platform webhook outbox retries (migration 025 + 029). One
+ * factory serves both platforms: re-attempts due failed
+ * deliveries through the same signed attempt path, then deletes
+ * subscriptions inactive for over 30 days. Dead-letter rows are
+ * kept for inspection — they are never deleted here. Latency
+ * honesty: this job runs on the daily 06:00 cron, so a failed
+ * delivery may wait up to ~24h for its next attempt.
+ *
+ * Platform methods are preferred; for Zapier the legacy
+ * Zapier-specific context methods are the fallback (contexts
+ * written before the platform methods existed). n8n has no
+ * legacy methods — a context without the platform methods
+ * records an honest "skipped" outcome.
  */
-const zapierWebhookRetry: JobHandler = async (_job, ctx: JobsContext) => {
-  if (!ctx.listDueZapierRetries || !ctx.retryZapierDelivery) {
+function platformWebhookRetry(
+  platform: "zapier" | "n8n",
+  label: string
+): JobHandler {
+  return async (_job, ctx: JobsContext) => {
+    const nowIso = new Date().toISOString();
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    let due: Array<{ id: string }> = [];
+    let delivered = 0;
+    let stillFailing = 0;
+    let dead = 0;
+    let cleaned = 0;
+    if (ctx.listDuePlatformRetries && ctx.retryPlatformDelivery) {
+      due = await ctx.listDuePlatformRetries(platform, nowIso);
+      for (const delivery of due) {
+        const result = await ctx.retryPlatformDelivery(platform, delivery.id);
+        if (result.status === "delivered") delivered++;
+        else if (result.status === "dead") dead++;
+        else stillFailing++;
+      }
+      if (ctx.cleanupStalePlatformSubscriptions) {
+        cleaned = await ctx.cleanupStalePlatformSubscriptions(platform, cutoff);
+      }
+    } else if (
+      platform === "zapier" &&
+      ctx.listDueZapierRetries &&
+      ctx.retryZapierDelivery
+    ) {
+      // Legacy Zapier-only context (no platform methods).
+      due = await ctx.listDueZapierRetries(nowIso);
+      for (const delivery of due) {
+        const result = await ctx.retryZapierDelivery(delivery.id);
+        if (result.status === "delivered") delivered++;
+        else if (result.status === "dead") dead++;
+        else stillFailing++;
+      }
+      if (ctx.cleanupStaleZapierSubscriptions) {
+        cleaned = await ctx.cleanupStaleZapierSubscriptions(cutoff);
+      }
+    } else {
+      return {
+        status: "skipped",
+        message:
+          `${label} outbox is not available in this worker context (no ${label} store). Nothing was retried.`,
+      };
+    }
     return {
-      status: "skipped",
-      message:
-        "Zapier outbox is not available in this worker context (no Zapier store). Nothing was retried.",
+      status: "completed",
+      message: `${label} webhook retries: ${due.length} due — ${delivered} delivered, ${stillFailing} still failing, ${dead} dead. ${cleaned} stale inactive subscription(s) removed.`,
     };
-  }
-  const due = await ctx.listDueZapierRetries(new Date().toISOString());
-  let delivered = 0;
-  let stillFailing = 0;
-  let dead = 0;
-  for (const delivery of due) {
-    const result = await ctx.retryZapierDelivery(delivery.id);
-    if (result.status === "delivered") delivered++;
-    else if (result.status === "dead") dead++;
-    else stillFailing++;
-  }
-  let cleaned = 0;
-  if (ctx.cleanupStaleZapierSubscriptions) {
-    const cutoff = new Date(
-      Date.now() - 30 * 24 * 60 * 60 * 1000
-    ).toISOString();
-    cleaned = await ctx.cleanupStaleZapierSubscriptions(cutoff);
-  }
-  return {
-    status: "completed",
-    message: `Zapier webhook retries: ${due.length} due — ${delivered} delivered, ${stillFailing} still failing, ${dead} dead. ${cleaned} stale inactive subscription(s) removed.`,
   };
-};
+}
+
+const zapierWebhookRetry: JobHandler = platformWebhookRetry("zapier", "Zapier");
+
+const n8nWebhookRetry: JobHandler = platformWebhookRetry("n8n", "n8n");
 
 const followUpDue: JobHandler = async (job, ctx: JobsContext) => {
   const executor = ctx.getSequenceExecutor?.() ?? null;
@@ -156,6 +196,7 @@ export function createJobHandlers(): Record<string, JobHandler> {
     usage_rollup: usageRollup,
     webhook_retry: webhookRetry,
     zapier_webhook_retry: zapierWebhookRetry,
+    n8n_webhook_retry: n8nWebhookRetry,
     follow_up_due: followUpDue,
   };
 }

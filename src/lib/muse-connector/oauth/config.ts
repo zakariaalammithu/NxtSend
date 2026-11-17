@@ -131,25 +131,26 @@ export function getClaudePublicUrl(
 
 // ── MCP resources (RFC 8707 `resource` / RFC 9728 audience) ────────────────
 
-export type McpPlatform = "muse" | "chatgpt" | "claude" | "zapier";
+export type McpPlatform = "muse" | "chatgpt" | "claude" | "zapier" | "n8n";
 
 /** Canonical public origin when no origin can be determined. */
 export const DEFAULT_OAUTH_ORIGIN = "https://nxtsend.com";
 
 /**
  * Path of each platform's resource, relative to the origin. Zapier
- * is NOT an MCP server — its resource is the Zapier REST API base
- * (`/api/integrations/zapier`) — but it rides the same RFC 8707
- * resource binding, so it lives in this table and
- * `resourcePlatform()` / `getMcpResourceUrl()` handle it like the
- * others. `canonicalMcpResources()` deliberately lists only the
- * three real MCP servers.
+ * and n8n are NOT MCP servers — their resources are the REST API
+ * bases (`/api/integrations/zapier`, `/api/integrations/n8n`) — but
+ * they ride the same RFC 8707 resource binding, so they live in
+ * this table and `resourcePlatform()` / `getMcpResourceUrl()`
+ * handle them like the others. `canonicalMcpResources()` deliberately
+ * lists only the three real MCP servers.
  */
 export const MCP_RESOURCE_PATHS: Record<McpPlatform, string> = {
   muse: "/api/mcp",
   chatgpt: "/api/mcp/chatgpt",
   claude: "/api/mcp/claude",
   zapier: "/api/integrations/zapier",
+  n8n: "/api/integrations/n8n",
 };
 
 /** Full resource URL of a platform's MCP server for an origin. */
@@ -160,6 +161,11 @@ export function getMcpResourceUrl(origin: string, platform: McpPlatform): string
 /** Full resource URL of the Zapier REST API for an origin. */
 export function getZapierResourceUrl(origin: string): string {
   return getMcpResourceUrl(origin, "zapier");
+}
+
+/** Full resource URL of the n8n REST API for an origin. */
+export function getN8nResourceUrl(origin: string): string {
+  return getMcpResourceUrl(origin, "n8n");
 }
 
 /** All three canonical MCP resource URLs for an origin. */
@@ -180,6 +186,7 @@ export function resourcePlatform(resource: string | null | undefined): McpPlatfo
   if (!resource) return null;
   try {
     const pathname = new URL(resource).pathname.replace(/\/+$/, "");
+    if (pathname === MCP_RESOURCE_PATHS.n8n) return "n8n";
     if (pathname === MCP_RESOURCE_PATHS.zapier) return "zapier";
     if (pathname === MCP_RESOURCE_PATHS.claude) return "claude";
     if (pathname === MCP_RESOURCE_PATHS.chatgpt) return "chatgpt";

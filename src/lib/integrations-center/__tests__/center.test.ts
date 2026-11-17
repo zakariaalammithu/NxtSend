@@ -467,6 +467,126 @@ describe("getIntegrationStatuses", () => {
     expect(entry?.troubleshooting.join(" ")).toContain("up to ~24h");
   });
 
+  it("n8n: same grant-only rule as the Zapier entry, on the n8n REST surface (N8N_* vars, n8n.* grants)", () => {
+    // Demo Mode refuses the surface outright.
+    expect(
+      statusOf(getIntegrationStatuses({ env: {}, mode: "demo" }), "n8n")
+    ).toBe("Demo Mode");
+    // No public URL anywhere: enabled by default, but unreachable.
+    expect(
+      statusOf(getIntegrationStatuses({ env: {}, mode: "supabase" }), "n8n")
+    ).toBe("Configuration Required");
+    // Disabled outright.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { N8N_INTEGRATION_ENABLED: "false", N8N_API_BASE_URL: "https://example.com" },
+          mode: "supabase",
+        }),
+        "n8n"
+      )
+    ).toBe("Not Connected");
+    // Enabled + public URL, but no n8n grant: configured, not connected.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { N8N_API_BASE_URL: "https://example.com" },
+          mode: "supabase",
+        }),
+        "n8n"
+      )
+    ).toBe("Connected but Not Verified");
+    // A Zapier grant does NOT connect the n8n entry.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { N8N_API_BASE_URL: "https://example.com" },
+          mode: "supabase",
+          zapierGrantsActive: 1,
+          n8nGrantsActive: 0,
+        }),
+        "n8n"
+      )
+    ).toBe("Connected but Not Verified");
+    // A Muse grant does NOT connect the n8n entry either.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { N8N_API_BASE_URL: "https://example.com" },
+          mode: "supabase",
+          museGrantsActive: 1,
+          n8nGrantsActive: 0,
+        }),
+        "n8n"
+      )
+    ).toBe("Connected but Not Verified");
+    // A real active n8n grant is the ONLY thing that yields Connected.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { N8N_API_BASE_URL: "https://example.com" },
+          mode: "supabase",
+          museGrantsActive: 0,
+          chatgptGrantsActive: 0,
+          claudeGrantsActive: 0,
+          zapierGrantsActive: 0,
+          n8nGrantsActive: 1,
+        }),
+        "n8n"
+      )
+    ).toBe("Connected and Verified");
+    // Unknown grant count (migration 023 not applied) never invents a grant.
+    expect(
+      statusOf(
+        getIntegrationStatuses({
+          env: { N8N_API_BASE_URL: "https://example.com" },
+          mode: "supabase",
+          n8nGrantsActive: null,
+        }),
+        "n8n"
+      )
+    ).toBe("Connected but Not Verified");
+  });
+
+  it("n8n registry entry: adapter kind, n8n env vars, no claimed publication or verification", () => {
+    const entry = INTEGRATION_REGISTRY.find((d) => d.id === "n8n");
+    expect(entry).toBeDefined();
+    expect(entry?.kind).toBe("adapter");
+    expect(entry?.category).toBe("Automation");
+    expect(entry?.envVars.map((v) => v.name)).toContain("N8N_INTEGRATION_ENABLED");
+    expect(entry?.envVars.map((v) => v.name)).toContain("N8N_API_BASE_URL");
+    expect(entry?.envVars.map((v) => v.name)).toContain("TOKEN_ENCRYPTION_KEY");
+    expect(entry?.envVars.map((v) => v.name)).not.toContain("N8N_API_KEY");
+    expect(entry?.envVars.map((v) => v.name)).not.toContain("N8N_OAUTH_CLIENT_SECRET");
+    expect(entry?.verifySupported).toBe(false);
+    expect(entry?.docsUrl).toBeNull();
+    expect(entry?.notImplementedNote).toContain("Not published on npm / not verified by n8n");
+    expect(entry?.description).toContain("/api/integrations/n8n/v1");
+    expect(entry?.description).toContain("n8n.read");
+    expect(entry?.description).toContain("no n8n.send");
+    expect(entry?.troubleshooting.join(" ")).toContain("up to ~24h");
+    expect(entry?.troubleshooting.join(" ")).toContain("shown exactly once");
+  });
+
+  it("n8n env helpers: enabled by default, flag parsing, URL precedence", async () => {
+    const { isN8nEnabled, getN8nBaseUrl } = await import("../status");
+    expect(isN8nEnabled({})).toBe(true);
+    expect(isN8nEnabled({ N8N_INTEGRATION_ENABLED: "false" })).toBe(false);
+    expect(isN8nEnabled({ N8N_INTEGRATION_ENABLED: "0" })).toBe(false);
+    expect(isN8nEnabled({ N8N_INTEGRATION_ENABLED: "true" })).toBe(true);
+    expect(getN8nBaseUrl(undefined, {})).toBeNull();
+    expect(
+      getN8nBaseUrl("https://origin.example", { NEXT_PUBLIC_APP_URL: "https://app.example" })
+    ).toBe("https://app.example");
+    expect(
+      getN8nBaseUrl("https://origin.example", {
+        N8N_API_BASE_URL: "https://n8n.example",
+        NEXT_PUBLIC_APP_URL: "https://app.example",
+      })
+    ).toBe("https://n8n.example");
+    expect(getN8nBaseUrl("https://origin.example", {})).toBe("https://origin.example");
+  });
+
   it("grants UI scope descriptions: every issued scope has a plain-words description (muse.* and nxtsend.*)", async () => {
     const { SCOPE_DESCRIPTIONS, ALL_OAUTH_SCOPES } = await import(
       "../../muse-connector/oauth/scopes"
@@ -565,6 +685,19 @@ describe("verifyIntegration — demo mode", () => {
     expect(out?.message).toContain("NOT actually called");
   });
 
+  it("n8n in demo mode: honest Demo Mode result, no grant can be issued or verified", async () => {
+    const fetchSpy = fakeFetch(200);
+    const out = await verifyIntegration("n8n", {
+      env: {},
+      mode: "demo",
+      fetchFn: fetchSpy as unknown as typeof fetch,
+    });
+    expect(out?.status).toBe("Demo Mode");
+    expect(out?.attempted).toBe(false);
+    expect(out?.message).toContain("503");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("zapier in demo mode: honest Demo Mode result, no grant can be issued or verified", async () => {
     const fetchSpy = fakeFetch(200);
     const out = await verifyIntegration("zapier", {
@@ -637,6 +770,29 @@ describe("verifyIntegration — configuration guards (no outbound call without c
     });
     expect(out?.status).toBe("Not Connected");
     expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it("n8n: configuration alone never verifies — only a real grant or key does", async () => {
+    const fetchSpy = fakeFetch(200);
+    // Configured (enabled + public URL) but no grant: never Verified, nothing called.
+    const configured = await verifyIntegration("n8n", {
+      env: { N8N_API_BASE_URL: "https://example.com" },
+      mode: "supabase",
+      fetchFn: fetchSpy as unknown as typeof fetch,
+    });
+    expect(configured?.status).toBe("Connected but Not Verified");
+    expect(configured?.attempted).toBe(false);
+    expect(configured?.message).toContain("real n8n OAuth grant");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    // Disabled outright.
+    const disabled = await verifyIntegration("n8n", {
+      env: { N8N_INTEGRATION_ENABLED: "false" },
+      mode: "supabase",
+      fetchFn: fetchSpy as unknown as typeof fetch,
+    });
+    expect(disabled?.status).toBe("Not Connected");
+    expect(disabled?.attempted).toBe(false);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("zapier: configuration alone never verifies — only a real grant does", async () => {
@@ -953,7 +1109,7 @@ describe("registry consistency", () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of [
       "supabase", "resend", "stripe", "openai", "anthropic", "meta-model",
-      "muse-ai", "chatgpt", "claude", "meta-pixel", "webhooks", "jobs", "linkedin",
+      "muse-ai", "chatgpt", "claude", "meta-pixel", "webhooks", "zapier", "n8n", "jobs", "linkedin",
       "google-sheets", "crm", "email-verification",
     ]) {
       expect(ids).toContain(id);

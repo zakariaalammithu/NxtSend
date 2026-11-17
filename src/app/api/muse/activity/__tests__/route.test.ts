@@ -39,6 +39,10 @@ describe("activityActionFilter", () => {
     expect(activityActionFilter("zapier")).toBe("action.ilike.zapier.%");
   });
 
+  it("returns only n8n.* rows for platform=n8n", () => {
+    expect(activityActionFilter("n8n")).toBe("action.ilike.n8n.%");
+  });
+
   it("falls back to the default filter for unknown platforms", () => {
     expect(activityActionFilter("unknown")).toBe(
       "action.ilike.muse.%,action.ilike.MUSE_OAUTH%"

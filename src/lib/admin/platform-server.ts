@@ -82,6 +82,7 @@ import {
 } from "@/lib/muse-connector/oauth/config";
 import { countActiveMuseGrants, countActiveGrantsByOrigin } from "@/lib/muse-connector/grants";
 import { isZapierEnabled, getZapierBaseUrl } from "@/lib/integrations/zapier/config";
+import { isN8nEnabled, getN8nBaseUrl } from "@/lib/integrations-center/status";
 import { PLAN_CATALOG } from "@/lib/billing/plans";
 import {
   mapBillingEventToTransaction,
@@ -1382,6 +1383,74 @@ export async function getSystemHealth(mode: DataMode): Promise<HealthSummary> {
           zapierGrants === 0
             ? `Zapier REST surface is configured at ${zapierBaseUrl}; no active grants yet (no Zapier user has connected).`
             : `Zapier REST surface is configured at ${zapierBaseUrl}; ${zapierGrants} active grant(s) platform-wide.`,
+      });
+    }
+  }
+
+  // ── n8n connector (REST API + webhooks + API keys + OAuth) ───────────────
+  // Same shape as the Zapier check: configured when
+  // N8N_INTEGRATION_ENABLED is on and a public URL is set; zero
+  // grants is normal, not a failure; a null grant count means the
+  // migration 023 tables could not be read. "Healthy" here never
+  // claims a connection — grants (and API keys) are counted
+  // separately. The grants-by-origin `n8n` branch HAS landed
+  // (Worker B), so the count below reads byOrigin.n8n directly;
+  // the `other` fallback is kept only as a defensive path.
+  if (mode === "demo") {
+    checks.push({
+      id: "n8n",
+      label: "n8n connector (REST API + OAuth + API keys)",
+      status: "warning",
+      required: false,
+      message:
+        "Demo Mode: the n8n REST API + webhook surface is unavailable — no grants can be issued or used.",
+    });
+  } else {
+    const n8nEnabled = isN8nEnabled();
+    const n8nBaseUrl = getN8nBaseUrl();
+    let n8nGrants: number | null = null;
+    const n8nAdmin = createAdminClient();
+    if (n8nAdmin) {
+      const byOrigin = await countActiveGrantsByOrigin(n8nAdmin).catch(() => null);
+      n8nGrants = byOrigin
+        ? ((byOrigin as typeof byOrigin & { n8n?: number }).n8n ?? byOrigin.other)
+        : null;
+    }
+    if (!n8nEnabled) {
+      checks.push({
+        id: "n8n",
+        label: "n8n connector (REST API + OAuth + API keys)",
+        status: "warning",
+        required: false,
+        message: "n8n REST surface is disabled (N8N_INTEGRATION_ENABLED is false).",
+      });
+    } else if (!n8nBaseUrl) {
+      checks.push({
+        id: "n8n",
+        label: "n8n connector (REST API + OAuth + API keys)",
+        status: "warning",
+        required: false,
+        message:
+          "n8n REST surface is enabled but no public URL is set (N8N_API_BASE_URL or NEXT_PUBLIC_APP_URL).",
+      });
+    } else if (n8nGrants === null) {
+      checks.push({
+        id: "n8n",
+        label: "n8n connector (REST API + OAuth + API keys)",
+        status: "warning",
+        required: false,
+        message: `n8n REST surface is configured at ${n8nBaseUrl}, but the OAuth tables could not be read — migration 023 may not be applied to this project.`,
+      });
+    } else {
+      checks.push({
+        id: "n8n",
+        label: "n8n connector (REST API + OAuth + API keys)",
+        status: "ok",
+        required: false,
+        message:
+          n8nGrants === 0
+            ? `n8n REST surface is configured at ${n8nBaseUrl}; no active grants yet (no n8n user has connected).`
+            : `n8n REST surface is configured at ${n8nBaseUrl}; ${n8nGrants} active grant(s) platform-wide (upper bound — see the admin n8n panel).`,
       });
     }
   }

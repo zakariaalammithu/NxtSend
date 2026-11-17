@@ -1,0 +1,111 @@
+{
+  "name": "NxtSend: Weekly Campaign Report \u2192 Email",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "675eb1ff-085d-492f-b6fd-27f282aa9211",
+      "name": "Weekly Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "analytics",
+        "operation": "getUsageReport"
+      },
+      "id": "8319360b-83be-4cc4-8c7f-19175c3ebdaa",
+      "name": "Get Usage Report",
+      "type": "n8n-nodes-nxtsend.nxtSend",
+      "typeVersion": 1,
+      "position": [
+        520,
+        300
+      ],
+      "credentials": {
+        "nxtSendApi": {
+          "id": null,
+          "name": "NxtSend API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "reports@example.com",
+        "toEmail": "team@example.com",
+        "subject": "Weekly NxtSend Usage Report",
+        "emailType": "text",
+        "message": "=Weekly usage report:\n{{ JSON.stringify($json, null, 2) }}"
+      },
+      "id": "db8fa58a-febf-432e-bcb8-80abb805ca4f",
+      "name": "Email Report",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        780,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Setup\n1. Connect your NxtSend API credential on the NxtSend node.\n2. Connect an SMTP credential on the Email Send node and set the addresses.\n3. The schedule runs every Monday at 09:00. Swap \"Get Usage Report\" for\n\"Get Campaign Statistics\" (with a campaign selected) for a per-campaign report.",
+        "height": 200,
+        "width": 440
+      },
+      "id": "e2b1064d-7278-413b-bf9a-b6036651c494",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        80
+      ]
+    }
+  ],
+  "connections": {
+    "Weekly Schedule": {
+      "main": [
+        [
+          {
+            "node": "Get Usage Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Usage Report": {
+      "main": [
+        [
+          {
+            "node": "Email Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "staticData": null
+}

@@ -4,11 +4,11 @@ import { getStripeClient } from "@/lib/billing/stripe-client";
 import { handleStripeWebhook } from "@/lib/billing/webhook";
 import { createSupabaseBillingStore } from "@/lib/billing/store";
 import { planForStripePriceId } from "@/lib/billing/state";
-import { emitZapierEvent } from "@/lib/integrations/zapier/emit";
+import { emitPlatformEvent } from "@/lib/integrations/rest/emit";
 import {
-  createSupabaseZapierStore,
-  getDemoZapierStore,
-} from "@/lib/integrations/zapier/outbox";
+  createPlatformStore,
+  getDemoPlatformStore,
+} from "@/lib/integrations/rest/outbox";
 
 /**
  * POST /api/webhooks/stripe
@@ -35,14 +35,14 @@ export async function POST(req: Request) {
         if (!stripe) throw new Error("Stripe client unavailable");
         return stripe.subscriptions.retrieve(id);
       },
-      // Zapier `subscription.changed`: emitted server-side after a
+      // `subscription.changed`: emitted server-side after a
       // subscription mutation is applied. Best-effort — emission
       // never breaks Stripe processing.
       onSubscriptionChanged: async (workspaceId, data) => {
         const store = admin
-          ? createSupabaseZapierStore(admin)
-          : getDemoZapierStore();
-        await emitZapierEvent({ store }, "subscription.changed", workspaceId, {
+          ? createPlatformStore(admin, "zapier")
+          : getDemoPlatformStore();
+        await emitPlatformEvent({ store }, "subscription.changed", workspaceId, {
           source: "stripe_webhook",
           ...data,
         });

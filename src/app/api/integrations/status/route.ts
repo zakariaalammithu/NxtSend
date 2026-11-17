@@ -33,6 +33,7 @@ export async function GET() {
   let chatgptGrantsActive: number | null = null;
   let claudeGrantsActive: number | null = null;
   let zapierGrantsActive: number | null = null;
+  let n8nGrantsActive: number | null = null;
   let oauthMailboxes:
     | Partial<Record<OAuthProvider, OAuthMailboxSummary | null>>
     | undefined;
@@ -57,6 +58,12 @@ export async function GET() {
     chatgptGrantsActive = byOrigin ? byOrigin.chatgpt : null;
     claudeGrantsActive = byOrigin ? byOrigin.claude : null;
     zapierGrantsActive = byOrigin ? byOrigin.zapier : null;
+    // n8n branch of countActiveGrantsByOrigin HAS landed (Worker
+    // B, 2026-11-18): the cast reads a real `n8n` key. The
+    // `?? null` stays as a defensive path for an older deployment.
+    n8nGrantsActive = byOrigin
+      ? ((byOrigin as typeof byOrigin & { n8n?: number }).n8n ?? null)
+      : null;
     try {
       const store = createSupabaseOAuthStore(ctx.admin);
       const views = await store.listConnectionViews(ctx.workspaceId);
@@ -76,6 +83,7 @@ export async function GET() {
     chatgptGrantsActive,
     claudeGrantsActive,
     zapierGrantsActive,
+    n8nGrantsActive,
   });
 
   return NextResponse.json({ mode: ctx.mode, integrations });

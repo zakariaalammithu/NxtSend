@@ -1,5 +1,6 @@
-import { withZapierRoute } from "@/lib/integrations/zapier/route-helpers";
-import { zapierAuthTest } from "@/lib/integrations/zapier/api";
+import { withRestRoute } from "@/lib/integrations/rest/route-helpers";
+import { ZAPIER_PLATFORM } from "@/lib/integrations/rest/config";
+import { restAuthTest } from "@/lib/integrations/rest/api";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -10,5 +11,5 @@ export const runtime = "nodejs";
  * label. Never returns token material.
  */
 export async function GET(req: Request) {
-  return withZapierRoute(req, "read", (ctx, deps) => zapierAuthTest(ctx, deps));
+  return withRestRoute(req, ZAPIER_PLATFORM, "read", (ctx, deps) => restAuthTest(ctx, deps));
 }

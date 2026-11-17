@@ -67,7 +67,11 @@ describe("event envelope", () => {
 describe("webhook config", () => {
   it("parses stored config and defaults the event filter to all events", () => {
     const config = parseWebhookConfig({ url: "https://n8n.example.com/hook", secret: "whsec_x" });
-    expect(config?.events).toHaveLength(3);
+    // 6 = the generic registry's full event set (the 3 original
+    // lead/campaign events + lead.updated, lead.added_to_campaign
+    // and lead.removed_from_campaign, added when the Zapier-only
+    // gap for those three was closed).
+    expect(config?.events).toHaveLength(6);
     expect(config?.enabled).toBe(true);
   });
 

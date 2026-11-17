@@ -1,0 +1,76 @@
+{
+  "name": "NxtSend: New Lead \u2192 Slack",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "webhook",
+        "event": "lead.created"
+      },
+      "id": "d84271ae-8216-4ac7-901c-88eb59bbff73",
+      "name": "New Lead",
+      "type": "n8n-nodes-nxtsend.nxtSendTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "credentials": {
+        "nxtSendApi": {
+          "id": null,
+          "name": "NxtSend API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": "#sales",
+        "text": "=New lead: {{ $json.first_name }} {{ $json.last_name }} ({{ $json.email }}){{ $json.company ? ' at ' + $json.company : '' }}.",
+        "otherOptions": {}
+      },
+      "id": "b543b6ca-b0d9-49a8-80d5-34e3fec32693",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Setup\n1. Connect your NxtSend API credential on the trigger (webhook mode needs a\nreachable n8n URL so NxtSend can deliver events).\n2. Connect Slack and set the channel.",
+        "height": 200,
+        "width": 440
+      },
+      "id": "3c221315-b57a-47c0-b05c-cb0068585f7a",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        80
+      ]
+    }
+  ],
+  "connections": {
+    "New Lead": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "staticData": null
+}

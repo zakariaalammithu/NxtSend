@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { withZapierRoute, readZapierJsonBody } from "@/lib/integrations/zapier/route-helpers";
-import { zapierUnsubscribeWebhook } from "@/lib/integrations/zapier/api";
+import { withRestRoute, readRestJsonBody } from "@/lib/integrations/rest/route-helpers";
+import { ZAPIER_PLATFORM } from "@/lib/integrations/rest/config";
+import { restUnsubscribeWebhook } from "@/lib/integrations/rest/api";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /** POST /v1/webhooks/unsubscribe `{id}` — idempotent; unknown id → 404. */
 export async function POST(req: Request) {
-  const body = await readZapierJsonBody(req);
+  const body = await readRestJsonBody(req);
   if (!body) return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  return withZapierRoute(req, "write", (ctx, deps) => zapierUnsubscribeWebhook(ctx, deps, body));
+  return withRestRoute(req, ZAPIER_PLATFORM, "write", (ctx, deps) => restUnsubscribeWebhook(ctx, deps, body));
 }

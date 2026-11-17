@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { resolveWebhookCaller } from "@/lib/webhooks/server";
 import { isZapierWebhookEventType } from "@/lib/integrations/zapier/events";
-import { emitZapierEvent } from "@/lib/integrations/zapier/emit";
+import { emitPlatformEvent } from "@/lib/integrations/rest/emit";
 import {
-  createSupabaseZapierStore,
-  getDemoZapierStore,
-} from "@/lib/integrations/zapier/outbox";
+  createPlatformStore,
+  getDemoPlatformStore,
+} from "@/lib/integrations/rest/outbox";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -20,6 +20,12 @@ export const runtime = "nodejs";
  * semantics — the mutation that triggered the emit already
  * succeeded; this route enqueues + best-effort immediate-attempts
  * and always answers 200 for a well-formed event.
+ *
+ * This route is also the n8n emit path: there is NO separate
+ * /api/integrations/n8n/emit route — emitPlatformEvent fans out
+ * to every platform's active subscriptions, so one notifier
+ * serves both Zapier and n8n (decision documented in
+ * src/lib/data/webhook-emission.ts).
  */
 export async function POST(req: Request) {
   const resolved = await resolveWebhookCaller();
@@ -39,7 +45,7 @@ export async function POST(req: Request) {
       ? (body.data as Record<string, unknown>)
       : {};
   const admin = createAdminClient();
-  const store = admin ? createSupabaseZapierStore(admin) : getDemoZapierStore();
-  await emitZapierEvent({ store }, body.type, caller.workspaceId, data);
+  const store = admin ? createPlatformStore(admin, "zapier") : getDemoPlatformStore();
+  await emitPlatformEvent({ store }, body.type, caller.workspaceId, data);
   return NextResponse.json({ ok: true });
 }

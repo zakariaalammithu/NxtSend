@@ -1,0 +1,77 @@
+{
+  "name": "NxtSend: CRM Webhook \u2192 Add to Campaign",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crm-contact",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "5362ee55-d81e-4253-b7af-74a17e808053",
+      "name": "CRM Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "lead",
+        "operation": "addToCampaign",
+        "leadId": "={{ $json.leadId }}",
+        "campaignId": "YOUR_CAMPAIGN_ID"
+      },
+      "id": "610c9279-a37a-44a2-bf3a-a6ba2c9407ed",
+      "name": "Add Lead to Campaign",
+      "type": "n8n-nodes-nxtsend.nxtSend",
+      "typeVersion": 1,
+      "position": [
+        520,
+        300
+      ],
+      "credentials": {
+        "nxtSendApi": {
+          "id": null,
+          "name": "NxtSend API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Setup\n1. Connect your NxtSend API credential on the NxtSend node.\n2. Replace YOUR_CAMPAIGN_ID with a real campaign (pick it from the dropdown once connected).\n3. Send contacts to this webhook as JSON: {\"leadId\": \"<nxtsend lead id>\"}.\nCreate the lead first (e.g. with workflow 01) if it does not exist yet.",
+        "height": 200,
+        "width": 440
+      },
+      "id": "3294e15a-84b3-4579-bdaa-bcf8bc0413ac",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        80
+      ]
+    }
+  ],
+  "connections": {
+    "CRM Webhook": {
+      "main": [
+        [
+          {
+            "node": "Add Lead to Campaign",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "staticData": null
+}

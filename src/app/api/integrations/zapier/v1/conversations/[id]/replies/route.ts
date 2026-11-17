@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { withZapierRoute, readZapierJsonBody } from "@/lib/integrations/zapier/route-helpers";
-import { zapierSendReply } from "@/lib/integrations/zapier/api";
+import { withRestRoute, readRestJsonBody } from "@/lib/integrations/rest/route-helpers";
+import { ZAPIER_PLATFORM } from "@/lib/integrations/rest/config";
+import { restSendReply } from "@/lib/integrations/rest/api";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -13,7 +14,7 @@ export const runtime = "nodejs";
  * refused 422: no authorized LinkedIn provider exists.
  */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const body = await readZapierJsonBody(req);
+  const body = await readRestJsonBody(req);
   if (!body) return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  return withZapierRoute(req, "write", (ctx, deps) => zapierSendReply(ctx, deps, params.id, body));
+  return withRestRoute(req, ZAPIER_PLATFORM, "write", (ctx, deps) => restSendReply(ctx, deps, params.id, body));
 }

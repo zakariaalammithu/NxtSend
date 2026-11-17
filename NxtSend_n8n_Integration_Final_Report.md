@@ -608,3 +608,39 @@ Final verification in the coordinator pass: repo suite
 accounts routes in the output), node package **126/126** tests,
 `npm run lint` 0 problems, `npm run build` pass, manifest
 untouched, no secrets, no publish/approval claims.
+
+## Live verification (parent, 2026-11-18 ~01:20–01:30 +06)
+
+- Commit `cdc7252` pushed to main; remote HEAD confirmed
+  `cdc7252` on a retry (the first `ls-remote` hit the known
+  flaky SSH proxy — "Connection reset by peer" — and the retry
+  succeeded; the push itself had already reported
+  `2e555a6..cdc7252 main -> main`).
+- Parent's own runs before pushing: repo suite **1,668/1,668**
+  (143 files), repo `npm run build` **PASS** (n8n routes in the
+  output), node package **126/126** tests, `npm run lint`
+  0 problems, `npm run build` pass. Manifest untouched; secret
+  scan clean (only obvious fake fixtures in tests);
+  publish/verification claims are all negations.
+- **Deploy NOT yet live at verification time — PENDING.**
+  Polled `GET /api/integrations/n8n/health` 40 times over
+  ~12 minutes (two rounds of 20×15s): HTTP 404 every time.
+  `GET /.well-known/oauth-protected-resource/api/integrations/n8n`
+  and `GET /api/integrations/n8n/v1/auth/test` (no token) also
+  return the 404 page. This is slower than the previous four
+  deployments (Muse/ChatGPT/Claude/Zapier landed in ~3–5
+  minutes); the commit is much larger (216 files, 32,176
+  insertions) and the Vercel build may simply be queued.
+- The live site is up and serving the **previous** deployment:
+  `GET /api/mcp/health` → 200 (54 tools, demo) and
+  `GET /api/integrations/zapier/health` → 200. So this is a
+  deploy delay, not a site outage and not a code failure —
+  the n8n routes exist in the local build output.
+- Still PENDING until the deploy lands: the n8n settings-page
+  render check, the health/metadata/auth-test checks above,
+  the full OAuth grant flow inside a real n8n instance, one
+  live run per node operation, webhook delivery to a real n8n
+  URL, the cron retry tick, loading the node into a local n8n
+  instance, npm publish + n8n verification, screenshots.
+  Re-check the three URLs above once Vercel reports the
+  `cdc7252` deployment as live.

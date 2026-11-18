@@ -12,15 +12,20 @@
  *
  * Scopes come from src/lib/muse-connector/oauth/scopes.ts
  * (SCOPE_DESCRIPTIONS / ALL_OAUTH_SCOPES); webhook events from
- * src/lib/integrations/rest/events.ts; rate limits from the auth
- * modules (REST_RATE_LIMIT_PER_MINUTE / MCP_RATE_LIMIT_PER_MINUTE).
- * This file adds no new names — it only arranges the real ones for
- * display.
+ * src/lib/integrations/rest/events.ts. Rate limits and the retry cap
+ * are LITERALS here (120 / 120 / 3) — this module is imported by
+ * "use client" pages and must not import the server modules that
+ * enforce them (rest/auth, muse-connector/mcp, rest/outbox pull in
+ * next/headers via supabase/server and break the production build).
+ * __tests__/reference.test.ts pins these literals to the real
+ * constants — update both places together.
  */
 
-import { REST_RATE_LIMIT_PER_MINUTE } from "@/lib/integrations/rest/auth";
-import { MCP_RATE_LIMIT_PER_MINUTE } from "@/lib/muse-connector/mcp";
-import { DELIVERY_MAX_ATTEMPTS } from "@/lib/integrations/rest/outbox";
+ // Client-safe literals — see the header comment. Pinned to the
+// enforcing modules by __tests__/reference.test.ts.
+const REST_RATE_LIMIT_PER_MINUTE = 120; // rest/auth.ts
+const MCP_RATE_LIMIT_PER_MINUTE = 120; // muse-connector/mcp.ts
+const DELIVERY_MAX_ATTEMPTS = 3; // rest/outbox.ts
 
 export type RestPlatformId =
   | "zapier"
@@ -548,7 +553,7 @@ export const OAUTH_ERRORS: { code: string; meaning: string }[] = [
   { code: "temporarily_unavailable", meaning: "The OAuth server is not configured (no admin client / TOKEN_ENCRYPTION_KEY missing or malformed)." },
 ];
 
-/** Rate limits, imported from the modules that enforce them. */
+/** Rate limits (literals — see the note at the top of this file; pinned to the enforcing modules by tests). */
 export const RATE_LIMITS = {
   restPerMinutePerToken: REST_RATE_LIMIT_PER_MINUTE,
   mcpPerMinutePerGrant: MCP_RATE_LIMIT_PER_MINUTE,

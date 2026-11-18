@@ -32,8 +32,13 @@ import {
   REST_PLATFORMS,
   REST_ENDPOINTS,
   REST_HEALTH_ENDPOINTS,
+  RATE_LIMITS,
+  WEBHOOK_DELIVERY,
   type RestPlatformId,
 } from "../reference";
+import { REST_RATE_LIMIT_PER_MINUTE } from "@/lib/integrations/rest/auth";
+import { MCP_RATE_LIMIT_PER_MINUTE } from "@/lib/muse-connector/mcp";
+import { DELIVERY_MAX_ATTEMPTS } from "@/lib/integrations/rest/outbox";
 import { ALL_OAUTH_SCOPES } from "@/lib/muse-connector/oauth/scopes";
 import { INTEGRATION_REGISTRY } from "@/lib/integrations-center/registry";
 import DevelopersPage from "../page";
@@ -274,5 +279,13 @@ describe("developers pages render", () => {
     expect(html).toContain("lead.created");
     expect(html).toContain("campaign.status_changed");
     expect(html).toContain("daily 06:00 cron");
+  });
+});
+
+describe("reference rate limits and retry cap match the enforcing modules", () => {
+  it("pins the documented literals to the real constants", () => {
+    expect(RATE_LIMITS.restPerMinutePerToken).toBe(REST_RATE_LIMIT_PER_MINUTE);
+    expect(RATE_LIMITS.mcpPerMinutePerGrant).toBe(MCP_RATE_LIMIT_PER_MINUTE);
+    expect(WEBHOOK_DELIVERY.maxAttempts).toBe(DELIVERY_MAX_ATTEMPTS);
   });
 });

@@ -2137,6 +2137,20 @@ const N8N_CONNECT_STEPS: string[] = [
  *     it returns none, the panel says so rather than showing
  *     Zapier/Muse rows as n8n activity.
  */
+/** Platforms whose webhook subscriptions this panel can list. Zapier is
+ * excluded here on purpose — its subscriptions live on the Zapier detail
+ * page; all six are listed together on /dashboard/developers/webhooks. */
+const WEBHOOK_PLATFORMS: {
+  id: "n8n" | "make" | "pabbly" | "albato" | "activepieces";
+  label: string;
+}[] = [
+  { id: "n8n", label: "n8n" },
+  { id: "make", label: "Make" },
+  { id: "pabbly", label: "Pabbly Connect" },
+  { id: "albato", label: "Albato" },
+  { id: "activepieces", label: "Activepieces" },
+];
+
 function N8nLivePanels({
   origin,
   status,
@@ -2156,6 +2170,9 @@ function N8nLivePanels({
   const [subs, setSubs] = React.useState<N8nSubscriptionEntry[] | null>(null);
   const [deliveries, setDeliveries] = React.useState<N8nDeliveryEntry[] | null>(null);
   const [subsError, setSubsError] = React.useState<string | null>(null);
+  const [webhookPlatform, setWebhookPlatform] = React.useState<
+    "n8n" | "make" | "pabbly" | "albato" | "activepieces"
+  >("n8n");
   const [n8nActivity, setN8nActivity] = React.useState<MuseActivityEntry[] | null>(null);
   const [n8nActivityError, setN8nActivityError] = React.useState<string | null>(null);
   const [apiKeys, setApiKeys] = React.useState<N8nApiKeyEntry[] | null>(null);
@@ -2198,24 +2215,31 @@ function N8nLivePanels({
     }
   }, []);
 
-  const loadWebhookStatus = React.useCallback(async () => {
-    try {
-      const res = await fetch("/api/integrations/n8n/subscriptions");
-      const body = (await res.json().catch(() => null)) as
-        | {
-            subscriptions?: N8nSubscriptionEntry[];
-            deliveries?: N8nDeliveryEntry[];
-            error?: string;
-          }
-        | null;
-      if (!res.ok) throw new Error(body?.error ?? `Webhook status request failed (HTTP ${res.status})`);
-      setSubs(body?.subscriptions ?? []);
-      setDeliveries(body?.deliveries ?? []);
-      setSubsError(null);
-    } catch (err) {
-      setSubsError(err instanceof Error ? err.message : "Failed to load n8n webhook status.");
-    }
-  }, []);
+  const loadWebhookStatus = React.useCallback(
+    async (platform: "n8n" | "make" | "pabbly" | "albato" | "activepieces") => {
+      // Clear the previous platform's rows first so stale n8n data is
+      // never shown under another platform's tab.
+      setSubs(null);
+      setDeliveries(null);
+      try {
+        const res = await fetch(`/api/integrations/${platform}/subscriptions`);
+        const body = (await res.json().catch(() => null)) as
+          | {
+              subscriptions?: N8nSubscriptionEntry[];
+              deliveries?: N8nDeliveryEntry[];
+              error?: string;
+            }
+          | null;
+        if (!res.ok) throw new Error(body?.error ?? `Webhook status request failed (HTTP ${res.status})`);
+        setSubs(body?.subscriptions ?? []);
+        setDeliveries(body?.deliveries ?? []);
+        setSubsError(null);
+      } catch (err) {
+        setSubsError(err instanceof Error ? err.message : `Failed to load ${platform} webhook status.`);
+      }
+    },
+    []
+  );
 
   const loadN8nActivity = React.useCallback(async () => {
     try {
@@ -2248,10 +2272,13 @@ function N8nLivePanels({
   React.useEffect(() => {
     void loadHealth();
     void loadGrants();
-    void loadWebhookStatus();
     void loadN8nActivity();
     void loadApiKeys();
-  }, [loadHealth, loadGrants, loadWebhookStatus, loadN8nActivity, loadApiKeys]);
+  }, [loadHealth, loadGrants, loadN8nActivity, loadApiKeys]);
+
+  React.useEffect(() => {
+    void loadWebhookStatus(webhookPlatform);
+  }, [webhookPlatform, loadWebhookStatus]);
 
   const revokeGrant = async (clientId: string) => {
     setRevokeBusy(clientId);
@@ -2426,6 +2453,38 @@ function N8nLivePanels({
               </div>
             ))}
         </div>
+        <h3 className="text-13 font-semibold text-white pt-2">
+          Other automation platforms — OAuth scopes
+        </h3>
+        <p className="text-13 text-black-300 leading-relaxed">
+          API keys carry n8n.read / n8n.write only and authorize the n8n v1 API only. The other
+          automation platforms authenticate with OAuth grants carrying their own scopes — a key
+          presented to their APIs is refused. There is no .send tier for any automation platform:
+          no platform sends LinkedIn messages, and email inbox replies are covered by the write
+          tier.
+        </p>
+        <div className="divide-y divide-black-700/60">
+          {(["zapier", "make", "pabbly", "albato", "activepieces"] as const).map((prefix) => (
+            <div key={prefix} className="py-3 space-y-1">
+              <span className="text-13 font-semibold text-white">{prefix}</span>
+              {(Object.entries(SCOPE_DESCRIPTIONS) as [OAuthScope, string][])
+                .filter(([scope]) => scope.startsWith(`${prefix}.`))
+                .map(([scope, description]) => (
+                  <p key={scope} className="text-12 text-black-300 leading-relaxed">
+                    <code className="font-mono text-black-200">{scope}</code>
+                    {` — ${description}`}
+                  </p>
+                ))}
+            </div>
+          ))}
+        </div>
+        <p className="text-12 text-black-400 leading-relaxed">
+          Full reference, including the endpoint table per platform:{" "}
+          <Link href="/dashboard/developers" className="font-semibold text-purple-300 hover:text-white transition-colors">
+            Developers
+          </Link>
+          .
+        </p>
       </Section>
 
       <Section title="API keys — create, list, revoke">
@@ -2435,7 +2494,13 @@ function N8nLivePanels({
           value is shown <strong className="text-white">exactly once</strong> at creation — copy it
           into n8n immediately; it can never be shown again. A lost key must be revoked and
           replaced. NxtSend API keys are not n8n instance credentials — your n8n login is
-          unrelated and is never entered here.
+          unrelated and is never entered here. Keys authorize the n8n v1 API only — a key
+          presented to another platform&apos;s API is refused. The same keys are manageable on
+          the{" "}
+          <Link href="/dashboard/developers/api-keys" className="font-semibold text-purple-300 hover:text-white transition-colors">
+            Developers → API keys page
+          </Link>
+          .
         </p>
         {apiKeysError && (
           <p className="text-13 text-rose-200 leading-relaxed">{apiKeysError}</p>
@@ -2658,12 +2723,46 @@ function N8nLivePanels({
 
       <Section title="Webhook subscriptions + delivery status">
         <p className="text-13 text-black-300 leading-relaxed">
-          Subscriptions are created from n8n — the NxtSend Trigger node subscribes via POST
-          /api/integrations/n8n/webhooks/subscribe — and the per-subscription HMAC secret is
-          generated server-side and never returned. Delivery latency: best-effort immediate
-          attempt, then the daily 06:00 cron retry (max 3 attempts, then dead) — a failed delivery
-          may wait up to ~24h for its next retry. Cross-check per-workflow runs in n8n&apos;s
-          Executions, and platform-wide failures in the admin n8n panel (/admin/integrations/n8n).
+          Subscriptions are created from the platform — it subscribes via POST{" "}
+          <code className="font-mono text-black-100">
+            /api/integrations/{webhookPlatform}/v1/webhooks/subscribe
+          </code>{" "}
+          — and the per-subscription HMAC secret is generated server-side and never returned.
+          Delivery latency: best-effort immediate attempt, then the daily 06:00 cron retry (max 3
+          attempts, then dead) — a failed delivery may wait up to ~24h for its next retry.
+          {webhookPlatform === "n8n"
+            ? " Cross-check per-workflow runs in n8n's Executions, and platform-wide failures in the admin n8n panel (/admin/integrations/n8n)."
+            : " Cross-check runs in the platform's own execution log."}
+        </p>
+        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Webhook platform">
+          {WEBHOOK_PLATFORMS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              role="tab"
+              aria-selected={webhookPlatform === p.id}
+              onClick={() => setWebhookPlatform(p.id)}
+              className={`rounded-xl border px-3 py-1.5 text-12 font-semibold transition-colors ${
+                webhookPlatform === p.id
+                  ? "border-purple-500/50 bg-purple-600/20 text-white"
+                  : "border-black-600 bg-black-800 text-black-300 hover:text-white"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-12 text-black-400 leading-relaxed">
+          Zapier subscriptions live on the{" "}
+          <Link href="/dashboard/integrations/zapier" className="font-semibold text-purple-300 hover:text-white transition-colors">
+            Zapier detail page
+          </Link>{" "}
+          — this picker covers the n8n-family platforms. All six platforms are listed together on
+          the{" "}
+          <Link href="/dashboard/developers/webhooks" className="font-semibold text-purple-300 hover:text-white transition-colors">
+            Developers → Webhook subscriptions page
+          </Link>
+          .
         </p>
         {subsError && (
           <p className="text-13 text-rose-200 leading-relaxed">{subsError}</p>
@@ -2673,8 +2772,12 @@ function N8nLivePanels({
         )}
         {!subsError && subs !== null && subs.length === 0 && (
           <p className="text-13 text-black-300 leading-relaxed">
-            No webhook subscriptions for this workspace yet — one appears here when a workflow with
-            a webhook-mode NxtSend Trigger is activated in n8n.
+            No {WEBHOOK_PLATFORMS.find((p) => p.id === webhookPlatform)?.label ?? webhookPlatform}{" "}
+            webhook subscriptions for this workspace yet — one appears here when{" "}
+            {webhookPlatform === "n8n"
+              ? "a workflow with a webhook-mode NxtSend Trigger is activated in n8n"
+              : `${WEBHOOK_PLATFORMS.find((p) => p.id === webhookPlatform)?.label ?? webhookPlatform} subscribes via POST /api/integrations/${webhookPlatform}/v1/webhooks/subscribe`}
+            .
           </p>
         )}
         {subs !== null && subs.length > 0 && (

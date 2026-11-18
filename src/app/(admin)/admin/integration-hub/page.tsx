@@ -53,6 +53,18 @@ export default function IntegrationHubOverviewPage() {
   const { data, error, loading, reload } = useAdminFetch<{
     overview: HubOverviewResponse;
   }>("/api/admin/integration-hub");
+  // Provider monitoring strip (Wave 2, Phase 2): super-admin only.
+  // Regular admins get 403 from that API, so the strip simply stays
+  // hidden for them — it never blocks the hub itself.
+  const { data: monitoring } = useAdminFetch<{
+    totals: {
+      providers: number;
+      disabled: number;
+      connectedWorkspaces: number;
+      apiErrors24h: number;
+      deadDeliveries: number;
+    };
+  }>("/api/admin/integrations/monitoring");
   const overview = data?.overview;
   const [query, setQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
@@ -114,6 +126,28 @@ export default function IntegrationHubOverviewPage() {
             unavailable until it is set. Configuration, checklists and
             documents work normally.
           </WarningNote>
+        </div>
+      )}
+
+      {monitoring && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-black-700/60 bg-black-800/60 px-5 py-4">
+          <div>
+            <p className="text-14 font-semibold text-white">Provider monitoring</p>
+            <p className="mt-0.5 text-13 text-black-300">
+              {monitoring.totals.providers} providers ·{" "}
+              {monitoring.totals.connectedWorkspaces} connected workspace(s) ·{" "}
+              {monitoring.totals.apiErrors24h} API error(s) in the last 24h ·{" "}
+              {monitoring.totals.deadDeliveries} dead webhook deliverie(s)
+              {monitoring.totals.disabled > 0 &&
+                ` · ${monitoring.totals.disabled} provider(s) disabled by an admin`}
+            </p>
+          </div>
+          <Link
+            href="/admin/integrations/monitoring"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3.5 py-2 text-13 font-semibold text-white transition-colors hover:bg-rose-500"
+          >
+            <Settings2 className="h-4 w-4" /> Open monitoring
+          </Link>
         </div>
       )}
 

@@ -12,6 +12,7 @@
  */
 
 import { describe, it, expect } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   createMemoryMuseOAuthStore,
   registerMuseClient,
@@ -308,6 +309,72 @@ describe("resolveRestContext — n8n API keys", () => {
       now: NOW,
       rateLimiter: freshLimiter(),
       apiKeyStore: store,
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error.status).toBe(401);
+  });
+});
+
+describe("provider disable kill-switch (migration 038)", () => {
+  /** Minimal fake service-role client: only .from().select() is read. */
+  function flagAdmin(rows: unknown[], shouldThrow = false): SupabaseClient {
+    return {
+      from: () => ({
+        select: async () => {
+          if (shouldThrow) throw new Error("db down");
+          return { data: rows, error: null };
+        },
+      }),
+    } as unknown as SupabaseClient;
+  }
+
+  const disabledZapierAdmin = flagAdmin([
+    {
+      provider: "zapier",
+      disabled: true,
+      disabled_by: null,
+      disabled_at: "2026-11-18T00:00:00.000Z",
+      reason: "maintenance",
+    },
+  ]);
+  const enabledAdmin = flagAdmin([]);
+  const brokenAdmin = flagAdmin([], true);
+
+  it("refuses a disabled platform with 503 provider_disabled before token auth", async () => {
+    const res = await resolveRestContext(apiRequest("zapier", "bogus-token"), ZAPIER_PLATFORM, "read", {
+      store: createMemoryMuseOAuthStore(),
+      mode: "supabase",
+      now: NOW,
+      rateLimiter: freshLimiter(),
+      admin: disabledZapierAdmin,
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error.status).toBe(503);
+      expect(res.error.body.code).toBe("provider_disabled");
+      expect(res.error.body.error).toContain("disabled by a platform administrator");
+    }
+  });
+
+  it("lets an enabled platform through the kill-switch (then fails token auth without a grant)", async () => {
+    const res = await resolveRestContext(apiRequest("zapier", "bogus-token"), ZAPIER_PLATFORM, "read", {
+      store: createMemoryMuseOAuthStore(),
+      mode: "supabase",
+      now: NOW,
+      rateLimiter: freshLimiter(),
+      admin: enabledAdmin,
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error.status).toBe(401);
+  });
+
+  it("fails open when the flag table cannot be read", async () => {
+    const res = await resolveRestContext(apiRequest("zapier", "bogus-token"), ZAPIER_PLATFORM, "read", {
+      store: createMemoryMuseOAuthStore(),
+      mode: "supabase",
+      now: NOW,
+      rateLimiter: freshLimiter(),
+      admin: brokenAdmin,
     });
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.error.status).toBe(401);

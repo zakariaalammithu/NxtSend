@@ -21,6 +21,7 @@ import {
   useAdminFetch,
 } from "@/components/admin/AdminBits";
 import { cn } from "@/lib/utils";
+import { getProviderDefinition } from "@/lib/integrations/providers/registry";
 import type {
   HubDetailResponse,
   HubOverviewResponse,
@@ -89,6 +90,9 @@ export default function IntegrationHubDetailPage({
   }
 
   const { integration } = detail;
+  // Provider monitoring link (Wave 2, Phase 2): only when this hub
+  // record's slug is also a provider id in the registry.
+  const monitoredProvider = getProviderDefinition(slug);
   const tabBadge: Partial<Record<HubTabId, string>> = {
     credentials: String(detail.credentials.length),
     documentation: String(detail.documents.length),
@@ -108,6 +112,18 @@ export default function IntegrationHubDetailPage({
         {integration.vendor ?? "—"} · {integration.category} ·{" "}
         <span className="font-mono">{integration.slug}</span>
       </p>
+      {monitoredProvider && (
+        <p className="mt-2 text-13 text-black-300">
+          This integration is a monitored provider —{" "}
+          <Link
+            href={`/admin/integrations/monitoring/${monitoredProvider.id}`}
+            className="font-medium text-white underline underline-offset-2"
+          >
+            open its provider monitoring
+          </Link>{" "}
+          (health, connections, errors, syncs; super-admin only).
+        </p>
+      )}
       <div className="mt-4">
         <ModeNote mode={mode} />
       </div>

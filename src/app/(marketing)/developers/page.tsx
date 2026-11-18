@@ -28,9 +28,11 @@ export const metadata: Metadata = {
  *   payload example below is built from the actual emission code in
  *   src/lib/data/webhook-emission.ts, and the verification sample
  *   mirrors src/lib/webhooks/signing.ts.
- * - There is NO public REST API, no customer API key, no SDK and no
- *   inbound-webhook product. Those are labelled "Coming Soon" /
- *   "API Access Required" — never documented as if they existed.
+ * - A public, versioned REST API IS live for the automation
+ *   platforms (Zapier, n8n, Make, Pabbly, Albato, Activepieces)
+ *   with customer API keys (Dashboard → Developers) and OAuth 2.1.
+ *   SDKs and inbound webhooks are still "Coming Soon" — never
+ *   documented as if they existed.
  * - Mailbox OAuth (Gmail / Outlook) is a real end-user capability,
  *   described as such — not as a developer API.
  */
@@ -113,14 +115,6 @@ const CONFIGURE_STEPS = [
 ] as const;
 
 const COMING_SOON = [
-  {
-    title: "Public REST API",
-    text: "There is no public, versioned REST API for NxtSend workspaces yet, so there is no endpoint catalogue to publish — we would rather say that plainly than document endpoints that do not exist.",
-  },
-  {
-    title: "API keys & token authentication",
-    text: "Customers cannot issue API keys or bearer tokens today. Key management arrives together with the public API, not before it.",
-  },
   {
     title: "SDKs & client libraries",
     text: "No official SDKs exist for any language yet. Webhooks need nothing but an HTTPS endpoint and the verification snippet above.",
@@ -403,18 +397,29 @@ export default function DevelopersPage() {
                 <KeyRound className="h-5 w-5" />
               </span>
               <h2 className="text-24 font-bold tracking-tight text-white sm:text-28">
-                Public API — API Access Required
+                Public API
               </h2>
-              <span className="rounded-full bg-amber-400/10 px-3 py-1 text-11 font-semibold uppercase tracking-wider text-amber-200 ring-1 ring-inset ring-amber-300/25">
-                Coming Soon
+              <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-11 font-semibold uppercase tracking-wider text-emerald-200 ring-1 ring-inset ring-emerald-300/25">
+                Live
               </span>
             </div>
             <p className="mt-5 max-w-3xl text-15 leading-relaxed text-black-300">
-              A public API is on the roadmap, but it does not exist yet —
-              so there are no endpoints, keys or published rate limits to
-              document, and anything you may see elsewhere claiming
-              otherwise is not official. Because there is no public API,
-              there are also no published API rate limits at this time.
+              NxtSend has a public, versioned REST API for the automation
+              platforms (Zapier, n8n, Make, Pabbly, Albato, Activepieces):
+              leads, campaigns, sequences, conversations and usage under
+              /api/integrations/…/v1 — one base per platform — plus the
+              MCP servers for AI assistants. Authenticate with OAuth 2.1
+              or an API key from Dashboard → Developers → API keys (shown
+              once at creation). Rate limit: 120 requests per minute per
+              token. The full endpoint reference, examples and error codes
+              live in the{" "}
+              <a
+                href="/dashboard/developers"
+                className="font-semibold text-purple-300 hover:underline"
+              >
+                dashboard developers docs
+              </a>
+              .
             </p>
             <div className="mt-8 grid gap-5 sm:grid-cols-2">
               {COMING_SOON.map((item) => (
@@ -437,8 +442,8 @@ export default function DevelopersPage() {
               ))}
             </div>
             <p className="mt-8 text-14 leading-relaxed text-black-300">
-              Building something that needs API access when it opens?
-              Write to{" "}
+              Building something with the API? Start from the API docs in
+              Dashboard → Developers — or write to{" "}
               <a
                 href="mailto:hello@nxtsend.com"
                 className="font-semibold text-purple-300 hover:underline"

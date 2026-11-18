@@ -42,6 +42,7 @@ import {
   createSupabaseApiKeyStore,
   type ApiKeyStore,
 } from "@/lib/integrations/n8n/api-keys";
+import { assertProviderEnabled } from "@/lib/admin/integration-monitoring";
 
 export const REST_RATE_LIMIT_PER_MINUTE = 120;
 
@@ -233,6 +234,30 @@ export async function resolveRestContext(
         },
       },
     };
+  }
+  // Admin kill-switch (migration 038, provider_disabled_flags): a
+  // disabled platform refuses every REST call with an honest 503,
+  // before any credential is checked. Skipped when no admin client
+  // is available (demo / tests) and fails open when the flag table
+  // cannot be read (migration unapplied) — see assertProviderEnabled.
+  if (deps.admin) {
+    try {
+      await assertProviderEnabled(deps.admin, platformId);
+    } catch (err) {
+      return {
+        ok: false,
+        error: {
+          status: 503,
+          body: {
+            error:
+              err instanceof Error
+                ? err.message
+                : `Provider "${platformId}" is disabled by a platform administrator.`,
+            code: "provider_disabled",
+          },
+        },
+      };
+    }
   }
   const token = bearerToken(req);
   if (!token) {

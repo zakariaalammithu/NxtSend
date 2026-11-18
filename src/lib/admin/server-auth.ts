@@ -91,3 +91,28 @@ export async function requireAdminApi(): Promise<
     },
   };
 }
+
+/**
+ * Super-admin-only gate for the provider-monitoring admin APIs
+ * (Wave 2, Phase 2). Wraps requireAdminApi(): any admin passes the
+ * session check, but only role `super_admin` may read provider
+ * monitoring or toggle a provider disable flag — a regular admin
+ * gets 403. Demo mode has no session, so callers must handle it
+ * before calling this (the monitoring routes serve labelled demo
+ * data there instead).
+ */
+export async function requireSuperAdminApi(): Promise<
+  { caller: AdminCaller } | { response: NextResponse }
+> {
+  const gate = await requireAdminApi();
+  if ("response" in gate) return gate;
+  if (gate.caller.role !== "super_admin") {
+    return {
+      response: NextResponse.json(
+        { error: "Forbidden: super-admin role required" },
+        { status: 403 }
+      ),
+    };
+  }
+  return gate;
+}

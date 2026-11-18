@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Target, Linkedin, Mail, MessageSquare, BarChart3, Puzzle, CreditCard, Settings, Bell, Search, LogOut, ChevronDown, ChevronLeft, ChevronRight, Zap, X, User, Users, Shield, Check, Sparkles, History, Gift, Coins, ShoppingCart, ContactRound } from "lucide-react";
+import { LayoutDashboard, Target, Linkedin, Mail, MessageSquare, BarChart3, Puzzle, Code, CreditCard, Settings, Bell, Search, LogOut, ChevronDown, ChevronLeft, ChevronRight, Zap, X, User, Users, Shield, Check, Sparkles, History, Gift, Coins, ShoppingCart, ContactRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/Logo";
 import { createClient } from "@/lib/supabase/client";
@@ -93,6 +93,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: "SETTINGS",
     items: [
       { label: "Integrations", href: "/dashboard/integrations", icon: Puzzle },
+      { label: "Developers", href: "/dashboard/developers", icon: Code },
       {
         label: "Connected Accounts",
         href: "/dashboard/accounts",

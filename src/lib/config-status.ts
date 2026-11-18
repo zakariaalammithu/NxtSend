@@ -120,6 +120,98 @@ export const CONFIG_CATALOG: ConfigVarSpec[] = [
   { name: "LINKEDIN_CLIENT_ID", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Documented-demo only: no LinkedIn OAuth flow exists in the app (no authorized provider). Kept for the future provider integration." },
   { name: "LINKEDIN_CLIENT_SECRET", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Documented-demo only — see LINKEDIN_CLIENT_ID." },
   { name: "LINKEDIN_REDIRECT_URI", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Documented-demo only — the callback route does not exist yet." },
+
+  // ── Automation REST platforms (Make / Pabbly / Albato / Activepieces) ──
+  // The platform surfaces authenticate with the shared OAuth 2.1 server
+  // (TOKEN_ENCRYPTION_KEY) — there is no per-platform client secret.
+  // These two variables per platform are the enable switch and the
+  // public-origin override, read by src/lib/integrations/rest/config.ts
+  // (isPlatformEnabled / getPlatformBaseUrl).
+  { name: "MAKE_ENABLED", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Enables the Make REST API surface (/api/integrations/make/v1). Set to \"false\" to disable it; unset means enabled. The OAuth 2.1 server (migrations 023 + 029) issues the credentials Make uses." },
+  { name: "MAKE_API_BASE_URL", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Public origin advertised in the Make protected-resource metadata (/.well-known/oauth-protected-resource/api/integrations/make). Only set when the Make surface lives somewhere other than NEXT_PUBLIC_APP_URL." },
+  { name: "PABBLY_ENABLED", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Enables the Pabbly Connect REST API surface (/api/integrations/pabbly/v1). Set to \"false\" to disable it; unset means enabled. The OAuth 2.1 server (migrations 023 + 029) issues the credentials Pabbly Connect uses." },
+  { name: "PABBLY_API_BASE_URL", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Public origin advertised in the Pabbly Connect protected-resource metadata (/.well-known/oauth-protected-resource/api/integrations/pabbly). Only set when the Pabbly Connect surface lives somewhere other than NEXT_PUBLIC_APP_URL." },
+  { name: "ALBATO_ENABLED", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Enables the Albato REST API surface (/api/integrations/albato/v1). Set to \"false\" to disable it; unset means enabled. The OAuth 2.1 server (migrations 023 + 029) issues the credentials Albato uses." },
+  { name: "ALBATO_API_BASE_URL", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Public origin advertised in the Albato protected-resource metadata (/.well-known/oauth-protected-resource/api/integrations/albato). Only set when the Albato surface lives somewhere other than NEXT_PUBLIC_APP_URL." },
+  { name: "ACTIVEPIECES_ENABLED", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Enables the Activepieces REST API surface (/api/integrations/activepieces/v1). Set to \"false\" to disable it; unset means enabled. The OAuth 2.1 server (migrations 023 + 029) issues the credentials Activepieces uses." },
+  { name: "ACTIVEPIECES_API_BASE_URL", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Public origin advertised in the Activepieces protected-resource metadata (/.well-known/oauth-protected-resource/api/integrations/activepieces). Only set when the Activepieces surface lives somewhere other than NEXT_PUBLIC_APP_URL." },
+
+  // ── Email Outreach provider credentials ───────────────────────────
+  // Server-side env fallback for each adapter's credential (the name
+  // declared in src/lib/integrations/providers/email-outreach/*/config.ts).
+  // The stored encrypted per-workspace connection is tried first; the env
+  // var only seeds/falls back. Presence alone never yields Connected.
+  { name: "EMAILBISON_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "EmailBison API key — server-side env fallback for the EmailBison email-outreach credential (stored encrypted connection tried first)." },
+  { name: "INSTANTLY_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Instantly API key — server-side env fallback for the Instantly email-outreach credential (stored encrypted connection tried first)." },
+  { name: "LEMLIST_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Lemlist API key — server-side env fallback for the Lemlist email-outreach credential (stored encrypted connection tried first)." },
+  { name: "MAILSHAKE_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Mailshake API key — server-side env fallback for the Mailshake email-outreach credential (stored encrypted connection tried first)." },
+  { name: "MASTERINBOX_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Master Inbox API key — server-side env fallback for the Master Inbox email-outreach credential (stored encrypted connection tried first)." },
+  { name: "REPLY_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Reply.io API key — server-side env fallback for the Reply email-outreach credential (stored encrypted connection tried first)." },
+  { name: "SMARTLEAD_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Smartlead API key — server-side env fallback for the Smartlead email-outreach credential (stored encrypted connection tried first)." },
+  { name: "SMARTREACH_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "SmartReach.io API key — server-side env fallback for the SmartReach email-outreach credential (stored encrypted connection tried first)." },
+  { name: "SNOV_API_USER_ID", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Snov.io API user ID (email-outreach OAuth pair with SNOV_API_SECRET) — server-side env fallback for the Snov email-outreach credential (stored encrypted connection tried first)." },
+  { name: "SNOV_API_SECRET", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Snov.io API secret (email-outreach OAuth pair with SNOV_API_USER_ID) — server-side env fallback for the Snov email-outreach credential (stored encrypted connection tried first)." },
+  { name: "WOODPECKER_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Woodpecker API key — server-side env fallback for the Woodpecker email-outreach credential (stored encrypted connection tried first)." },
+  { name: "HOTHAWK_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "HotHawk API key — server-side env fallback for the HotHawk email-outreach credential (stored encrypted connection tried first)." },
+
+  // ── Lead Enrichment provider credentials ─────────────────────────
+  // Server-side env fallback for each adapter's credential (the name
+  // declared in src/lib/integrations/providers/enrichment/*/config.ts,
+  // read via resolveProviderApiKey in enrichment/common.ts). The stored
+  // encrypted per-workspace connection is tried first.
+  { name: "APIFY_TOKEN", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Apify API token — server-side env fallback for the Apify lead-enrichment credential (stored encrypted connection tried first)." },
+  { name: "APOLLO_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Apollo API key — server-side env fallback for the Apollo lead-enrichment credential (stored encrypted connection tried first)." },
+  { name: "CLAY_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Clay API key — server-side env fallback for the Clay lead-enrichment credential (stored encrypted connection tried first)." },
+  { name: "CONTACTOUT_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "ContactOut API key — server-side env fallback for the ContactOut lead-enrichment credential (stored encrypted connection tried first)." },
+  { name: "DROPCONTACT_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Dropcontact API key — server-side env fallback for the Dropcontact lead-enrichment credential (stored encrypted connection tried first)." },
+  { name: "FACTORS_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Factors.ai API key — server-side env fallback for the Factors lead-enrichment credential (stored encrypted connection tried first)." },
+  { name: "HUNTER_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Hunter API key — server-side env fallback for the Hunter lead-enrichment and Hunter email-verification credentials (shared name; stored encrypted connection tried first)." },
+  { name: "PERSANA_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Persana API key — server-side env fallback for the Persana lead-enrichment credential (stored encrypted connection tried first)." },
+  { name: "RB2B_WEBHOOK_SECRET", group: "integrations", visibility: "server", requiredForLive: false, purpose: "RB2B webhook secret — server-side env fallback for the RB2B lead-enrichment credential (stored encrypted connection tried first). RB2B delivers via webhook, not a polling API key." },
+  { name: "SALESQL_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "SalesQL API key — server-side env fallback for the SalesQL lead-enrichment credential (stored encrypted connection tried first)." },
+  { name: "SNOV_CLIENT_ID", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Snov.io OAuth client ID (enrichment OAuth pair with SNOV_CLIENT_SECRET) — server-side env fallback for the Snov lead-enrichment credential (stored encrypted connection tried first). Distinct from the SNOV_API_USER_ID / SNOV_API_SECRET outreach pair." },
+  { name: "SNOV_CLIENT_SECRET", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Snov.io OAuth client secret (enrichment OAuth pair with SNOV_CLIENT_ID) — server-side env fallback for the Snov lead-enrichment credential (stored encrypted connection tried first)." },
+  { name: "ZOOMINFO_CLIENT_ID", group: "integrations", visibility: "server", requiredForLive: false, purpose: "ZoomInfo OAuth client ID (pair with ZOOMINFO_CLIENT_SECRET) — server-side env fallback for the ZoomInfo lead-enrichment credential (stored encrypted connection tried first)." },
+  { name: "ZOOMINFO_CLIENT_SECRET", group: "integrations", visibility: "server", requiredForLive: false, purpose: "ZoomInfo OAuth client secret (pair with ZOOMINFO_CLIENT_ID) — server-side env fallback for the ZoomInfo lead-enrichment credential (stored encrypted connection tried first)." },
+  { name: "ZOOMINFO_ACCESS_TOKEN", group: "integrations", visibility: "server", requiredForLive: false, purpose: "ZoomInfo access token — server-side env fallback for the ZoomInfo lead-enrichment credential (stored encrypted connection tried first)." },
+  { name: "GETLEADS_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "GetLeads API key — server-side env fallback for the GetLeads lead-enrichment credential (stored encrypted connection tried first)." },
+  { name: "CORNERSIGHT_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "CornerSight API key — server-side env fallback for the CornerSight lead-enrichment credential (stored encrypted connection tried first)." },
+
+  // ── Email Verification provider credentials ───────────────────────
+  // Server-side env fallback for each adapter's credential (the name
+  // declared in src/lib/integrations/providers/verification/*/config.ts,
+  // read via resolveProviderApiKey re-exported from verification/common.ts).
+  // The stored encrypted per-workspace connection is tried first.
+  { name: "BOUNCER_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Bouncer API key — server-side env fallback for the Bouncer email-verification credential (stored encrypted connection tried first)." },
+  { name: "MILLIONVERIFIER_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "MillionVerifier API key — server-side env fallback for the MillionVerifier email-verification credential (stored encrypted connection tried first)." },
+  { name: "NEVERBOUNCE_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "NeverBounce API key — server-side env fallback for the NeverBounce email-verification credential (stored encrypted connection tried first)." },
+  { name: "ZEROBOUNCE_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "ZeroBounce API key — server-side env fallback for the ZeroBounce email-verification credential (stored encrypted connection tried first)." },
+
+  // ── Communication provider credentials ────────────────────────────
+  // Server-side env fallback for each adapter's credential (the name
+  // declared in src/lib/integrations/providers/communication/*/config.ts).
+  // The stored encrypted per-workspace connection is tried first.
+  { name: "DISCORD_WEBHOOK_URL", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Discord incoming webhook URL — server-side env fallback for the Discord communication credential (stored encrypted connection tried first)." },
+  { name: "SLACK_WEBHOOK_URL", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Slack incoming webhook URL — server-side env fallback for the Slack communication credential (stored encrypted connection tried first)." },
+  { name: "SLACK_BOT_TOKEN", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Slack bot token — server-side env fallback for the Slack communication credential (stored encrypted connection tried first)." },
+  { name: "TEAMS_WEBHOOK_URL", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Microsoft Teams incoming webhook URL — server-side env fallback for the Teams communication credential (stored encrypted connection tried first)." },
+  { name: "TELEGRAM_BOT_TOKEN", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Telegram bot token — server-side env fallback for the Telegram communication credential (stored encrypted connection tried first)." },
+  { name: "WHATSAPP_ACCESS_TOKEN", group: "integrations", visibility: "server", requiredForLive: false, purpose: "WhatsApp Business API access token — server-side env fallback for the WhatsApp communication credential (stored encrypted connection tried first)." },
+
+  // ── Productivity provider credentials ─────────────────────────────
+  // Server-side env fallback for each adapter's credential (the name
+  // declared in src/lib/integrations/providers/productivity/*/config.ts).
+  // The stored encrypted per-workspace connection is tried first.
+  { name: "AIRTABLE_PAT", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Airtable personal access token — server-side env fallback for the Airtable productivity credential (stored encrypted connection tried first)." },
+  { name: "ASANA_ACCESS_TOKEN", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Asana personal access token — server-side env fallback for the Asana productivity credential (stored encrypted connection tried first)." },
+  { name: "CALENDLY_ACCESS_TOKEN", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Calendly personal access token — server-side env fallback for the Calendly productivity credential (stored encrypted connection tried first)." },
+  { name: "CLICKUP_API_TOKEN", group: "integrations", visibility: "server", requiredForLive: false, purpose: "ClickUp API token — server-side env fallback for the ClickUp productivity credential (stored encrypted connection tried first)." },
+  { name: "JIRA_API_TOKEN", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Jira API token — server-side env fallback for the Jira productivity credential (stored encrypted connection tried first)." },
+  { name: "LINEAR_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Linear API key — server-side env fallback for the Linear productivity credential (stored encrypted connection tried first)." },
+  { name: "MONDAY_API_TOKEN", group: "integrations", visibility: "server", requiredForLive: false, purpose: "monday.com API token — server-side env fallback for the monday.com productivity and CRM credentials (stored encrypted connection tried first)." },
+  { name: "NOTION_TOKEN", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Notion internal integration token — server-side env fallback for the Notion productivity credential (stored encrypted connection tried first)." },
+  { name: "TRELLO_API_KEY", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Trello API key (pair with TRELLO_TOKEN) — server-side env fallback for the Trello productivity credential (stored encrypted connection tried first)." },
+  { name: "TRELLO_TOKEN", group: "integrations", visibility: "server", requiredForLive: false, purpose: "Trello token (pair with TRELLO_API_KEY) — server-side env fallback for the Trello productivity credential (stored encrypted connection tried first)." },
 ];
 
 export function classifyEnvValue(

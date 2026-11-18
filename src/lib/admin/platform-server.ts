@@ -82,6 +82,12 @@ import {
 } from "@/lib/muse-connector/oauth/config";
 import { countActiveMuseGrants, countActiveGrantsByOrigin } from "@/lib/muse-connector/grants";
 import { isZapierEnabled, getZapierBaseUrl } from "@/lib/integrations/zapier/config";
+import {
+  getPlatformBaseUrl,
+  isPlatformEnabled,
+  type RestPlatform,
+} from "@/lib/integrations/rest/config";
+import { listProviderDisabledFlags } from "@/lib/admin/integration-monitoring";
 import { isN8nEnabled, getN8nBaseUrl } from "@/lib/integrations-center/status";
 import { PLAN_CATALOG } from "@/lib/billing/plans";
 import {
@@ -1452,6 +1458,132 @@ export async function getSystemHealth(mode: DataMode): Promise<HealthSummary> {
             ? `n8n REST surface is configured at ${n8nBaseUrl}; no active grants yet (no n8n user has connected).`
             : `n8n REST surface is configured at ${n8nBaseUrl}; ${n8nGrants} active grant(s) platform-wide (upper bound — see the admin n8n panel).`,
       });
+    }
+  }
+
+  // ── Make / Pabbly / Albato / Activepieces (REST API + webhooks) ─────────
+  // Same shape as the Zapier check, via the shared REST platform
+  // config (src/lib/integrations/rest/config.ts): configured when the
+  // platform flag is on and a public URL is set. Grants are NOT
+  // counted per platform here — grants_by_origin classifies only
+  // Muse / ChatGPT / Claude / Zapier / n8n, so a Make (or Pabbly /
+  // Albato / Activepieces) client lands in "Other" and a per-platform
+  // grant count would be invented. The message says so instead of
+  // claiming a number. Zero grants is normal, not a failure.
+  const automationPlatforms: Array<{ id: RestPlatform; label: string; flag: string }> = [
+    { id: "make", label: "Make", flag: "MAKE_ENABLED" },
+    { id: "pabbly", label: "Pabbly Connect", flag: "PABBLY_ENABLED" },
+    { id: "albato", label: "Albato", flag: "ALBATO_ENABLED" },
+    { id: "activepieces", label: "Activepieces", flag: "ACTIVEPIECES_ENABLED" },
+  ];
+  for (const platform of automationPlatforms) {
+    if (mode === "demo") {
+      checks.push({
+        id: platform.id,
+        label: `${platform.label} connector (REST API + OAuth)`,
+        status: "warning",
+        required: false,
+        message: `Demo Mode: the ${platform.label} REST API + webhook surface is unavailable — no grants can be issued or used.`,
+      });
+      continue;
+    }
+    const enabled = isPlatformEnabled(platform.id);
+    const baseUrl = getPlatformBaseUrl(platform.id);
+    if (!enabled) {
+      checks.push({
+        id: platform.id,
+        label: `${platform.label} connector (REST API + OAuth)`,
+        status: "warning",
+        required: false,
+        message: `${platform.label} REST surface is disabled (${platform.flag} is false).`,
+      });
+    } else if (!baseUrl) {
+      checks.push({
+        id: platform.id,
+        label: `${platform.label} connector (REST API + OAuth)`,
+        status: "warning",
+        required: false,
+        message: `${platform.label} REST surface is enabled but no public URL is set (${platform.flag} base URL or NEXT_PUBLIC_APP_URL).`,
+      });
+    } else {
+      checks.push({
+        id: platform.id,
+        label: `${platform.label} connector (REST API + OAuth)`,
+        status: "ok",
+        required: false,
+        message: `${platform.label} REST surface is configured at ${baseUrl}; grants for this platform are not tracked separately (they classify as "Other" in grants by origin).`,
+      });
+    }
+  }
+
+  // ── Provider adapters (config-ready, stored connections) ────────────────
+  // Platform-wide rollup over `integration_connections` (migration
+  // 030): how many providers have stored connections, how many
+  // workspaces are connected, how many connections are in error
+  // state, and how many providers an admin has disabled (migration
+  // 038). Only counts and statuses — the encrypted credential blob
+  // is never selected. A table that cannot be read reports unknown
+  // (warning), never zero.
+  if (mode === "demo") {
+    checks.push({
+      id: "provider-adapters",
+      label: "Provider adapters (stored connections)",
+      status: "warning",
+      required: false,
+      message:
+        "Demo Mode: no stored provider connections exist — the 60+ config-ready adapters have no connections in demo.",
+    });
+  } else {
+    const adaptersAdmin = createAdminClient();
+    if (!adaptersAdmin) {
+      checks.push({
+        id: "provider-adapters",
+        label: "Provider adapters (stored connections)",
+        status: "warning",
+        required: false,
+        message: "Service role client is not configured — stored provider connections could not be read.",
+      });
+    } else {
+      const { data, error } = await adaptersAdmin
+        .from("integration_connections")
+        .select("provider, workspace_id, status");
+      const { flags, unknown: flagsUnknown } = await listProviderDisabledFlags(
+        adaptersAdmin
+      ).catch(() => ({ flags: [], unknown: true }));
+      if (error) {
+        checks.push({
+          id: "provider-adapters",
+          label: "Provider adapters (stored connections)",
+          status: "warning",
+          required: false,
+          message: `Stored provider connections could not be read — migration 030 may not be applied to this project.`,
+        });
+      } else {
+        const rows = (data ?? []) as Array<Record<string, unknown>>;
+        const providers = new Set(rows.map((r) => String(r.provider ?? "")));
+        const connectedWorkspaces = new Set(
+          rows
+            .filter((r) => r.status === "connected")
+            .map((r) => String(r.workspace_id ?? ""))
+        );
+        const errorCount = rows.filter((r) => r.status === "error").length;
+        const disabledCount = flags.filter((f) => f.disabled).length;
+        const flagsNote = flagsUnknown
+          ? " Disabled-provider flags could not be read (migration 038 may not be applied)."
+          : disabledCount > 0
+            ? ` ${disabledCount} provider(s) disabled by an admin.`
+            : "";
+        checks.push({
+          id: "provider-adapters",
+          label: "Provider adapters (stored connections)",
+          status: errorCount > 0 || disabledCount > 0 ? "warning" : "ok",
+          required: false,
+          message:
+            rows.length === 0
+              ? `No stored provider connections yet (no workspace has connected a config-ready adapter).${flagsNote}`
+              : `${rows.length} stored connection(s) across ${providers.size} provider(s); ${connectedWorkspaces.size} workspace(s) connected; ${errorCount} connection(s) in error state.${flagsNote}`,
+        });
+      }
     }
   }
 

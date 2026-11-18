@@ -13,16 +13,15 @@
  * Milestone 2 providers (CRM, email outreach, enrichment, verification,
  * communication, productivity, automation, AI MCP clients): their
  * credentials are stored encrypted per workspace in
- * integration_connections, NOT in env vars — the adapter configs name a
- * server-side env fallback (e.g. APOLLO_API_KEY) that .env.example does
- * not define, so those names are documented in each entry's setup steps
- * instead of listed here (listing them would fail the consistency test).
- * Only env names that .env.example already defines appear in envVars
- * (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET for the Google providers,
- * TOKEN_ENCRYPTION_KEY for the shared-OAuth platforms). Every new entry
- * therefore has envVars [] unless noted, and derives status
- * "Not Connected" until a credential is stored — key presence alone
- * never yields Connected.
+ * integration_connections, NOT in env vars — but the adapter configs
+ * name a server-side env fallback (e.g. APOLLO_API_KEY) that
+ * .env.example defines, so those names ARE listed in each entry's
+ * envVars below (required: false — the stored connection is tried
+ * first). A provider whose adapter declares no env fallback (CRM
+ * providers: stored-credential only) or whose provider is blocked /
+ * not implemented (Clearbit, Trigify, Weezly — do not enter
+ * credentials) keeps envVars []. Key presence alone never yields
+ * Connected.
  */
 
 import type { IntegrationDescriptor, IntegrationStatusEntry } from "./types";
@@ -847,7 +846,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Board items as leads: list via items_page, create via create_item, update via change_multiple_column_values (GraphQL API v2) — implemented, NOT live-verified. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://developer.monday.com/api-reference/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "MONDAY_API_TOKEN", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Monday.com credential — the stored encrypted per-workspace connection is tried first. API token (avatar → Administration → API, or Developers → My Access Tokens)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Board items as leads: list via items_page, create via create_item, update via change_multiple_column_values (GraphQL API v2) — implemented, NOT live-verified",
       "Status sync via a status column (change_column_value) when configured — implemented, NOT live-verified",
@@ -958,7 +959,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Connection test only (GET /api/users) — verified. Authenticates with a Bearer token stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://docs.emailbison.com/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "EMAILBISON_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the EmailBison credential — the stored encrypted per-workspace connection is tried first. API token (Settings > Developer API > New API Token)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Connection test only (GET /api/users) — verified",
       "Campaign list, lead add / attach, reply and bounce sync: NOT implemented — endpoint paths were not verified against docs.emailbison.com (config-ready)",
@@ -983,7 +986,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "List campaigns (GET /campaigns) — verified. Authenticates with a Bearer token stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://developer.instantly.ai/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "INSTANTLY_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Instantly credential — the stored encrypted per-workspace connection is tried first. API v2 key (Settings > Integrations > API Keys, Version 2; Growth plan or above)." + VERCEL_HINT },
+    ],
     capabilities: [
       "List campaigns (GET /campaigns) — verified",
       "Add up to 1,000 leads to a campaign in one call (POST /leads/add) with an idempotency key, so a retried batch does not duplicate leads — verified",
@@ -1011,7 +1016,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "List campaigns (GET /campaigns) — verified. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://developer.lemlist.com/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "LEMLIST_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Lemlist credential — the stored encrypted per-workspace connection is tried first. API key (Settings > Integrations > API Key)." + VERCEL_HINT },
+    ],
     capabilities: [
       "List campaigns (GET /campaigns) — verified",
       "List / add leads in a campaign (GET /campaigns/{id}/leads, POST /campaigns/{id}/leads) — verified",
@@ -1039,7 +1046,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Connection test (GET /me) — verified. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://api-docs.mailshake.com/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "MAILSHAKE_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Mailshake credential — the stored encrypted per-workspace connection is tried first. API key (Extensions > API > Create API Key)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Connection test (GET /me) — verified",
       "List campaigns (POST /campaigns/list) — verified",
@@ -1068,7 +1077,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Unified-inbox aggregator for replies from Instantly, Smartlead, EmailBison, Reply.io, Lemlist and others — NxtSend does NOT send campaigns through Master Inbox. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://masterinbox.com/api",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "MASTERINBOX_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Master Inbox credential — the stored encrypted per-workspace connection is tried first. API key (Settings > APIs > Create new key). Header scheme not verified — no live call is made until a read endpoint is verified." + VERCEL_HINT },
+    ],
     capabilities: [
       "Unified-inbox aggregator for replies from Instantly, Smartlead, EmailBison, Reply.io, Lemlist and others — NxtSend does NOT send campaigns through Master Inbox",
       "Connection test, reply sync, bounce sync: NOT implemented — no endpoint path was verified against the public OpenAPI reference (config-ready)",
@@ -1094,7 +1105,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Upsert contacts (POST /v1/people — email is the unique identifier; linkedInUrl is a supported field) — verified. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://docs.reply.io",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "REPLY_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Reply.io credential — the stored encrypted per-workspace connection is tried first. API key (Settings > API Key)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Upsert contacts (POST /v1/people — email is the unique identifier; linkedInUrl is a supported field) — verified",
       "Suppression-checked export — a suppressed lead is never sent",
@@ -1120,7 +1133,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "List campaigns (GET /campaigns/) — verified. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://api.smartlead.ai/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "SMARTLEAD_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Smartlead credential — the stored encrypted per-workspace connection is tried first. API key (Settings > API Keys)." + VERCEL_HINT },
+    ],
     capabilities: [
       "List campaigns (GET /campaigns/) — verified",
       "Add up to 400 leads per call (POST /campaigns/{id}/leads, { lead_list: [...] }) — verified; the official getting-started guide uses this exact body",
@@ -1148,7 +1163,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "List campaigns and get one campaign (GET /campaigns, GET /campaigns/{id}) — verified. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://help.smartreach.io/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "SMARTREACH_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the SmartReach credential — the stored encrypted per-workspace connection is tried first. REST API key (Settings > Integrations > SmartReach API > Get API Key)." + VERCEL_HINT },
+    ],
     capabilities: [
       "List campaigns and get one campaign (GET /campaigns, GET /campaigns/{id}) — verified",
       "List / get prospects (GET /prospects, GET /prospects/{id}) — verified",
@@ -1176,7 +1193,12 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "OAuth client-credentials token exchange (POST /v1/oauth/access_token, 1-hour token) — verified; token is cached in memory and refreshed on expiry. Authenticates with OAuth 2.0; tokens are stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://snov.io/api",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "SNOV_API_USER_ID", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Snov.io (email outreach) credential — the stored encrypted per-workspace connection is tried first. API User ID (Account > API). Exchanged with SNOV_API_SECRET for a 1-hour Bearer token." + VERCEL_HINT },
+      { name: "SNOV_API_SECRET", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Snov.io (email outreach) credential — the stored encrypted per-workspace connection is tried first. API Secret (Account > API). Stored as extra.client_secret on the credential." + VERCEL_HINT },
+      { name: "SNOV_CLIENT_ID", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Snov.io (enrichment) credential — the stored encrypted per-workspace connection is tried first. OAuth client ID (https://snov.io/api)." + VERCEL_HINT },
+      { name: "SNOV_CLIENT_SECRET", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Snov.io (enrichment) credential — the stored encrypted per-workspace connection is tried first. OAuth client secret." + VERCEL_HINT },
+    ],
     capabilities: [
       "OAuth client-credentials token exchange (POST /v1/oauth/access_token, 1-hour token) — verified; token is cached in memory and refreshed on expiry",
       "List campaigns (GET /v1/get-user-campaigns) — verified (also the connection test)",
@@ -1210,7 +1232,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Connection test (GET /v1/me) — verified. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://developers.woodpecker.co/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "WOODPECKER_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Woodpecker credential — the stored encrypted per-workspace connection is tried first. API key (Marketplace > Integrations > API keys > Create a key)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Connection test (GET /v1/me) — verified",
       "List / search prospects (GET /v1/prospects, campaigns_details=true) — verified",
@@ -1239,6 +1263,8 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     docsUrl: "https://www.activepieces.com/docs",
     kind: "adapter",
     envVars: [
+      { name: "ACTIVEPIECES_ENABLED", required: false, visibility: "server-only", purpose: "Set to \"false\" to disable the Activepieces REST API surface. Unset means enabled. It does NOT gate the OAuth routes." + VERCEL_HINT },
+      { name: "ACTIVEPIECES_API_BASE_URL", required: false, visibility: "server-only", purpose: "Public origin advertised for the Activepieces surface when it lives somewhere other than NEXT_PUBLIC_APP_URL." + VERCEL_HINT },
       { name: "TOKEN_ENCRYPTION_KEY", required: true, visibility: "server-only", purpose: "AES-256 key (base64 of 32 bytes; generate: openssl rand -base64 32) reused to sign the shared OAuth authorize-state token. Without it the authorize endpoint returns 503. Shared with the Gmail/Outlook and Muse.ai entries. Set it in Vercel → Project → Settings → Environment Variables (or .env.local for local development), then redeploy/restart." },
     ],
     capabilities: [
@@ -1268,6 +1294,8 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     docsUrl: "https://albato.com/en/wiki/articles/app-integrator-introduction",
     kind: "adapter",
     envVars: [
+      { name: "ALBATO_ENABLED", required: false, visibility: "server-only", purpose: "Set to \"false\" to disable the Albato REST API surface. Unset means enabled. It does NOT gate the OAuth routes." + VERCEL_HINT },
+      { name: "ALBATO_API_BASE_URL", required: false, visibility: "server-only", purpose: "Public origin advertised for the Albato surface when it lives somewhere other than NEXT_PUBLIC_APP_URL." + VERCEL_HINT },
       { name: "TOKEN_ENCRYPTION_KEY", required: true, visibility: "server-only", purpose: "AES-256 key (base64 of 32 bytes; generate: openssl rand -base64 32) reused to sign the shared OAuth authorize-state token. Without it the authorize endpoint returns 503. Shared with the Gmail/Outlook and Muse.ai entries. Set it in Vercel → Project → Settings → Environment Variables (or .env.local for local development), then redeploy/restart." },
     ],
     capabilities: [
@@ -1297,6 +1325,8 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     docsUrl: "https://developers.make.com",
     kind: "adapter",
     envVars: [
+      { name: "MAKE_ENABLED", required: false, visibility: "server-only", purpose: "Set to \"false\" to disable the Make REST API surface. Unset means enabled. It does NOT gate the OAuth routes." + VERCEL_HINT },
+      { name: "MAKE_API_BASE_URL", required: false, visibility: "server-only", purpose: "Public origin advertised for the Make surface when it lives somewhere other than NEXT_PUBLIC_APP_URL." + VERCEL_HINT },
       { name: "TOKEN_ENCRYPTION_KEY", required: true, visibility: "server-only", purpose: "AES-256 key (base64 of 32 bytes; generate: openssl rand -base64 32) reused to sign the shared OAuth authorize-state token. Without it the authorize endpoint returns 503. Shared with the Gmail/Outlook and Muse.ai entries. Set it in Vercel → Project → Settings → Environment Variables (or .env.local for local development), then redeploy/restart." },
     ],
     capabilities: [
@@ -1327,6 +1357,8 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     docsUrl: "https://www.pabbly.com/pabbly-connect-documentation-complete-integration-guide/",
     kind: "adapter",
     envVars: [
+      { name: "PABBLY_ENABLED", required: false, visibility: "server-only", purpose: "Set to \"false\" to disable the Pabbly Connect REST API surface. Unset means enabled. It does NOT gate the OAuth routes." + VERCEL_HINT },
+      { name: "PABBLY_API_BASE_URL", required: false, visibility: "server-only", purpose: "Public origin advertised for the Pabbly Connect surface when it lives somewhere other than NEXT_PUBLIC_APP_URL." + VERCEL_HINT },
       { name: "TOKEN_ENCRYPTION_KEY", required: true, visibility: "server-only", purpose: "AES-256 key (base64 of 32 bytes; generate: openssl rand -base64 32) reused to sign the shared OAuth authorize-state token. Without it the authorize endpoint returns 503. Shared with the Gmail/Outlook and Muse.ai entries. Set it in Vercel → Project → Settings → Environment Variables (or .env.local for local development), then redeploy/restart." },
     ],
     capabilities: [
@@ -1443,7 +1475,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Run an operator-chosen Store Actor (async run + dataset read) Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://docs.apify.com/api/v2",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "APIFY_TOKEN", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Apify credential — the stored encrypted per-workspace connection is tried first. API token (https://docs.apify.com/api/v2)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Run an operator-chosen Store Actor (async run + dataset read)",
       "Dataset items mapped generically onto lead fields",
@@ -1468,7 +1502,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Enrich one person by email, name + employer, or LinkedIn URL. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://docs.apollo.io/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "APOLLO_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Apollo.io credential — the stored encrypted per-workspace connection is tried first. API key (https://docs.apollo.io/)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Enrich one person by email, name + employer, or LinkedIn URL",
       "Bulk enrichment (up to 10 people per call)",
@@ -1495,7 +1531,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Run an operator-configured enrichment routine (1–100 items inline) Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://developers.clay.com",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "CLAY_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Clay credential — the stored encrypted per-workspace connection is tried first. API key (https://developers.clay.com)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Run an operator-configured enrichment routine (1–100 items inline)",
       "Batch routine runs via JSONL upload",
@@ -1543,7 +1581,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Enrich a person from a LinkedIn profile URL. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://contactout.com/api_docs/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "CONTACTOUT_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the ContactOut credential — the stored encrypted per-workspace connection is tried first. API key (https://contactout.com/api_docs/)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Enrich a person from a LinkedIn profile URL",
       "Enrich a person by email or name + company",
@@ -1568,7 +1608,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Batch person enrichment (up to 250 contacts per batch, async) Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://developer.dropcontact.com/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "DROPCONTACT_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Dropcontact credential — the stored encrypted per-workspace connection is tried first. API key (https://developer.dropcontact.com/)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Batch person enrichment (up to 250 contacts per batch, async)",
       "Verified work emails with qualification",
@@ -1594,7 +1636,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Config-ready only — Factors API reference not verified; endpoints unverified. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://help.factors.ai/en/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "FACTORS_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Factors.ai credential — the stored encrypted per-workspace connection is tried first. API key (https://help.factors.ai/en/). Config-ready only — the API reference was not verified." + VERCEL_HINT },
+    ],
     capabilities: [
       "Config-ready only — Factors API reference not verified; endpoints unverified",
     ],
@@ -1618,7 +1662,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Domain search (all emails at a company) Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://hunter.io/api-documentation",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "HUNTER_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Hunter.io credential — the stored encrypted per-workspace connection is tried first. API key (https://hunter.io/api-documentation). Shared with the Hunter Email Verifier entry." + VERCEL_HINT },
+    ],
     capabilities: [
       "Domain search (all emails at a company)",
       "Email finder with 0–100 confidence",
@@ -1645,7 +1691,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Config-ready only — no public API reference found; endpoints unverified. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://persana.ai/full-contact-api",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "PERSANA_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Persana AI credential — the stored encrypted per-workspace connection is tried first. API key (https://persana.ai/full-contact-api). Config-ready only — no public API reference found." + VERCEL_HINT },
+    ],
     capabilities: [
       "Config-ready only — no public API reference found; endpoints unverified",
     ],
@@ -1669,7 +1717,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Webhook-only visitor identification (no pull API) RB2B posts visitor payloads to NxtSend (webhook-only, no pull API) and covers US traffic only. The webhook secret is stored encrypted per workspace in integration_connections.",
     docsUrl: "https://support.rb2b.com/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "RB2B_WEBHOOK_SECRET", required: false, visibility: "server-only", purpose: "Server-side env fallback for the RB2B credential — the stored encrypted per-workspace connection is tried first. Webhook secret (https://support.rb2b.com/). Webhook-only, US traffic only." + VERCEL_HINT },
+    ],
     capabilities: [
       "Webhook-only visitor identification (no pull API)",
       "Maps inbound visitor payloads onto lead fields",
@@ -1695,7 +1745,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Enrich a person by LinkedIn URL, email, or name + company. Authenticates with a Bearer token stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://salesql.com/api",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "SALESQL_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the SalesQL credential — the stored encrypted per-workspace connection is tried first. API key (https://salesql.com/api)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Enrich a person by LinkedIn URL, email, or name + company",
       "Verified work and personal emails with status",
@@ -1767,7 +1819,11 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Contact enrichment (legacy Enterprise API paths; GTM API paths unverified — see adapter config) Authenticates with OAuth 2.0; tokens are stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://docs.gtm.ai/docs/overview",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "ZOOMINFO_CLIENT_ID", required: false, visibility: "server-only", purpose: "Server-side env fallback for the ZoomInfo credential — the stored encrypted per-workspace connection is tried first. OAuth client ID (https://docs.gtm.ai/docs/overview)." + VERCEL_HINT },
+      { name: "ZOOMINFO_CLIENT_SECRET", required: false, visibility: "server-only", purpose: "Server-side env fallback for the ZoomInfo credential — the stored encrypted per-workspace connection is tried first. OAuth client secret." + VERCEL_HINT },
+      { name: "ZOOMINFO_ACCESS_TOKEN", required: false, visibility: "server-only", purpose: "Server-side env fallback for the ZoomInfo credential — the stored encrypted per-workspace connection is tried first. Access token for the legacy Enterprise API paths." + VERCEL_HINT },
+    ],
     capabilities: [
       "Contact enrichment (legacy Enterprise API paths; GTM API paths unverified — see adapter config)",
       "Company enrichment",
@@ -1793,7 +1849,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Single email verification. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://www.usebouncer.com/api-documentation/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "BOUNCER_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Bouncer credential — the stored encrypted per-workspace connection is tried first. API key (https://www.usebouncer.com/api-documentation/)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Single email verification",
       "Bulk verification (sequential single checks; batch result-retrieval path unverified)",
@@ -1819,7 +1877,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Single email verification. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://hunter.io/api-documentation",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "HUNTER_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Hunter Email Verifier credential — the stored encrypted per-workspace connection is tried first. API key (https://hunter.io/api-documentation). Shared with the Hunter.io enrichment entry." + VERCEL_HINT },
+    ],
     capabilities: [
       "Single email verification",
       "Bulk verification (sequential single checks)",
@@ -1845,7 +1905,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Single email verification. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://developer.millionverifier.com",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "MILLIONVERIFIER_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the MillionVerifier credential — the stored encrypted per-workspace connection is tried first. API key (https://developer.millionverifier.com)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Single email verification",
       "Bulk verification (sequential single checks)",
@@ -1871,7 +1933,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Single email verification. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://developers.neverbounce.com/v4.0/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "NEVERBOUNCE_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the NeverBounce credential — the stored encrypted per-workspace connection is tried first. API key (https://developers.neverbounce.com/v4.0/)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Single email verification",
       "Bulk verification (sequential single checks; Jobs API is form-encoded and not used)",
@@ -1897,7 +1961,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Single email verification. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://www.zerobounce.net/docs/email-validation-api-quickstart/v2-validate-emails",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "ZEROBOUNCE_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the ZeroBounce credential — the stored encrypted per-workspace connection is tried first. API key (https://www.zerobounce.net/docs/email-validation-api-quickstart/v2-validate-emails)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Single email verification",
       "Native batch verification (up to 100 per call, with single-check fallback)",
@@ -1923,7 +1989,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Send NxtSend alerts to a Discord channel via a channel webhook (POST /api/v10/webhooks/{id}/{token}) — one-way, no bot account needed. Connects via webhook; the webhook URL or secret is stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://discord.com/developers/docs/resources/webhook",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "DISCORD_WEBHOOK_URL", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Discord credential — the stored encrypted per-workspace connection is tried first. Channel webhook URL (https://discord.com/api/webhooks/<id>/<token>). The URL itself is the credential." + VERCEL_HINT },
+    ],
     capabilities: [
       "Send NxtSend alerts to a Discord channel via a channel webhook (POST /api/v10/webhooks/{id}/{token}) — one-way, no bot account needed",
       "Config-ready: no live Discord webhook has been connected from this environment; delivery is mock-tested only",
@@ -1947,7 +2015,10 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Send NxtSend alerts (new lead, new reply, interested lead, campaign status, daily report, sync error) to a Slack channel. Authenticates with OAuth 2.0; tokens are stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://docs.slack.dev/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "SLACK_WEBHOOK_URL", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Slack credential — the stored encrypted per-workspace connection is tried first. Incoming-webhook URL for the target channel. The URL itself is the credential." + VERCEL_HINT },
+      { name: "SLACK_BOT_TOKEN", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Slack credential — the stored encrypted per-workspace connection is tried first. Bot token (xoxb-…) with chat:write, for chat.postMessage delivery when no webhook is stored." + VERCEL_HINT },
+    ],
     capabilities: [
       "Send NxtSend alerts (new lead, new reply, interested lead, campaign status, daily report, sync error) to a Slack channel",
       "Two delivery paths: incoming webhook (one URL per channel) or bot token + chat.postMessage (chat:write) — webhook is the default",
@@ -1972,7 +2043,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Send NxtSend alerts to a Teams channel via a Teams Workflows webhook (the Office 365 Connector / incoming-webhook path is deprecated — new webhooks must be created as Workflows) Connects via webhook; the webhook URL or secret is stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://learn.microsoft.com/en-us/microsoftteams/platform/webhooks-and-connectors/what-are-webhooks-and-connectors",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "TEAMS_WEBHOOK_URL", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Microsoft Teams credential — the stored encrypted per-workspace connection is tried first. Teams Workflows webhook URL for the target channel." + VERCEL_HINT },
+    ],
     capabilities: [
       "Send NxtSend alerts to a Teams channel via a Teams Workflows webhook (the Office 365 Connector / incoming-webhook path is deprecated — new webhooks must be created as Workflows)",
       "Microsoft Graph channel-message sending is NOT implemented: Graph application permissions cannot send channel messages (delegated ChatMessage.Send / ChannelMessage.Send only), so the webhook is the supported path",
@@ -1998,7 +2071,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Send NxtSend alerts to a Telegram chat / group / channel via the Bot API (POST /bot<token>/sendMessage) — bot token from @BotFather, no OAuth. Authenticates with a Bearer token stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://core.telegram.org/bots/api",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "TELEGRAM_BOT_TOKEN", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Telegram Bot credential — the stored encrypted per-workspace connection is tried first. Bot token from @BotFather (https://core.telegram.org/bots/api)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Send NxtSend alerts to a Telegram chat / group / channel via the Bot API (POST /bot<token>/sendMessage) — bot token from @BotFather, no OAuth",
       "A bot cannot start a conversation: the user must message the bot first, or the bot must be added to the target group/channel",
@@ -2023,7 +2098,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Send NxtSend alerts via the official Meta WhatsApp Business Cloud API only (POST /v21.0/{phone-number-id}/messages) — no unofficial workarounds. Authenticates with a Bearer token stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://developers.facebook.com/docs/whatsapp/cloud-api",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "WHATSAPP_ACCESS_TOKEN", required: false, visibility: "server-only", purpose: "Server-side env fallback for the WhatsApp Business Platform credential — the stored encrypted per-workspace connection is tried first. Permanent system-user access token with whatsapp_business_messaging. The temporary dashboard token lasts ~24h and is testing-only." + VERCEL_HINT },
+    ],
     capabilities: [
       "Send NxtSend alerts via the official Meta WhatsApp Business Cloud API only (POST /v21.0/{phone-number-id}/messages) — no unofficial workarounds",
       "Business-initiated messages outside the 24-hour customer-service window must use a Meta-approved template; free-form text only works inside an open window",
@@ -2049,7 +2126,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Export leads to an Airtable table (up to 10 records per request, chunked) and import records, with field mapping and email dedupe. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://airtable.com/developers/web/api/introduction",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "AIRTABLE_PAT", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Airtable credential — the stored encrypted per-workspace connection is tried first. Personal access token with data.records:read + data.records:write on the target base." + VERCEL_HINT },
+    ],
     capabilities: [
       "Export leads to an Airtable table (up to 10 records per request, chunked) and import records, with field mapping and email dedupe",
       "Authenticates with a personal access token (legacy API keys were shut off 1 Feb 2024); scopes data.records:read / data.records:write",
@@ -2074,7 +2153,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Create follow-up tasks from interested leads in an Asana project, and import tasks back to leads (best-effort: name + description lines the adapter wrote) Authenticates with OAuth 2.0; tokens are stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://developers.asana.com/reference/rest-api-reference",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "ASANA_ACCESS_TOKEN", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Asana credential — the stored encrypted per-workspace connection is tried first. Personal access token (Developer Console → Personal access tokens) or OAuth access token, with tasks:write." + VERCEL_HINT },
+    ],
     capabilities: [
       "Create follow-up tasks from interested leads in an Asana project, and import tasks back to leads (best-effort: name + description lines the adapter wrote)",
       "Authenticates with a personal access token (Bearer) or OAuth; task creation requires the tasks:write scope",
@@ -2099,7 +2180,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "List scheduled events and invitees, and generate a pre-filled scheduling link for a lead — Calendly API v2 cannot create events directly (booking happens on the scheduling link), so lead export is NOT supported. Authenticates with OAuth 2.0; tokens are stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://developer.calendly.com/api-docs",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "CALENDLY_ACCESS_TOKEN", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Calendly credential — the stored encrypted per-workspace connection is tried first. OAuth access token or personal access token (https://developer.calendly.com/api-docs)." + VERCEL_HINT },
+    ],
     capabilities: [
       "List scheduled events and invitees, and generate a pre-filled scheduling link for a lead — Calendly API v2 cannot create events directly (booking happens on the scheduling link), so lead export is NOT supported",
       "Authenticates with OAuth 2.0 (or a personal access token for internal use)",
@@ -2124,7 +2207,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Create follow-up tasks from interested leads in a ClickUp list, and import tasks back to leads (best-effort: name + description lines the adapter wrote) Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://developer.clickup.com/reference",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "CLICKUP_API_TOKEN", required: false, visibility: "server-only", purpose: "Server-side env fallback for the ClickUp credential — the stored encrypted per-workspace connection is tried first. Personal API token (pk_…) from Settings → Apps → API Token." + VERCEL_HINT },
+    ],
     capabilities: [
       "Create follow-up tasks from interested leads in a ClickUp list, and import tasks back to leads (best-effort: name + description lines the adapter wrote)",
       "Authenticates with a personal API token (Bearer); one request per task (no bulk create endpoint)",
@@ -2209,7 +2294,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Create follow-up issues from interested leads in a Jira Cloud project (ADF description) and import issues via JQL search, with field mapping. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://developer.atlassian.com/cloud/jira/platform/rest/v3/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "JIRA_API_TOKEN", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Jira credential — the stored encrypted per-workspace connection is tried first. API token from Atlassian account security settings (Basic auth with the account email). Jira Cloud only." + VERCEL_HINT },
+    ],
     capabilities: [
       "Create follow-up issues from interested leads in a Jira Cloud project (ADF description) and import issues via JQL search, with field mapping",
       "Authenticates with email + API token (Basic auth); Jira Cloud only — Data Center uses the v2 API and is not covered",
@@ -2234,7 +2321,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Create follow-up issues from interested leads in a Linear team (issueCreate) and import issues, with field mapping. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://linear.app/developers",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "LINEAR_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Linear credential — the stored encrypted per-workspace connection is tried first. Personal API key from Settings → API (or an OAuth access token)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Create follow-up issues from interested leads in a Linear team (issueCreate) and import issues, with field mapping",
       "GraphQL API at api.linear.app/graphql with a personal API key or OAuth token",
@@ -2259,7 +2348,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Export leads to a Notion database (create page, upsert by email) and import database rows, with field mapping and email dedupe. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://developers.notion.com/reference/intro",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "NOTION_TOKEN", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Notion credential — the stored encrypted per-workspace connection is tried first. Internal integration secret (ntn_… / secret_…). Create the integration in Notion → Settings → Connections, then share the target database with it." + VERCEL_HINT },
+    ],
     capabilities: [
       "Export leads to a Notion database (create page, upsert by email) and import database rows, with field mapping and email dedupe",
       "Authenticates with an internal integration secret (Bearer token) + Notion-Version header; the database must be shared with the integration",
@@ -2284,7 +2375,10 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Create follow-up cards from interested leads on a Trello list, and import cards back to leads (best-effort: name + description lines the adapter wrote) Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://developer.atlassian.com/cloud/trello/rest/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "TRELLO_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Trello credential — the stored encrypted per-workspace connection is tried first. API key from trello.com/app-key (identifies the app)." + VERCEL_HINT },
+      { name: "TRELLO_TOKEN", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Trello credential — the stored encrypted per-workspace connection is tried first. API token from trello.com/app-key (grants access to the account)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Create follow-up cards from interested leads on a Trello list, and import cards back to leads (best-effort: name + description lines the adapter wrote)",
       "Authenticates with an API key + token passed as query parameters",
@@ -2309,7 +2403,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Search and enrich contacts and companies. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://www.getleads.io/docs/",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "GETLEADS_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the GetLeads credential — the stored encrypted per-workspace connection is tried first. API key (https://www.getleads.io/docs/). Sent as Authorization: Bearer <keyId>_<secret> (or X-API-Key)." + VERCEL_HINT },
+    ],
     capabilities: [
       "Contact search (POST /api/v1/contacts/search, up to 5,000 rows/page) — implemented, NOT live-verified",
       "Person enrichment from LinkedIn URL, work email, or name + company (POST /api/v1/enrich/from-*) — implemented, NOT live-verified",
@@ -2336,7 +2432,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Find leads from LinkedIn engagement (intent signals, no emails). Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://app.cornersight.io/docs",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "CORNERSIGHT_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the Cornersight credential — the stored encrypted per-workspace connection is tried first. API key (cs_ prefix, https://app.cornersight.io/docs). Sent as the X-API-Key header. Cornersight leads carry no email." + VERCEL_HINT },
+    ],
     capabilities: [
       "LinkedIn-engagement leads: list enriched leads (GET /api/v1/leads) and per-person engagers (GET /api/v1/engagers) — implemented, NOT live-verified",
       "On-demand profile/company enrichment via async job (POST /api/v1/enrich/profile|company + GET /api/v1/jobs/{jobId}/status) — implemented, NOT live-verified",
@@ -2364,7 +2462,9 @@ export const INTEGRATION_REGISTRY: IntegrationDescriptor[] = [
     description: "Cold-email campaigns with CRM lead import. Authenticates with an API key stored encrypted per workspace in integration_connections. The adapter is implemented but has not been live-verified against a real account, so nothing is connected until a credential is stored.",
     docsUrl: "https://hothawk.ai/developers",
     kind: "adapter",
-    envVars: [],
+    envVars: [
+      { name: "HOTHAWK_API_KEY", required: false, visibility: "server-only", purpose: "Server-side env fallback for the HotHawk credential — the stored encrypted per-workspace connection is tried first. API key (https://hothawk.ai/developers). Sent as Authorization: Bearer. HotHawk /linkedin/* endpoints are not wired." + VERCEL_HINT },
+    ],
     capabilities: [
       "List campaigns + campaign leads (GET /v1/campaigns, GET /v1/campaigns/{id}/leads) — implemented, NOT live-verified",
       "List CRM leads and lists (GET /v1/crm/leads, GET /v1/crm/lists) — implemented, NOT live-verified",

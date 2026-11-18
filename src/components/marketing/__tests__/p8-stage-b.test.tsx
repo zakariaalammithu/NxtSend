@@ -8,8 +8,10 @@
  *   (P10 later moved the legal links into the footer Company & Legal
  *   column and Developers into Product; see p10-footer.test.tsx.)
  * - /developers documents ONLY what the code implements (outbound
- *   webhooks) and labels the public API "Coming Soon" / "API Access
- *   Required" — with no invented endpoints and no rate-limit numbers.
+ *   webhooks, plus the live public REST API for the automation
+ *   platforms with its real rate limit of 120 requests per minute)
+ *   — with no invented endpoints; SDKs and inbound webhooks stay
+ *   labelled "Coming Soon".
  * - /support describes billing as per-seat subscriptions; the word
  *   "credit" never appears (NxtSend has no credit/balance system).
  * - /terms, /privacy and /cookies no longer carry the draft-template
@@ -80,16 +82,18 @@ describe("P8 Stage B — /developers honesty", () => {
     expect(html).toContain("hello@nxtsend.com");
   });
 
-  it("labels the public API as not yet available", () => {
-    expect(html).toContain("API Access Required");
-    expect(html).toContain("Coming Soon");
+  it("documents the live public API (not Coming Soon)", () => {
+    expect(html).toContain("Public API");
+    expect(html).toContain("Live");
+    expect(html).toContain("120 requests per minute");
+    expect(html).toContain("/dashboard/developers");
+    expect(html).toContain("API keys");
   });
 
-  it("invents no REST endpoints and no rate-limit numbers", () => {
+  it("documents only real REST bases and the real rate limit", () => {
     expect(html).not.toContain("/api/v1");
-    expect(html).not.toMatch(
-      /\d+\s*(requests|req)\s*(per|\/)\s*(minute|second|hour|day)/i,
-    );
+    expect(html).toContain("/api/integrations/");
+    expect(html).toContain("120 requests per minute");
     expect(html).not.toMatch(/rate limit of \d+/i);
   });
 });

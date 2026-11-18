@@ -35,6 +35,85 @@ import type { OAuthScope } from "@/lib/muse-connector/oauth/scopes";
 import EmailAuthPanel from "@/components/integrations/EmailAuthPanel";
 import EmailRoutingPanel from "@/components/integrations/EmailRoutingPanel";
 import OAuthMailboxPanel from "@/components/integrations/OAuthMailboxPanel";
+import { getProviderDefinition } from "@/lib/integrations/providers/registry";
+import { displayStatusMessage } from "@/lib/integrations-center/registry";
+import type {
+  FieldMapping,
+  ProviderDefinition,
+} from "@/lib/integrations/providers/types";
+import { HUBSPOT_FIELD_MAPPINGS } from "@/lib/integrations/providers/crm/hubspot/config";
+import { SALESFORCE_FIELD_MAPPINGS } from "@/lib/integrations/providers/crm/salesforce/config";
+import { PIPEDRIVE_FIELD_MAPPINGS } from "@/lib/integrations/providers/crm/pipedrive/config";
+import { CLOSE_FIELD_MAPPINGS } from "@/lib/integrations/providers/crm/close/config";
+import { GOHIGHLEVEL_FIELD_MAPPINGS } from "@/lib/integrations/providers/crm/gohighlevel/config";
+import { ZOHO_FIELD_MAPPINGS } from "@/lib/integrations/providers/crm/zoho/config";
+import { ATTIO_FIELD_MAPPINGS } from "@/lib/integrations/providers/crm/attio/config";
+import { BREAKCOLD_FIELD_MAPPINGS } from "@/lib/integrations/providers/crm/breakcold/config";
+import { MONDAY_FIELD_MAPPINGS } from "@/lib/integrations/providers/crm/monday/config";
+import { INSTANTLY_FIELD_MAPPINGS } from "@/lib/integrations/providers/email-outreach/instantly/config";
+import { SMARTLEAD_FIELD_MAPPINGS } from "@/lib/integrations/providers/email-outreach/smartlead/config";
+import { EMAILBISON_FIELD_MAPPINGS } from "@/lib/integrations/providers/email-outreach/emailbison/config";
+import { MASTERINBOX_FIELD_MAPPINGS } from "@/lib/integrations/providers/email-outreach/masterinbox/config";
+import { SMARTREACH_FIELD_MAPPINGS } from "@/lib/integrations/providers/email-outreach/smartreach/config";
+import { REPLY_FIELD_MAPPINGS } from "@/lib/integrations/providers/email-outreach/reply/config";
+import { LEMLIST_FIELD_MAPPINGS } from "@/lib/integrations/providers/email-outreach/lemlist/config";
+import { SNOV_FIELD_MAPPINGS } from "@/lib/integrations/providers/email-outreach/snov/config";
+import { MAILSHAKE_FIELD_MAPPINGS } from "@/lib/integrations/providers/email-outreach/mailshake/config";
+import { WOODPECKER_FIELD_MAPPINGS } from "@/lib/integrations/providers/email-outreach/woodpecker/config";
+
+/**
+ * Field mappings published by the CRM + email-outreach adapters
+ * (their config files are the single source of truth — this record
+ * only re-exports them for display). Providers without an entry
+ * here have no fixed field map in their adapter config.
+ */
+const PROVIDER_FIELD_MAPPINGS: Record<string, FieldMapping[]> = {
+  hubspot: HUBSPOT_FIELD_MAPPINGS,
+  salesforce: SALESFORCE_FIELD_MAPPINGS,
+  pipedrive: PIPEDRIVE_FIELD_MAPPINGS,
+  close: CLOSE_FIELD_MAPPINGS,
+  gohighlevel: GOHIGHLEVEL_FIELD_MAPPINGS,
+  zoho: ZOHO_FIELD_MAPPINGS,
+  attio: ATTIO_FIELD_MAPPINGS,
+  breakcold: BREAKCOLD_FIELD_MAPPINGS,
+  monday: MONDAY_FIELD_MAPPINGS,
+  instantly: INSTANTLY_FIELD_MAPPINGS,
+  smartlead: SMARTLEAD_FIELD_MAPPINGS,
+  emailbison: EMAILBISON_FIELD_MAPPINGS,
+  masterinbox: MASTERINBOX_FIELD_MAPPINGS,
+  smartreach: SMARTREACH_FIELD_MAPPINGS,
+  reply: REPLY_FIELD_MAPPINGS,
+  lemlist: LEMLIST_FIELD_MAPPINGS,
+  snov: SNOV_FIELD_MAPPINGS,
+  mailshake: MAILSHAKE_FIELD_MAPPINGS,
+  woodpecker: WOODPECKER_FIELD_MAPPINGS,
+};
+
+const AUTH_TYPE_LABELS: Record<ProviderDefinition["authType"], string> = {
+  oauth2: "OAuth 2.0",
+  api_key: "API key",
+  bearer_token: "Bearer token",
+  webhook: "Webhook",
+  none: "None",
+};
+
+/**
+ * Milestone 2 provider adapters (everything wired in
+ * src/lib/integrations/providers/registry.ts) EXCEPT the five
+ * pre-existing live platforms, which keep their own panels and
+ * Test Connection behaviour: zapier, n8n, chatgpt, claude
+ * (muse-ai never resolves here — its provider id is "muse").
+ * These adapters have no server-side verification call
+ * (verify.ts has no case for them, so POST .../verify would 404),
+ * and their credentials live in the encrypted per-workspace
+ * connection store, not env vars.
+ */
+function isNewProviderAdapter(
+  id: string,
+  providerDef: ProviderDefinition | null
+): boolean {
+  return providerDef !== null && !["zapier", "n8n", "chatgpt", "claude"].includes(id);
+}
 
 /**
  * Integration Center detail page — one dynamic route driven entirely
@@ -43,8 +122,14 @@ import OAuthMailboxPanel from "@/components/integrations/OAuthMailboxPanel";
  * steps, webhook configuration where the provider calls NxtSend, a
  * Test Connection action wired to POST /api/integrations/[id]/verify
  * with the result rendered verbatim, disconnect guidance, and
- * troubleshooting. The Muse.ai page additionally renders the
- * research-based readiness pack (tool manifest + checklist).
+ * troubleshooting. Milestone 2 provider adapters additionally get
+ * Provider details (real auth method, scopes, sync direction),
+ * Field mapping (only where the adapter defines one), and a
+ * Sync/usage/activity section with honest empty states — and no
+ * Test Connection button, because no server-side verification call
+ * exists for them yet (the button would 404). The Muse.ai page
+ * additionally renders the research-based readiness pack (tool
+ * manifest + checklist).
  */
 
 interface StatusResponse {
@@ -165,6 +250,9 @@ export default function IntegrationDetailPage() {
 
   const d = entry.descriptor;
   const Icon = INTEGRATION_ICONS[d.id] ?? Puzzle;
+  const providerDef = getProviderDefinition(id);
+  const newProviderAdapter = isNewProviderAdapter(id, providerDef);
+  const fieldMappings = PROVIDER_FIELD_MAPPINGS[id] ?? null;
   const lastVerification = verifyResult
     ? {
         ok: verifyResult.ok,
@@ -191,7 +279,7 @@ export default function IntegrationDetailPage() {
             </Badge>
           </div>
           <p className="mt-1 text-14 text-black-300">{d.tagline}</p>
-          <p className="mt-1 text-13 text-black-400">{entry.statusMessage}</p>
+          <p className="mt-1 text-13 text-black-400">{displayStatusMessage(entry)}</p>
         </div>
       </div>
 
@@ -202,13 +290,34 @@ export default function IntegrationDetailPage() {
         </div>
       )}
 
-      {/* Test Connection */}
-      <Section title="Test Connection">
-        <p className="text-13 text-black-300 leading-relaxed">
-          {d.verifySupported
-            ? "Runs one safe, read-only verification call against the provider using the server-side configuration. The result — success or failure — is shown verbatim below; a configured key alone never counts as verified."
-            : "This integration has no server-side verification call. The button returns the exact reason and what to do instead — it never pretends to have verified anything."}
-        </p>
+      {/* Test Connection — not rendered as a button for Milestone 2
+          provider adapters: no server-side verification call exists
+          for them (verify.ts has no case), so POST .../verify would
+          answer 404 "Unknown integration" for a provider that does
+          exist. The honest state is shown instead; the button returns
+          only for entries whose verify path exists. */}
+      {newProviderAdapter ? (
+        <Section title="Test Connection">
+          <p className="text-13 text-black-300 leading-relaxed">
+            No server-side verification call exists for this provider yet, so there is
+            nothing to test from here. The adapter reads its credential from the
+            encrypted per-workspace connection store — a stored credential alone
+            never counts as verified, and the status stays Not Connected until a
+            credential is stored and a verification call is implemented.
+          </p>
+          <p className="text-12 text-black-400 leading-relaxed">
+            {lastVerification
+              ? `Last verification: ${lastVerification.ok ? "passed" : "failed"} · ${new Date(lastVerification.checkedAt).toLocaleString()} — ${lastVerification.message}`
+              : "No verification has ever run for this provider."}
+          </p>
+        </Section>
+      ) : (
+        <Section title="Test Connection">
+          <p className="text-13 text-black-300 leading-relaxed">
+            {d.verifySupported
+              ? "Runs one safe, read-only verification call against the provider using the server-side configuration. The result — success or failure — is shown verbatim below; a configured key alone never counts as verified."
+              : "This integration has no server-side verification call. The button returns the exact reason and what to do instead — it never pretends to have verified anything."}
+          </p>
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
@@ -260,6 +369,7 @@ export default function IntegrationDetailPage() {
           <p className="text-12 text-black-400">{lastVerification.message}</p>
         )}
       </Section>
+      )}
 
       {/* Email authentication — Resend only: real DNS verdicts for the
           sending domain + the provider-domain match. */}
@@ -305,6 +415,144 @@ export default function IntegrationDetailPage() {
           ))}
         </ul>
       </Section>
+
+      {/* Provider details — Milestone 2 adapters only: the real auth
+          method, scopes and sync direction from the provider
+          definition. Credentials are stored encrypted per workspace
+          in integration_connections; nothing here shows a value. */}
+      {providerDef && (
+        <Section title="Provider details">
+          <dl className="space-y-2 text-13">
+            <div className="flex flex-wrap gap-2">
+              <dt className="text-black-400 w-36 shrink-0">Authentication</dt>
+              <dd className="text-black-200">
+                {AUTH_TYPE_LABELS[providerDef.authType]} — credentials are stored
+                encrypted per workspace in integration_connections and are never
+                shown here.
+              </dd>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <dt className="text-black-400 w-36 shrink-0">Two-way sync</dt>
+              <dd className="text-black-200">
+                {providerDef.twoWaySync
+                  ? "Yes — the adapter can read from and write to this provider once connected."
+                  : "No — one-way only (the adapter reads from, or sends to, this provider and does not write back)."}
+              </dd>
+            </div>
+            {providerDef.scopes && providerDef.scopes.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                <dt className="text-black-400 w-36 shrink-0">Scopes</dt>
+                <dd className="flex flex-wrap gap-1.5">
+                  {providerDef.scopes.map((scope) => (
+                    <code
+                      key={scope}
+                      className="rounded-md bg-black-800 border border-black-700 px-2 py-0.5 font-mono text-12 text-purple-200"
+                    >
+                      {scope}
+                    </code>
+                  ))}
+                </dd>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <dt className="text-black-400 w-36 shrink-0">Category</dt>
+              <dd className="text-black-200">{d.category}</dd>
+            </div>
+          </dl>
+        </Section>
+      )}
+
+      {/* Field mapping — only where the adapter defines one (CRM +
+          email-outreach configs). Anything else gets the honest
+          empty state, never an invented mapping. */}
+      {providerDef && (
+        <Section title="Field mapping">
+          {fieldMappings ? (
+            <>
+              <p className="text-12 text-black-400 leading-relaxed">
+                How NxtSend lead fields map onto {d.name} fields. Required
+                mappings must be present for an export to run.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-13">
+                  <thead>
+                    <tr className="text-left text-black-400 border-b border-black-700/60">
+                      <th className="py-2 pr-4 font-semibold">NxtSend field</th>
+                      <th className="py-2 pr-4 font-semibold">{d.name} field</th>
+                      <th className="py-2 font-semibold">Required</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fieldMappings.map((mapping) => (
+                      <tr
+                        key={`${mapping.source}→${mapping.target}`}
+                        className="border-b border-black-700/40 last:border-0"
+                      >
+                        <td className="py-2 pr-4 font-mono text-12 text-white">
+                          {mapping.source}
+                        </td>
+                        <td className="py-2 pr-4 font-mono text-12 text-black-200">
+                          {mapping.target}
+                        </td>
+                        <td className="py-2 text-black-300">
+                          {mapping.required ? "Yes" : "No"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="text-13 text-black-300 leading-relaxed">
+              No fixed field mapping is defined for this provider — fields are
+              mapped generically at run time (see Capabilities), or the provider
+              does not sync lead records at all. No mapping is shown because
+              none exists in the adapter config.
+            </p>
+          )}
+        </Section>
+      )}
+
+      {/* Sync, usage & activity — honest empty states. No sync store,
+          usage counter, activity log or error log exists for these
+          adapters yet, so every value is "none yet", never a number. */}
+      {newProviderAdapter && (
+        <Section title="Sync, usage & activity">
+          <dl className="space-y-2 text-13">
+            <div className="flex flex-wrap gap-2">
+              <dt className="text-black-400 w-36 shrink-0">Connection health</dt>
+              <dd className="text-black-200">
+                {entry.status} — {displayStatusMessage(entry)}
+              </dd>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <dt className="text-black-400 w-36 shrink-0">Sync preferences</dt>
+              <dd className="text-black-200">
+                {providerDef?.twoWaySync
+                  ? "Two-way sync is supported by the adapter; sync runs only after credentials are connected."
+                  : "One-way only (see Provider details above); sync runs only after credentials are connected."}
+              </dd>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <dt className="text-black-400 w-36 shrink-0">Last sync</dt>
+              <dd className="text-black-300">No syncs yet — connect credentials first.</dd>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <dt className="text-black-400 w-36 shrink-0">Usage</dt>
+              <dd className="text-black-300">No usage recorded yet.</dd>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <dt className="text-black-400 w-36 shrink-0">Activity history</dt>
+              <dd className="text-black-300">No activity history yet.</dd>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <dt className="text-black-400 w-36 shrink-0">Error log</dt>
+              <dd className="text-black-300">No errors logged.</dd>
+            </div>
+          </dl>
+        </Section>
+      )}
 
       {/* Muse.ai readiness pack */}
       {d.id === "muse-ai" && <MuseReadinessPack />}
@@ -439,6 +687,8 @@ export default function IntegrationDetailPage() {
               ? "Revoke individual grants from the “Your Claude grants” panel above — revoking removes Claude's access for that grant immediately (every token for that client + user is revoked). Removing the environment variables additionally prevents NEW grants. Past audit entries are kept."
               : d.id === "zapier"
               ? "Revoke individual grants from the “Your Zapier grants” panel above — revoking removes Zapier's access for that grant immediately (every token for that client + user is revoked), and any Zaps using it stop working. Setting ZAPIER_ENABLED=false additionally prevents NEW Zapier API calls (the OAuth routes stay available). Past audit entries and webhook delivery logs are kept; webhook subscriptions created by that grant stay in the outbox tables until they are unsubscribed from Zapier or cleaned up as stale (inactive > 30 days)."
+              : newProviderAdapter
+              ? "No connection is stored yet, so there is nothing to disconnect. Once a credential is stored, disconnect removes the stored credential from the encrypted integration_connections store for this workspace; past sync records (if any) are kept. Removing environment variables does not disconnect this provider — its credential is not an environment variable."
               : d.kind === "info"
               ? "Nothing is connected, so there is nothing to disconnect. This entry documents the limitation and what implementing it would require."
               : "Remove (or replace) the environment variables listed above in Vercel and redeploy. The status returns to Not Connected, and any stored verification stops applying because the configuration it verified is gone. No data is deleted by disconnecting."}

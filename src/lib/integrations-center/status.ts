@@ -672,7 +672,6 @@ function deriveStatus(
         configured: false,
       };
     }
-    case "google-sheets":
     case "crm":
     case "email-verification":
       return {

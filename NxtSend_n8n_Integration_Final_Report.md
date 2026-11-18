@@ -501,33 +501,39 @@ not verified by n8n".
 
 ## Remaining blockers
 
-1. **Worker A — v1 REST API + API keys + migration 028 not
-   landed.** Without them the node cannot call anything, the
-   health endpoint 404s, and the settings page's API-key
-   section cannot create a key. The panel/admin/docs degrade
-   honestly, but the integration cannot be used end-to-end.
-   Owner: Worker A.
-2. **Root `npm run build` fails on Worker C's
-   `test/helpers.ts:24`** ("Cannot use namespace 'jest' as a
-   value"). The root Next build type-checks the node package's
-   test files; the package's own build passes. Fix options:
-   import `jest` explicitly in the helper, or exclude
-   `integrations/n8n-nodes-nxtsend/test/` from the root
-   tsconfig. Owner: Worker C (with coordinator decision on
-   the exclusion).
-3. **16 repo test failures in Worker B's OAuth/rest tests**
-   (latest run). The OAuth surface they test is the same
-   surface the n8n integration depends on — these must go
-   green before any live verification claim. Owner: Worker B.
+**Correction (parent, 2026-11-18 ~07:25 +06): items 1–3 below are
+stale worker-draft entries — all three were resolved before the
+`cdc7252` push and re-verified this morning. They are kept here
+with their corrected status so the audit trail stays honest.**
+
+1. **Worker A — v1 REST API + API keys + migration 028 — LANDED
+   (was "not landed" in the draft).** All of it shipped in
+   `cdc7252`: `/api/integrations/n8n/v1/*` (36 routes),
+   `nxtsend_api_keys` (migration 028), API-key management
+   routes, `n8n.read/write` scopes. Live use still waits on
+   the deploy + migrations 028/029 being applied (see 4–5).
+2. **Root `npm run build` — PASSES (was "fails" in the draft).**
+   The `test/helpers.ts` issue was fixed in the coordinator
+   pass. Parent verified the build twice: 2026-11-18 ~01:15
+   and again ~07:25 +06 ("Compiled successfully", n8n routes
+   in the output).
+3. **Repo test failures — RESOLVED (was "16 failures" in the
+   draft).** Suite is **1,668/1,668 (143 files)**, verified
+   twice by the parent (2026-11-18 ~01:15 and ~07:25 +06).
+   Node package **126/126 (5 suites)**, lint clean, build
+   passes, `npm pack --dry-run` works (35 files,
+   `n8n-nodes-nxtsend-0.1.0.tgz`).
 4. **Migration 029 not applied** (written, not applied) and
-   **028 not written.** No live Supabase project was used from
+   **028 not applied either.** No live Supabase project was used from
    this environment; nothing has been verified against a
    deployed site. Owner: whoever owns the Supabase project.
-5. **No live verification anywhere:** no OAuth grant flow
-   inside a real n8n instance, no live run per node operation,
-   no webhook delivery to a real n8n URL, no cron retry tick,
-   no local-n8n load test (no Docker here). Owner: coordinator
-   (needs a deployed site + a real n8n instance).
+5. **No live verification anywhere — STILL OPEN, and now
+   blocked on the deploy itself (see "Live verification"
+   below):** no OAuth grant flow inside a real n8n instance,
+   no live run per node operation, no webhook delivery to a
+   real n8n URL, no cron retry tick, no local-n8n load test
+   (no Docker here). Owner: coordinator (needs a deployed
+   site + a real n8n instance).
 6. **Node/server contract gaps — FIXED in the coordinator pass
    (2026-11-18 ~19:00 +06):** `GET /v1/accounts/:id` and
    `GET /v1/accounts/:id/status` now have server routes
@@ -644,3 +650,35 @@ untouched, no secrets, no publish/approval claims.
   instance, npm publish + n8n verification, screenshots.
   Re-check the three URLs above once Vercel reports the
   `cdc7252` deployment as live.
+
+## Re-check (parent, 2026-11-18 ~07:25 +06)
+
+- **Deploy STILL not live, ~6 hours after the push.** `GET
+  /api/integrations/n8n/health` → 404, n8n metadata → 404,
+  v1 auth-test → 404, and the root metadata still lists only
+  the 11 pre-n8n scopes (no `n8n.read`/`n8n.write`). The
+  homepage's `buildId` is unchanged from last night —
+  `SRCeQ_zoG-67TWwPomTCn` — proving the live site is still
+  running the exact same deployment as before `cdc7252`.
+  Remote HEAD on GitHub is `fee6221` (up to date), the repo
+  tree is clean, and the site itself is up (Muse + Zapier
+  health both 200). This is no longer a slow deploy: the
+  `cdc7252`/`fee6221` deployment either never started or
+  failed in Vercel. **Owner action needed:** open the Vercel
+  dashboard → Deployments and check the entries for
+  `cdc7252` (pushed ~01:19 +06) and `fee6221` — whether they
+  show Failed, Queued, or are missing entirely — and whether
+  the GitHub integration is still connected. Muse has no
+  Vercel access and cannot see or restart the build from here.
+- **Code re-verified this morning (tree unchanged since the
+  push):** repo suite **1,668/1,668** (143 files), repo build
+  **PASS**, node package **126/126** (5 suites), lint clean,
+  node build pass, `npm pack --dry-run` works (35 files).
+  Docs 17 files, workflow templates 12, n8n route files 41,
+  `n8n.read` present in the OAuth scopes source. Nothing in
+  the code needs adding — the only thing missing is the live
+  deployment itself.
+- Settings-page render, live grant flow, live operation runs,
+  webhook delivery, npm publish and n8n verification all
+  remain PENDING until the deploy lands and migrations
+  028/029 are applied.

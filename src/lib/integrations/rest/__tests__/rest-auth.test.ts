@@ -95,7 +95,7 @@ async function platformToken(
   return { store, access: (res.body as { access_token: string }).access_token };
 }
 
-function apiRequest(platform: "n8n" | "zapier", access: string | null): Request {
+function apiRequest(platform: RestPlatform, access: string | null): Request {
   const headers: Record<string, string> = {};
   if (access) headers.authorization = `Bearer ${access}`;
   return new Request(`${ORIGIN}/api/integrations/${platform}/v1/leads`, { headers });

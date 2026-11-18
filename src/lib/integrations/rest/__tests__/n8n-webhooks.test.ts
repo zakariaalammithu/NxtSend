@@ -38,7 +38,7 @@ const failFetch = (async () => ({ status: 500 }) as unknown) as typeof fetch;
 
 const savedNodeEnv = process.env.NODE_ENV;
 afterEach(() => {
-  process.env.NODE_ENV = savedNodeEnv;
+  (process.env as Record<string, string | undefined>).NODE_ENV = savedNodeEnv;
 });
 
 describe("platform config", () => {
@@ -87,9 +87,9 @@ describe("validatePlatformTargetUrl", () => {
   });
 
   it("allows http loopback for n8n only on a local deployment", () => {
-    process.env.NODE_ENV = "production";
+    (process.env as Record<string, string | undefined>).NODE_ENV = "production";
     expect(validatePlatformTargetUrl("n8n", "http://localhost:5678/webhook/x").ok).toBe(false);
-    process.env.NODE_ENV = "development";
+    (process.env as Record<string, string | undefined>).NODE_ENV = "development";
     expect(validatePlatformTargetUrl("n8n", "http://localhost:5678/webhook/x").ok).toBe(true);
   });
 });

@@ -770,11 +770,11 @@ export async function unsubscribePlatformWebhook(
  * is unfiltered by platform by design (see the module header).
  */
 export async function enqueuePlatformEvent(
-  store: ZapierSubscriptionStore & ZapierOutboxStore,
+  store: PlatformWebhookStore,
   envelope: WebhookEnvelope
-): Promise<ZapierWebhookDelivery[]> {
+): Promise<PlatformWebhookDelivery[]> {
   const subs = await store.listActiveSubscriptions(envelope.workspace_id, envelope.type);
-  const rows: ZapierWebhookDelivery[] = [];
+  const rows: PlatformWebhookDelivery[] = [];
   for (const sub of subs) {
     rows.push(
       await store.enqueueDelivery({

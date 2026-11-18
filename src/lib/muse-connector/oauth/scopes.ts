@@ -8,7 +8,8 @@
  * dropped or widened.
  *
  * Three prefixes, one meaning: `muse.read`, `nxtsend.read`,
- * `claude.read`, `zapier.read` and `n8n.read` grant exactly the same tier of access. The prefix records which platform
+ * `claude.read`, `zapier.read`, `n8n.read`, `make.read`,
+ * `pabbly.read`, `albato.read` and `activepieces.read` grant exactly the same tier of access. The prefix records which platform
  * the grant belongs to (so the consent screen and the scope string
  * round-trip honestly); authorization decisions MUST go through
  * `grantHasTier`, never through a string prefix check, so a grant
@@ -42,16 +43,55 @@ export const ZAPIER_SCOPES = ["zapier.read", "zapier.write"] as const;
  */
 export const N8N_SCOPES = ["n8n.read", "n8n.write"] as const;
 
-/** Every scope this authorization server issues, all five platforms. */
-export const ALL_OAUTH_SCOPES = [...MUSE_SCOPES, ...NXT_SEND_SCOPES, ...CLAUDE_SCOPES, ...ZAPIER_SCOPES, ...N8N_SCOPES] as const;
+/**
+ * Make scopes. Only read + write exist — there is NO `make.send`
+ * tier: Make never sends LinkedIn messages (no provider exists),
+ * and email replies sent through the Make API are covered by the
+ * write tier, documented as such — the same rule as Zapier/n8n.
+ */
+export const MAKE_SCOPES = ["make.read", "make.write"] as const;
+
+/**
+ * Pabbly Connect scopes. Only read + write exist — there is NO
+ * `pabbly.send` tier: Pabbly never sends LinkedIn messages (no
+ * provider exists), and email replies sent through the Pabbly API
+ * are covered by the write tier, documented as such — the same
+ * rule as Zapier/n8n.
+ */
+export const PABBLY_SCOPES = ["pabbly.read", "pabbly.write"] as const;
+
+/**
+ * Albato scopes. Only read + write exist — there is NO
+ * `albato.send` tier: Albato never sends LinkedIn messages (no
+ * provider exists), and email replies sent through the Albato API
+ * are covered by the write tier, documented as such — the same
+ * rule as Zapier/n8n.
+ */
+export const ALBATO_SCOPES = ["albato.read", "albato.write"] as const;
+
+/**
+ * Activepieces scopes. Only read + write exist — there is NO
+ * `activepieces.send` tier: Activepieces never sends LinkedIn
+ * messages (no provider exists), and email replies sent through
+ * the Activepieces API are covered by the write tier, documented
+ * as such — the same rule as Zapier/n8n.
+ */
+export const ACTIVEPIECES_SCOPES = ["activepieces.read", "activepieces.write"] as const;
+
+/** Every scope this authorization server issues, all nine platforms. */
+export const ALL_OAUTH_SCOPES = [...MUSE_SCOPES, ...NXT_SEND_SCOPES, ...CLAUDE_SCOPES, ...ZAPIER_SCOPES, ...N8N_SCOPES, ...MAKE_SCOPES, ...PABBLY_SCOPES, ...ALBATO_SCOPES, ...ACTIVEPIECES_SCOPES] as const;
 
 export type MuseScope = (typeof MUSE_SCOPES)[number];
 export type NxtSendScope = (typeof NXT_SEND_SCOPES)[number];
 export type ClaudeScope = (typeof CLAUDE_SCOPES)[number];
 export type ZapierScope = (typeof ZAPIER_SCOPES)[number];
 export type N8nScope = (typeof N8N_SCOPES)[number];
+export type MakeScope = (typeof MAKE_SCOPES)[number];
+export type PabblyScope = (typeof PABBLY_SCOPES)[number];
+export type AlbatoScope = (typeof ALBATO_SCOPES)[number];
+export type ActivepiecesScope = (typeof ACTIVEPIECES_SCOPES)[number];
 /** Any scope this server issues, any platform prefix. */
-export type OAuthScope = MuseScope | NxtSendScope | ClaudeScope | ZapierScope | N8nScope;
+export type OAuthScope = MuseScope | NxtSendScope | ClaudeScope | ZapierScope | N8nScope | MakeScope | PabblyScope | AlbatoScope | ActivepiecesScope;
 
 export type ScopeTier = "read" | "write" | "send";
 
@@ -74,6 +114,14 @@ export const SCOPE_TIER_MAP: Record<OAuthScope, ScopeTier> = {
   "zapier.write": "write",
   "n8n.read": "read",
   "n8n.write": "write",
+  "make.read": "read",
+  "make.write": "write",
+  "pabbly.read": "read",
+  "pabbly.write": "write",
+  "albato.read": "read",
+  "albato.write": "write",
+  "activepieces.read": "read",
+  "activepieces.write": "write",
 };
 
 const SCOPE_SET = new Set<string>(ALL_OAUTH_SCOPES);
@@ -120,6 +168,34 @@ export const N8N_SCOPE_DESCRIPTIONS: Record<N8nScope, string> = {
     "Let n8n create and change leads and draft campaigns, pause, resume or archive campaigns, enroll leads, and send email inbox replies. n8n never sends LinkedIn messages.",
 };
 
+export const MAKE_SCOPE_DESCRIPTIONS: Record<MakeScope, string> = {
+  "make.read":
+    "Let Make read your leads, campaigns, inbox conversations and usage — no changes are made.",
+  "make.write":
+    "Let Make create and change leads and draft campaigns, pause, resume or archive campaigns, enroll leads, and send email inbox replies. Make never sends LinkedIn messages.",
+};
+
+export const PABBLY_SCOPE_DESCRIPTIONS: Record<PabblyScope, string> = {
+  "pabbly.read":
+    "Let Pabbly Connect read your leads, campaigns, inbox conversations and usage — no changes are made.",
+  "pabbly.write":
+    "Let Pabbly Connect create and change leads and draft campaigns, pause, resume or archive campaigns, enroll leads, and send email inbox replies. Pabbly never sends LinkedIn messages.",
+};
+
+export const ALBATO_SCOPE_DESCRIPTIONS: Record<AlbatoScope, string> = {
+  "albato.read":
+    "Let Albato read your leads, campaigns, inbox conversations and usage — no changes are made.",
+  "albato.write":
+    "Let Albato create and change leads and draft campaigns, pause, resume or archive campaigns, enroll leads, and send email inbox replies. Albato never sends LinkedIn messages.",
+};
+
+export const ACTIVEPIECES_SCOPE_DESCRIPTIONS: Record<ActivepiecesScope, string> = {
+  "activepieces.read":
+    "Let Activepieces read your leads, campaigns, inbox conversations and usage — no changes are made.",
+  "activepieces.write":
+    "Let Activepieces create and change leads and draft campaigns, pause, resume or archive campaigns, enroll leads, and send email inbox replies. Activepieces never sends LinkedIn messages.",
+};
+
 /** Description for any issued scope, whichever prefix was requested. */
 export const SCOPE_DESCRIPTIONS: Record<OAuthScope, string> = {
   ...MUSE_SCOPE_DESCRIPTIONS,
@@ -127,6 +203,10 @@ export const SCOPE_DESCRIPTIONS: Record<OAuthScope, string> = {
   ...CLAUDE_SCOPE_DESCRIPTIONS,
   ...ZAPIER_SCOPE_DESCRIPTIONS,
   ...N8N_SCOPE_DESCRIPTIONS,
+  ...MAKE_SCOPE_DESCRIPTIONS,
+  ...PABBLY_SCOPE_DESCRIPTIONS,
+  ...ALBATO_SCOPE_DESCRIPTIONS,
+  ...ACTIVEPIECES_SCOPE_DESCRIPTIONS,
 };
 
 /** Plain-words description for one scope (unknown scopes have none). */
@@ -145,7 +225,8 @@ export function grantHasTier(scopes: string[], tier: ScopeTier): boolean {
 
 /**
  * Parses a space-separated scope string. Accepts any prefix
- * (`muse.*`, `nxtsend.*`, `claude.*`, `zapier.*` or `n8n.*`); returns the de-duplicated scopes in
+ * (`muse.*`, `nxtsend.*`, `claude.*`, `zapier.*`, `n8n.*`,
+ * `make.*`, `pabbly.*`, `albato.*` or `activepieces.*`); returns the de-duplicated scopes in
  * request order, or null when any requested scope is unknown. An
  * empty/omitted scope defaults to read-only (`muse.read`) — the
  * least privilege. Callers that know the client platform should
@@ -180,10 +261,14 @@ export function isValidMuseScopeSubset(scopes: string[]): scopes is OAuthScope[]
 }
 
 /** Least-privilege default scope for a client platform. */
-export function defaultScopeForPlatform(platform: "muse" | "chatgpt" | "claude" | "zapier" | "n8n"): OAuthScope {
+export function defaultScopeForPlatform(platform: "muse" | "chatgpt" | "claude" | "zapier" | "n8n" | "make" | "pabbly" | "albato" | "activepieces"): OAuthScope {
   if (platform === "chatgpt") return "nxtsend.read";
   if (platform === "claude") return "claude.read";
   if (platform === "zapier") return "zapier.read";
   if (platform === "n8n") return "n8n.read";
+  if (platform === "make") return "make.read";
+  if (platform === "pabbly") return "pabbly.read";
+  if (platform === "albato") return "albato.read";
+  if (platform === "activepieces") return "activepieces.read";
   return "muse.read";
 }

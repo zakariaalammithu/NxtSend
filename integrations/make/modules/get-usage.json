@@ -1,0 +1,16 @@
+{
+  "label": "Get Usage",
+  "description": "Workspace usage + plan (all-time only; no date-range report exists).",
+  "type": "search",
+  "connection": "nxtsend-oauth2",
+  "endpoint": {
+    "method": "GET",
+    "path": "/usage"
+  },
+  "parameters": [],
+  "output": "Usage + plan.",
+  "notes": [
+    "SKELETON — part of the Make custom-app spec (see integrations/make/app.json). Build this module in Make's web UI / VS Code from this spec; the endpoint (method + path) is the contract the module must call.",
+    "No secrets in this file."
+  ]
+}

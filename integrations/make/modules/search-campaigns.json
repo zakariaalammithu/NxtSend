@@ -1,0 +1,29 @@
+{
+  "label": "Search Campaigns",
+  "description": "Search campaigns by text.",
+  "type": "search",
+  "connection": "nxtsend-oauth2",
+  "endpoint": {
+    "method": "GET",
+    "path": "/search/campaigns"
+  },
+  "parameters": [
+    {
+      "name": "q",
+      "label": "Search text",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "limit",
+      "label": "Limit (1–100)",
+      "type": "number",
+      "required": false
+    }
+  ],
+  "output": "Matching campaigns.",
+  "notes": [
+    "SKELETON — part of the Make custom-app spec (see integrations/make/app.json). Build this module in Make's web UI / VS Code from this spec; the endpoint (method + path) is the contract the module must call.",
+    "No secrets in this file."
+  ]
+}

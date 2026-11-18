@@ -1,0 +1,53 @@
+{
+  "label": "Update Lead",
+  "description": "Update a lead's fields or status. Emits lead.updated.",
+  "type": "action",
+  "connection": "nxtsend-oauth2",
+  "endpoint": {
+    "method": "PATCH",
+    "path": "/leads/{id}"
+  },
+  "parameters": [
+    {
+      "name": "id",
+      "label": "Lead ID",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "status",
+      "label": "Status (new, contacted, replied, converted, unresponsive)",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "first_name",
+      "label": "First name",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "last_name",
+      "label": "Last name",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "company",
+      "label": "Company",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "job_title",
+      "label": "Job title",
+      "type": "text",
+      "required": false
+    }
+  ],
+  "output": "The updated lead.",
+  "notes": [
+    "SKELETON — part of the Make custom-app spec (see integrations/make/app.json). Build this module in Make's web UI / VS Code from this spec; the endpoint (method + path) is the contract the module must call.",
+    "No secrets in this file."
+  ]
+}

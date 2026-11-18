@@ -1,0 +1,100 @@
+{
+  "flow": [
+    {
+      "id": 1,
+      "mapper": {
+        "bodyType": "",
+        "headers": [
+          {
+            "name": "Authorization",
+            "value": "Bearer PASTE_YOUR_NXTEND_ACCESS_TOKEN"
+          }
+        ],
+        "method": "get",
+        "parseResponse": true,
+        "qs": [
+          {
+            "name": "limit",
+            "value": "100"
+          }
+        ],
+        "url": "https://<your-domain>/api/integrations/make/v1/leads"
+      },
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "module": "http:ActionSendData",
+      "parameters": {
+        "handleErrors": false
+      },
+      "version": 3
+    },
+    {
+      "id": 2,
+      "mapper": {
+        "array": "{{1.data.leads}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      },
+      "module": "builtin:BasicFeeder",
+      "parameters": {},
+      "version": 1
+    },
+    {
+      "id": 3,
+      "mapper": {
+        "from": "drive",
+        "includesHeaders": true,
+        "insertDataOption": "INSERT_ROWS",
+        "mode": "select",
+        "sheetId": "Leads",
+        "spreadsheetId": "PASTE_YOUR_SPREADSHEET_ID",
+        "valueInputOption": "USER_ENTERED",
+        "values": {
+          "0": "{{2.created_at}}",
+          "1": "{{2.email}}",
+          "2": "{{2.first_name}} {{2.last_name}}",
+          "3": "{{2.company}}",
+          "4": "{{2.status}}"
+        }
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0
+        }
+      },
+      "module": "google-sheets:addRow",
+      "parameters": {
+        "__IMTCONN__": null
+      },
+      "version": 2
+    }
+  ],
+  "metadata": {
+    "designer": {
+      "orphans": []
+    },
+    "instant": false,
+    "scenario": {
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false,
+      "maxErrors": 3,
+      "roundtrips": 1,
+      "sequential": false
+    },
+    "version": 1
+  },
+  "name": "NxtSend poll new leads to Google Sheet"
+}

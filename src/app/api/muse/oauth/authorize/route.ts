@@ -19,6 +19,7 @@ import {
   signMuseAuthorizeState,
   verifyMuseAuthorizeState,
   type MuseOAuthClientRow,
+  type OAuthClientPlatform,
   type OAuthScope,
 } from "@/lib/muse-connector/oauth";
 
@@ -64,7 +65,7 @@ function errorPage(title: string, message: string, status = 400): NextResponse {
 function consentPage(input: {
   clientName: string;
   clientOrigin: string | null;
-  platform: "muse" | "chatgpt" | "claude" | "zapier" | "n8n";
+  platform: OAuthClientPlatform;
   redirectUri: string;
   scopes: OAuthScope[];
   workspaceLabel: string;

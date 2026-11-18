@@ -131,15 +131,16 @@ export function getClaudePublicUrl(
 
 // ── MCP resources (RFC 8707 `resource` / RFC 9728 audience) ────────────────
 
-export type McpPlatform = "muse" | "chatgpt" | "claude" | "zapier" | "n8n";
+export type McpPlatform = "muse" | "chatgpt" | "claude" | "zapier" | "n8n" | "make" | "pabbly" | "albato" | "activepieces";
 
 /** Canonical public origin when no origin can be determined. */
 export const DEFAULT_OAUTH_ORIGIN = "https://nxtsend.com";
 
 /**
- * Path of each platform's resource, relative to the origin. Zapier
- * and n8n are NOT MCP servers — their resources are the REST API
- * bases (`/api/integrations/zapier`, `/api/integrations/n8n`) — but
+ * Path of each platform's resource, relative to the origin. Zapier,
+ * n8n, Make, Pabbly, Albato and Activepieces are NOT MCP servers —
+ * their resources are the REST API bases
+ * (`/api/integrations/zapier`, `/api/integrations/n8n`, …) — but
  * they ride the same RFC 8707 resource binding, so they live in
  * this table and `resourcePlatform()` / `getMcpResourceUrl()`
  * handle them like the others. `canonicalMcpResources()` deliberately
@@ -151,6 +152,10 @@ export const MCP_RESOURCE_PATHS: Record<McpPlatform, string> = {
   claude: "/api/mcp/claude",
   zapier: "/api/integrations/zapier",
   n8n: "/api/integrations/n8n",
+  make: "/api/integrations/make",
+  pabbly: "/api/integrations/pabbly",
+  albato: "/api/integrations/albato",
+  activepieces: "/api/integrations/activepieces",
 };
 
 /** Full resource URL of a platform's MCP server for an origin. */
@@ -166,6 +171,26 @@ export function getZapierResourceUrl(origin: string): string {
 /** Full resource URL of the n8n REST API for an origin. */
 export function getN8nResourceUrl(origin: string): string {
   return getMcpResourceUrl(origin, "n8n");
+}
+
+/** Full resource URL of the Make REST API for an origin. */
+export function getMakeResourceUrl(origin: string): string {
+  return getMcpResourceUrl(origin, "make");
+}
+
+/** Full resource URL of the Pabbly Connect REST API for an origin. */
+export function getPabblyResourceUrl(origin: string): string {
+  return getMcpResourceUrl(origin, "pabbly");
+}
+
+/** Full resource URL of the Albato REST API for an origin. */
+export function getAlbatoResourceUrl(origin: string): string {
+  return getMcpResourceUrl(origin, "albato");
+}
+
+/** Full resource URL of the Activepieces REST API for an origin. */
+export function getActivepiecesResourceUrl(origin: string): string {
+  return getMcpResourceUrl(origin, "activepieces");
 }
 
 /** All three canonical MCP resource URLs for an origin. */
@@ -186,6 +211,10 @@ export function resourcePlatform(resource: string | null | undefined): McpPlatfo
   if (!resource) return null;
   try {
     const pathname = new URL(resource).pathname.replace(/\/+$/, "");
+    if (pathname === MCP_RESOURCE_PATHS.activepieces) return "activepieces";
+    if (pathname === MCP_RESOURCE_PATHS.albato) return "albato";
+    if (pathname === MCP_RESOURCE_PATHS.pabbly) return "pabbly";
+    if (pathname === MCP_RESOURCE_PATHS.make) return "make";
     if (pathname === MCP_RESOURCE_PATHS.n8n) return "n8n";
     if (pathname === MCP_RESOURCE_PATHS.zapier) return "zapier";
     if (pathname === MCP_RESOURCE_PATHS.claude) return "claude";

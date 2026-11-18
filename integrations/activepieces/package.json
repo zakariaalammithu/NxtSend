@@ -1,0 +1,45 @@
+{
+  "author": {
+    "email": "mithusquare@gmail.com",
+    "name": "NxtSend"
+  },
+  "dependencies": {
+    "@activepieces/pieces-common": "0.12.5",
+    "@activepieces/pieces-framework": "0.32.0",
+    "@activepieces/shared": "0.32.0"
+  },
+  "description": "NxtSend — lead and campaign automation for Activepieces",
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vitest": "^2.1.9"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist"
+  ],
+  "homepage": "https://github.com/zakariaalammithu/NxtSend/tree/main/integrations/activepieces",
+  "keywords": [
+    "activepieces",
+    "nxtsend",
+    "linkedin",
+    "outreach",
+    "leads",
+    "campaigns",
+    "sales"
+  ],
+  "license": "MIT",
+  "main": "dist/index.js",
+  "name": "@nxtsend/piece-nxtsend",
+  "repository": {
+    "directory": "integrations/activepieces",
+    "type": "git",
+    "url": "https://github.com/zakariaalammithu/NxtSend.git"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "version": "0.1.0"
+}

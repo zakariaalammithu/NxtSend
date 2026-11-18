@@ -100,7 +100,16 @@ export function isZapierRedirectUri(uri: string): boolean {
   return ZAPIER_REDIRECT_PATH_PATTERN.test(parsed.pathname);
 }
 
-export type OAuthClientPlatform = "muse" | "chatgpt" | "claude" | "zapier" | "n8n";
+export type OAuthClientPlatform =
+  | "muse"
+  | "chatgpt"
+  | "claude"
+  | "zapier"
+  | "n8n"
+  | "make"
+  | "pabbly"
+  | "albato"
+  | "activepieces";
 
 /** Hosts that belong to a known platform's callback (never n8n). */
 const KNOWN_CALLBACK_HOSTS = new Set([
@@ -173,6 +182,21 @@ export function isN8nRedirectUri(uri: string, env: NodeJS.ProcessEnv = process.e
   return parsed.hostname.length > 0;
 }
 
+/**
+ * True when a redirect URI is an automation-platform OAuth
+ * callback (Make, Pabbly Connect, Albato, Activepieces): same
+ * instance-style rule as n8n — any https URI on a public host,
+ * except the known platforms' callback hosts. These platforms
+ * have instance/account-specific callback hosts that cannot be
+ * allowlisted by value (like n8n), so they share the n8n shape
+ * check. Exact DCR registration is still required on top of
+ * this (validateRedirectUriForPlatform), and the client must
+ * declare the platform's scopes (or resource) to resolve to it.
+ */
+export function isAutomationRedirectUri(uri: string, env: NodeJS.ProcessEnv = process.env): boolean {
+  return isN8nRedirectUri(uri, env);
+}
+
 export interface ClientPlatformHints {
   /** Requested scope strings (raw, e.g. ["n8n.read"]). */
   scopes?: string[];
@@ -224,11 +248,19 @@ export function clientPlatform(
   if (scopeList.some((s) => s.startsWith("claude."))) return "claude";
   if (scopeList.some((s) => s.startsWith("nxtsend."))) return "chatgpt";
   if (scopeList.some((s) => s.startsWith("muse."))) return "muse";
+  if (scopeList.some((s) => s.startsWith("make."))) return "make";
+  if (scopeList.some((s) => s.startsWith("pabbly."))) return "pabbly";
+  if (scopeList.some((s) => s.startsWith("albato."))) return "albato";
+  if (scopeList.some((s) => s.startsWith("activepieces."))) return "activepieces";
   if (hints.resource) {
     try {
       const pathname = new URL(hints.resource).pathname.replace(/\/+$/, "");
       if (pathname === "/api/integrations/n8n") return "n8n";
       if (pathname === "/api/integrations/zapier") return "zapier";
+      if (pathname === "/api/integrations/make") return "make";
+      if (pathname === "/api/integrations/pabbly") return "pabbly";
+      if (pathname === "/api/integrations/albato") return "albato";
+      if (pathname === "/api/integrations/activepieces") return "activepieces";
       if (pathname === "/api/mcp/claude") return "claude";
       if (pathname === "/api/mcp/chatgpt") return "chatgpt";
       if (pathname === "/api/mcp") return "muse";
@@ -260,6 +292,10 @@ export function platformLabel(platform: OAuthClientPlatform): string {
   if (platform === "claude") return "Claude";
   if (platform === "zapier") return "Zapier";
   if (platform === "n8n") return "n8n";
+  if (platform === "make") return "Make";
+  if (platform === "pabbly") return "Pabbly Connect";
+  if (platform === "albato") return "Albato";
+  if (platform === "activepieces") return "Activepieces";
   return "Muse";
 }
 
@@ -345,6 +381,18 @@ export function isAllowedRedirectUriForPlatform(
     // this is not an open redirect. isN8nRedirectUri already
     // encodes the loopback rule, so no extra loopback arm here.
     return isN8nRedirectUri(uri);
+  }
+  if (
+    platform === "make" ||
+    platform === "pabbly" ||
+    platform === "albato" ||
+    platform === "activepieces"
+  ) {
+    // Same instance-style rule as n8n: these platforms have
+    // instance/account-specific callback hosts that cannot be
+    // allowlisted by value. Exact DCR registration is still
+    // required on top of this.
+    return isAutomationRedirectUri(uri);
   }
   if (platform === "zapier") {
     return isZapierRedirectUri(uri) || isLoopbackRedirectUri(uri);
@@ -470,6 +518,10 @@ function registrationPlatform(input: RegisterMuseClientInput): OAuthClientPlatfo
   if (scopes.some((s) => s.startsWith("claude."))) return "claude";
   if (scopes.some((s) => s.startsWith("nxtsend."))) return "chatgpt";
   if (scopes.some((s) => s.startsWith("muse."))) return "muse";
+  if (scopes.some((s) => s.startsWith("make."))) return "make";
+  if (scopes.some((s) => s.startsWith("pabbly."))) return "pabbly";
+  if (scopes.some((s) => s.startsWith("albato."))) return "albato";
+  if (scopes.some((s) => s.startsWith("activepieces."))) return "activepieces";
   if (typeof input.resource === "string") return resourcePlatform(input.resource);
   return null;
 }

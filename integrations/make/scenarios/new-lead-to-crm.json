@@ -1,0 +1,76 @@
+{
+  "flow": [
+    {
+      "id": 1,
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "module": "gateway:CustomWebHook",
+      "parameters": {},
+      "version": 1
+    },
+    {
+      "id": 2,
+      "mapper": {
+        "body": {
+          "company": "{{1.data.company}}",
+          "email": "{{1.data.email}}",
+          "first_name": "{{1.data.first_name}}",
+          "job_title": "{{1.data.job_title}}",
+          "last_name": "{{1.data.last_name}}",
+          "nxtsend_lead_id": "{{1.data.id}}",
+          "source": "NxtSend"
+        },
+        "bodyType": "json",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "name": "Authorization",
+            "value": "Bearer PASTE_YOUR_CRM_API_KEY"
+          }
+        ],
+        "method": "post",
+        "parseResponse": true,
+        "qs": [],
+        "url": "https://crm.example.com/api/leads"
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      },
+      "module": "http:ActionSendData",
+      "parameters": {
+        "handleErrors": false
+      },
+      "version": 3
+    }
+  ],
+  "metadata": {
+    "designer": {
+      "orphans": []
+    },
+    "instant": true,
+    "scenario": {
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false,
+      "maxErrors": 3,
+      "roundtrips": 1,
+      "sequential": false
+    },
+    "version": 1
+  },
+  "name": "NxtSend new lead to CRM"
+}

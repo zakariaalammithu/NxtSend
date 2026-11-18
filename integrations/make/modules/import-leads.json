@@ -1,0 +1,23 @@
+{
+  "label": "Import Leads",
+  "description": "Bulk-import leads. Dedups by email like single creates.",
+  "type": "action",
+  "connection": "nxtsend-oauth2",
+  "endpoint": {
+    "method": "POST",
+    "path": "/leads/import"
+  },
+  "parameters": [
+    {
+      "name": "leads",
+      "label": "Leads (JSON array of lead objects)",
+      "type": "text",
+      "required": true
+    }
+  ],
+  "output": "Import summary (created / duplicates / errors).",
+  "notes": [
+    "SKELETON — part of the Make custom-app spec (see integrations/make/app.json). Build this module in Make's web UI / VS Code from this spec; the endpoint (method + path) is the contract the module must call.",
+    "No secrets in this file."
+  ]
+}

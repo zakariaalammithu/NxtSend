@@ -13,12 +13,20 @@ export {
   CLAUDE_SCOPES,
   ZAPIER_SCOPES,
   N8N_SCOPES,
+  MAKE_SCOPES,
+  PABBLY_SCOPES,
+  ALBATO_SCOPES,
+  ACTIVEPIECES_SCOPES,
   ALL_OAUTH_SCOPES,
   MUSE_SCOPE_DESCRIPTIONS,
   NXT_SEND_SCOPE_DESCRIPTIONS,
   CLAUDE_SCOPE_DESCRIPTIONS,
   ZAPIER_SCOPE_DESCRIPTIONS,
   N8N_SCOPE_DESCRIPTIONS,
+  MAKE_SCOPE_DESCRIPTIONS,
+  PABBLY_SCOPE_DESCRIPTIONS,
+  ALBATO_SCOPE_DESCRIPTIONS,
+  ACTIVEPIECES_SCOPE_DESCRIPTIONS,
   SCOPE_DESCRIPTIONS,
   SCOPE_TIER_MAP,
   parseMuseScopes,
@@ -28,7 +36,7 @@ export {
   scopeDescription,
   defaultScopeForPlatform,
 } from "./scopes";
-export type { MuseScope, NxtSendScope, ClaudeScope, ZapierScope, N8nScope, OAuthScope, ScopeTier } from "./scopes";
+export type { MuseScope, NxtSendScope, ClaudeScope, ZapierScope, N8nScope, MakeScope, PabblyScope, AlbatoScope, ActivepiecesScope, OAuthScope, ScopeTier } from "./scopes";
 export { computeCodeChallenge, verifyCodeChallenge, isS256Method } from "./pkce";
 export {
   hashToken,
@@ -66,6 +74,7 @@ export {
   isLocalDeployment,
   isAllowedOAuthRedirectUri,
   isAllowedRedirectUriForPlatform,
+  isAutomationRedirectUri,
   isLoopbackRedirectUri,
   isRegisteredRedirectUri,
   validateRedirectUri,
@@ -100,7 +109,7 @@ export { resolveMuseContext } from "./context";
 export type { ResolveMuseContextDeps } from "./context";
 export { recordMuseOAuthEvent } from "./audit";
 export type { MuseOAuthAuditAction } from "./audit";
-export { isMuseMcpEnabled, isChatGptMcpEnabled, isClaudeMcpEnabled, getMusePublicUrl, getChatGptPublicUrl, getClaudePublicUrl, getOAuthIssuer, getMcpResourceUrl, getZapierResourceUrl, getN8nResourceUrl, canonicalMcpResources, resourcePlatform, DEFAULT_OAUTH_ORIGIN, MCP_RESOURCE_PATHS } from "./config";
+export { isMuseMcpEnabled, isChatGptMcpEnabled, isClaudeMcpEnabled, getMusePublicUrl, getChatGptPublicUrl, getClaudePublicUrl, getOAuthIssuer, getMcpResourceUrl, getZapierResourceUrl, getN8nResourceUrl, getMakeResourceUrl, getPabblyResourceUrl, getAlbatoResourceUrl, getActivepiecesResourceUrl, canonicalMcpResources, resourcePlatform, DEFAULT_OAUTH_ORIGIN, MCP_RESOURCE_PATHS } from "./config";
 export type { McpPlatform } from "./config";
 export {
   handleMuseTokenRequest,

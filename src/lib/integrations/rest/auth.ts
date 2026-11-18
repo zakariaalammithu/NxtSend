@@ -32,6 +32,7 @@ import { getMcpResourceUrl } from "@/lib/muse-connector/oauth/config";
 import {
   getPlatformConfig,
   getPlatformResourceUrl,
+  platformDisplayName,
   type PlatformConfig,
   type RestPlatform,
 } from "./config";
@@ -96,7 +97,7 @@ export async function resolvePlatformContext(
   deps: ResolvePlatformContextDeps & { rateLimit?: boolean } = {}
 ): Promise<ResolvePlatformContextResult> {
   const config = getPlatformConfig(platform);
-  const label = platform === "n8n" ? "n8n" : "Zapier";
+  const label = platformDisplayName(platform);
   const mode = deps.mode ?? getDataMode();
   if (mode === "demo") {
     return {
@@ -219,7 +220,7 @@ export async function resolveRestContext(
   const platformId: RestPlatform =
     typeof platform === "string" ? platform : platform.platform;
   const config = getPlatformConfig(platformId);
-  const label = platformId === "n8n" ? "n8n" : "Zapier";
+  const label = platformDisplayName(platformId);
   const mode = deps.mode ?? getDataMode();
   if (mode === "demo") {
     return {

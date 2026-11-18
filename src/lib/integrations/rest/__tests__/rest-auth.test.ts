@@ -20,7 +20,7 @@ import {
 } from "@/lib/muse-connector/oauth";
 import { createRateLimiter } from "@/lib/admin/submissions-core";
 import { resolveRestContext, REST_RATE_LIMIT_PER_MINUTE } from "../auth";
-import { getPlatformResourceUrl, N8N_PLATFORM, ZAPIER_PLATFORM } from "../config";
+import { getPlatformResourceUrl, N8N_PLATFORM, ZAPIER_PLATFORM, type RestPlatform } from "../config";
 import {
   createApiKey,
   createMemoryApiKeyStore,
@@ -41,7 +41,7 @@ function formRequest(url: string, params: Record<string, string>): Request {
 }
 
 async function platformToken(
-  platform: "n8n" | "zapier",
+  platform: RestPlatform,
   scopes: string[] = [`${platform}.read`, `${platform}.write`],
   resource: string = getPlatformResourceUrl(platform, ORIGIN)
 ): Promise<{ store: ReturnType<typeof createMemoryMuseOAuthStore>; access: string }> {

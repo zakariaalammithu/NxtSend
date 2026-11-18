@@ -1,0 +1,35 @@
+{
+  "label": "Send Inbox Reply (Email)",
+  "description": "Send an inbox reply — email channel only. LinkedIn replies are refused (422). idempotencyKey is required; duplicates replay, never re-send.",
+  "type": "action",
+  "connection": "nxtsend-oauth2",
+  "endpoint": {
+    "method": "POST",
+    "path": "/conversations/{id}/replies"
+  },
+  "parameters": [
+    {
+      "name": "id",
+      "label": "Conversation ID",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "body",
+      "label": "Reply body",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "idempotencyKey",
+      "label": "Idempotency key (unique per reply)",
+      "type": "text",
+      "required": true
+    }
+  ],
+  "output": "Reply outcome (sent / simulated, never LinkedIn).",
+  "notes": [
+    "SKELETON — part of the Make custom-app spec (see integrations/make/app.json). Build this module in Make's web UI / VS Code from this spec; the endpoint (method + path) is the contract the module must call.",
+    "No secrets in this file."
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://developers.make.com/custom-apps/app-manifest",
+  "base": "base.json",
+  "baseUrl": "https://<your-domain>/api/integrations/make/v1",
+  "connection": "connections/oauth2.json",
+  "description": "Lead and campaign automation for NxtSend workspaces — leads, campaigns, sequences, inbox conversations and usage, via the NxtSend REST API v1.",
+  "docsUrl": "https://github.com/zakariaalammithu/NxtSend/blob/main/docs/integrations/providers/automation-make.md",
+  "label": "NxtSend",
+  "modules": {
+    "actions": [
+      "modules/create-lead.json",
+      "modules/update-lead.json",
+      "modules/delete-lead.json",
+      "modules/import-leads.json",
+      "modules/create-campaign.json",
+      "modules/campaign-action.json",
+      "modules/add-leads-to-campaign.json",
+      "modules/send-inbox-reply.json",
+      "modules/subscribe-webhook.json",
+      "modules/unsubscribe-webhook.json"
+    ],
+    "searches": [
+      "modules/search-leads.json",
+      "modules/search-campaigns.json",
+      "modules/get-campaign-performance.json",
+      "modules/get-usage.json"
+    ],
+    "triggers": [
+      "modules/trigger-new-lead.json",
+      "modules/trigger-lead-updated.json",
+      "modules/trigger-new-reply.json",
+      "modules/trigger-poll-new-leads.json"
+    ],
+    "universal": [
+      "modules/universal-api-call.json"
+    ]
+  },
+  "notes": [
+    "SKELETON. Make custom apps are built in the Make web interface or VS Code as component directories (Base / Connections / Modules) written in JSONC + IML — there is no single app.json file Make imports. This file is the spec for that build: use it (with base.json, connections/oauth2.json and modules/*.json) to create the app in Make, then submit it for review separately.",
+    "Replace <your-domain> with the deployment origin (e.g. https://nxtsend.com) everywhere before building.",
+    "No secrets live in this directory. The OAuth client_id / client_secret come from the one-time Dynamic Client Registration call (see docs/integrations/providers/automation-make.md) and are entered in Make, never committed here.",
+    "Auth: OAuth 2.0 against NxtSend's shared authorization server. Scopes: make.read make.write. There is no make.send tier — Make never sends LinkedIn messages.",
+    "Campaigns are created DRAFT ONLY; there is no launch module. There is no message-draft module. Inbox replies are email-channel only."
+  ],
+  "status": "skeleton — NOT submitted to Make",
+  "version": "0.1.0"
+}

@@ -1,0 +1,29 @@
+{
+  "label": "Create Campaign (Draft)",
+  "description": "Create a campaign — DRAFT ONLY. There is no launch module; launch stays dashboard-only.",
+  "type": "action",
+  "connection": "nxtsend-oauth2",
+  "endpoint": {
+    "method": "POST",
+    "path": "/campaigns"
+  },
+  "parameters": [
+    {
+      "name": "name",
+      "label": "Campaign name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "type",
+      "label": "Campaign type",
+      "type": "text",
+      "required": false
+    }
+  ],
+  "output": "The created draft campaign.",
+  "notes": [
+    "SKELETON — part of the Make custom-app spec (see integrations/make/app.json). Build this module in Make's web UI / VS Code from this spec; the endpoint (method + path) is the contract the module must call.",
+    "No secrets in this file."
+  ]
+}

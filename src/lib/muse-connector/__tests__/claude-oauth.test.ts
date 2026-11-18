@@ -130,7 +130,7 @@ afterEach(() => {
 // ── Scopes & tiers ──────────────────────────────────────────────────────────
 
 describe("claude.* scopes", () => {
-  it("lists all four scope sets; muse.*, nxtsend.* and claude.* are unchanged", () => {
+  it("lists all scope sets; muse.*, nxtsend.* and claude.* are unchanged", () => {
     expect([...MUSE_SCOPES]).toEqual(["muse.read", "muse.write", "muse.send"]);
     expect([...NXT_SEND_SCOPES]).toEqual(["nxtsend.read", "nxtsend.write", "nxtsend.send"]);
     expect([...CLAUDE_SCOPES]).toEqual(["claude.read", "claude.write", "claude.send"]);
@@ -148,6 +148,14 @@ describe("claude.* scopes", () => {
       "zapier.write",
       "n8n.read",
       "n8n.write",
+      "make.read",
+      "make.write",
+      "pabbly.read",
+      "pabbly.write",
+      "albato.read",
+      "albato.write",
+      "activepieces.read",
+      "activepieces.write",
     ]);
   });
 

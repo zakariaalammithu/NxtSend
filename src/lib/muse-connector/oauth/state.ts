@@ -19,6 +19,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { getTokenEncryptionKey, type TokenVaultEnv } from "@/lib/oauth/crypto";
 import { DEFAULT_OAUTH_ORIGIN, getMcpResourceUrl } from "./config";
+import type { OAuthClientPlatform } from "./clients";
 import type { OAuthScope } from "./scopes";
 
 export const MUSE_AUTHORIZE_STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
@@ -38,7 +39,7 @@ export interface MuseAuthorizeStateClaims {
   /** RFC 8707 resource the grant is bound to (full MCP resource URL). */
   resource?: string;
   /** Which platform the client is (consent-screen wording). */
-  platform?: "muse" | "chatgpt" | "claude" | "zapier" | "n8n";
+  platform?: OAuthClientPlatform;
   /** Origin of a CIMD client_id URL, else null. */
   clientOrigin?: string | null;
 }
@@ -146,7 +147,15 @@ export function verifyMuseAuthorizeState(
             ? "zapier"
             : parsed.platform === "n8n"
               ? "n8n"
-              : "muse",
+              : parsed.platform === "make"
+                ? "make"
+                : parsed.platform === "pabbly"
+                  ? "pabbly"
+                  : parsed.platform === "albato"
+                    ? "albato"
+                    : parsed.platform === "activepieces"
+                      ? "activepieces"
+                      : "muse",
     clientOrigin: parsed.clientOrigin ?? null,
   };
 }

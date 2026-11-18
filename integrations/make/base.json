@@ -1,0 +1,27 @@
+{
+  "authorization": {
+    "header": {
+      "Authorization": "Bearer {{connection.accessToken}}"
+    },
+    "type": "oauth2"
+  },
+  "baseUrl": "https://<your-domain>/api/integrations/make/v1",
+  "description": "Settings common to every NxtSend module: base URL, shared auth header, error mapping. Inherited by all modules.",
+  "errors": {
+    "401": "The NxtSend access token is invalid or expired. Reconnect the NxtSend connection in Make.",
+    "403": "This connection does not have the required scope (make.read for reads, make.write for changes). Reconnect with both scopes.",
+    "404": "The lead, campaign or conversation was not found in this workspace.",
+    "422": "The request was rejected (e.g. LinkedIn replies are not supported — inbox replies are email-channel only).",
+    "429": "Rate limit exceeded: 120 requests/minute per token. Make will retry on the next run.",
+    "503": "The NxtSend integration is disabled on this deployment, or the deployment is in Demo Mode (the API refuses demo outright)."
+  },
+  "headers": {
+    "Accept": "application/json",
+    "Content-Type": "application/json"
+  },
+  "label": "NxtSend Base",
+  "notes": [
+    "Replace <your-domain> with the deployment origin (e.g. https://nxtsend.com).",
+    "Secrets are sanitized from logs: the Authorization header value is never logged by Make."
+  ]
+}

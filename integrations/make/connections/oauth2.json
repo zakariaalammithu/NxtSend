@@ -1,0 +1,40 @@
+{
+  "authorizationUrl": "https://<your-domain>/api/muse/oauth/authorize",
+  "description": "OAuth 2.0 connection to NxtSend's shared authorization server. Scopes make.read / make.write (no make.send tier exists).",
+  "id": "nxtsend-oauth2",
+  "label": "NxtSend OAuth 2.0",
+  "notes": [
+    "Replace <your-domain> with the deployment origin (e.g. https://nxtsend.com).",
+    "BLOCKED until the coordinator extends src/lib/muse-connector/oauth/clients.ts: DCR currently refuses a make.* registration, so no client_id/client_secret can be issued for this resource yet. See docs/integrations/providers/automation-make.md.",
+    "PKCE: Make's OAuth 2.0 connection sends no PKCE by default; the NxtSend server requires PKCE only for public clients — a confidential Make client (client secret present) is exempt, same rule as Zapier."
+  ],
+  "parameters": [
+    {
+      "help": "From the one-time Dynamic Client Registration call (POST /api/muse/oauth/register). Shown once — store it in Make immediately.",
+      "label": "Client ID",
+      "name": "clientId",
+      "required": true,
+      "type": "text"
+    },
+    {
+      "help": "From the same DCR response. Never commit it to the repo.",
+      "label": "Client secret",
+      "name": "clientSecret",
+      "required": true,
+      "type": "password"
+    }
+  ],
+  "resource": "https://<your-domain>/api/integrations/make",
+  "revokeUrl": "https://<your-domain>/api/muse/oauth/revoke",
+  "scopes": [
+    "make.read",
+    "make.write"
+  ],
+  "tokenUrl": "https://<your-domain>/api/muse/oauth/token",
+  "type": "oauth2",
+  "validation": {
+    "description": "Connection test — must return 200 with the user and workspace for the token.",
+    "method": "GET",
+    "url": "/auth/test"
+  }
+}

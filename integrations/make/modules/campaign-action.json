@@ -1,0 +1,35 @@
+{
+  "label": "Pause / Resume / Stop / Archive Campaign",
+  "description": "Lifecycle transition. Pause needs an active campaign, resume needs paused, stop/archive refuse an already-archived campaign.",
+  "type": "action",
+  "connection": "nxtsend-oauth2",
+  "endpoint": {
+    "method": "POST",
+    "path": "/campaigns/{id}/{action}"
+  },
+  "parameters": [
+    {
+      "name": "id",
+      "label": "Campaign ID",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "action",
+      "label": "Action (pause, resume, stop, archive)",
+      "type": "select",
+      "required": true,
+      "options": [
+        "pause",
+        "resume",
+        "stop",
+        "archive"
+      ]
+    }
+  ],
+  "output": "The updated campaign.",
+  "notes": [
+    "SKELETON — part of the Make custom-app spec (see integrations/make/app.json). Build this module in Make's web UI / VS Code from this spec; the endpoint (method + path) is the contract the module must call.",
+    "No secrets in this file."
+  ]
+}

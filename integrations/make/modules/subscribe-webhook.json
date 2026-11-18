@@ -1,0 +1,39 @@
+{
+  "label": "Subscribe Webhook",
+  "description": "Subscribe a Make webhook URL to one of the 8 NxtSend events. Returns {id, event, target_url}; the HMAC secret is server-side only.",
+  "type": "action",
+  "connection": "nxtsend-oauth2",
+  "endpoint": {
+    "method": "POST",
+    "path": "/webhooks/subscribe"
+  },
+  "parameters": [
+    {
+      "name": "event",
+      "label": "Event (lead.created, lead.updated, lead.added_to_campaign, lead.removed_from_campaign, campaign.created, campaign.status_changed, conversation.reply_created, subscription.changed)",
+      "type": "select",
+      "required": true,
+      "options": [
+        "lead.created",
+        "lead.updated",
+        "lead.added_to_campaign",
+        "lead.removed_from_campaign",
+        "campaign.created",
+        "campaign.status_changed",
+        "conversation.reply_created",
+        "subscription.changed"
+      ]
+    },
+    {
+      "name": "target_url",
+      "label": "Make webhook URL",
+      "type": "text",
+      "required": true
+    }
+  ],
+  "output": "{id, event, target_url}.",
+  "notes": [
+    "SKELETON — part of the Make custom-app spec (see integrations/make/app.json). Build this module in Make's web UI / VS Code from this spec; the endpoint (method + path) is the contract the module must call.",
+    "No secrets in this file."
+  ]
+}

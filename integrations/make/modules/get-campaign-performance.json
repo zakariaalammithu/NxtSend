@@ -1,0 +1,23 @@
+{
+  "label": "Get Campaign Performance",
+  "description": "Campaign stats. accepted is always null — no data source exists for it.",
+  "type": "search",
+  "connection": "nxtsend-oauth2",
+  "endpoint": {
+    "method": "GET",
+    "path": "/campaigns/{id}/performance"
+  },
+  "parameters": [
+    {
+      "name": "id",
+      "label": "Campaign ID",
+      "type": "text",
+      "required": true
+    }
+  ],
+  "output": "Campaign performance stats.",
+  "notes": [
+    "SKELETON — part of the Make custom-app spec (see integrations/make/app.json). Build this module in Make's web UI / VS Code from this spec; the endpoint (method + path) is the contract the module must call.",
+    "No secrets in this file."
+  ]
+}

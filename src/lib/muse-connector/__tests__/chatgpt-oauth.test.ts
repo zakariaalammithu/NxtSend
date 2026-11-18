@@ -110,7 +110,7 @@ afterEach(() => {
 // ── Scopes & tiers ──────────────────────────────────────────────────────────
 
 describe("platform-neutral scopes", () => {
-  it("lists both scope sets; muse.* is unchanged", () => {
+  it("lists all scope sets; muse.* is unchanged", () => {
     expect([...MUSE_SCOPES]).toEqual(["muse.read", "muse.write", "muse.send"]);
     expect([...NXT_SEND_SCOPES]).toEqual(["nxtsend.read", "nxtsend.write", "nxtsend.send"]);
     expect([...ALL_OAUTH_SCOPES]).toEqual([
@@ -127,6 +127,14 @@ describe("platform-neutral scopes", () => {
       "zapier.write",
       "n8n.read",
       "n8n.write",
+      "make.read",
+      "make.write",
+      "pabbly.read",
+      "pabbly.write",
+      "albato.read",
+      "albato.write",
+      "activepieces.read",
+      "activepieces.write",
     ]);
   });
 

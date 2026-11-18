@@ -1,0 +1,17 @@
+{
+  "label": "New Inbox Reply",
+  "description": "Fires when an inbox reply is created (conversation.reply_created webhook). Email channel only.",
+  "type": "trigger",
+  "connection": "nxtsend-oauth2",
+  "endpoint": {
+    "method": "POST",
+    "path": "/webhooks/subscribe"
+  },
+  "event": "conversation.reply_created",
+  "parameters": [],
+  "output": "Webhook envelope; data is the reply/conversation.",
+  "notes": [
+    "SKELETON — part of the Make custom-app spec (see integrations/make/app.json). Build this module in Make's web UI / VS Code from this spec; the endpoint (method + path) is the contract the module must call.",
+    "No secrets in this file."
+  ]
+}

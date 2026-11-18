@@ -1,0 +1,23 @@
+{
+  "label": "Watch New Leads (Polling)",
+  "description": "Polling trigger: checks GET /v1/leads on the scenario schedule and emits leads newer than the last run (after cursor). Use when a webhook trigger is not wanted.",
+  "type": "trigger",
+  "connection": "nxtsend-oauth2",
+  "endpoint": {
+    "method": "GET",
+    "path": "/leads"
+  },
+  "parameters": [
+    {
+      "name": "limit",
+      "label": "Limit per poll (1–100)",
+      "type": "number",
+      "required": false
+    }
+  ],
+  "output": "New leads since the last poll.",
+  "notes": [
+    "SKELETON — part of the Make custom-app spec (see integrations/make/app.json). Build this module in Make's web UI / VS Code from this spec; the endpoint (method + path) is the contract the module must call.",
+    "No secrets in this file."
+  ]
+}

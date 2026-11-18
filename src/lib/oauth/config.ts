@@ -67,6 +67,13 @@ export const GOOGLE_SCOPES: readonly string[] = [
   "profile",
   "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/gmail.readonly",
+  // Productivity integrations (added 2026-11-19): Sheets, Drive and
+  // Calendar adapters request these through the same Google OAuth
+  // flow. A stored Gmail-only grant cannot call them — the user
+  // must re-connect Google after this change for the new scopes.
+  "https://www.googleapis.com/auth/spreadsheets",
+  "https://www.googleapis.com/auth/drive.file",
+  "https://www.googleapis.com/auth/calendar.events",
 ];
 
 export const MICROSOFT_SCOPES: readonly string[] = [

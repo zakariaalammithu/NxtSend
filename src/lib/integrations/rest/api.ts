@@ -79,7 +79,7 @@ import {
   type WebhookOutboxStore,
   type WebhookSubscriptionStore,
 } from "./outbox";
-import type { PlatformConfig } from "./config";
+import { platformDisplayName, type PlatformConfig } from "./config";
 
 export interface RestApiDeps {
   /** Which platform the call came from — drives audit, emit source and messages. */
@@ -113,7 +113,7 @@ export interface RestApiDeps {
 
 /** Display name for the platform in human-readable audit details. */
 function apiLabel(deps: RestApiDeps): string {
-  return deps.platform.platform === "n8n" ? "n8n" : "Zapier";
+  return platformDisplayName(deps.platform);
 }
 
 export interface RestApiResult {

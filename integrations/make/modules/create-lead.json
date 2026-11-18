@@ -1,0 +1,59 @@
+{
+  "label": "Create Lead",
+  "description": "Create a lead. Dedups by email — returns the existing lead with duplicate: true instead of a second row.",
+  "type": "action",
+  "connection": "nxtsend-oauth2",
+  "endpoint": {
+    "method": "POST",
+    "path": "/leads"
+  },
+  "parameters": [
+    {
+      "name": "email",
+      "label": "Email",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "first_name",
+      "label": "First name",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "last_name",
+      "label": "Last name",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "company",
+      "label": "Company",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "job_title",
+      "label": "Job title",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "linkedin_url",
+      "label": "LinkedIn URL",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "tags",
+      "label": "Tags (comma-separated)",
+      "type": "text",
+      "required": false
+    }
+  ],
+  "output": "The created lead (id, email, first_name, last_name, company, job_title, status, tags, created_at) plus duplicate: true when the email already existed.",
+  "notes": [
+    "SKELETON — part of the Make custom-app spec (see integrations/make/app.json). Build this module in Make's web UI / VS Code from this spec; the endpoint (method + path) is the contract the module must call.",
+    "No secrets in this file."
+  ]
+}

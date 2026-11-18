@@ -1,0 +1,17 @@
+{
+  "label": "New Lead",
+  "description": "Fires when a lead is created (lead.created webhook). The trigger subscribes its Make webhook URL on enable and unsubscribes on disable.",
+  "type": "trigger",
+  "connection": "nxtsend-oauth2",
+  "endpoint": {
+    "method": "POST",
+    "path": "/webhooks/subscribe"
+  },
+  "event": "lead.created",
+  "parameters": [],
+  "output": "Webhook envelope {id, type, created_at, workspace_id, data} where data is the lead (id, email, first_name, last_name, company, job_title, status, tags, created_at).",
+  "notes": [
+    "SKELETON — part of the Make custom-app spec (see integrations/make/app.json). Build this module in Make's web UI / VS Code from this spec; the endpoint (method + path) is the contract the module must call.",
+    "No secrets in this file."
+  ]
+}

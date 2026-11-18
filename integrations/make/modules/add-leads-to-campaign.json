@@ -1,0 +1,29 @@
+{
+  "label": "Add Leads to Campaign",
+  "description": "Enroll leads in a campaign. Emits lead.added_to_campaign.",
+  "type": "action",
+  "connection": "nxtsend-oauth2",
+  "endpoint": {
+    "method": "POST",
+    "path": "/campaigns/{id}/leads"
+  },
+  "parameters": [
+    {
+      "name": "id",
+      "label": "Campaign ID",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "lead_ids",
+      "label": "Lead IDs (JSON array)",
+      "type": "text",
+      "required": true
+    }
+  ],
+  "output": "Enrollment summary.",
+  "notes": [
+    "SKELETON — part of the Make custom-app spec (see integrations/make/app.json). Build this module in Make's web UI / VS Code from this spec; the endpoint (method + path) is the contract the module must call.",
+    "No secrets in this file."
+  ]
+}

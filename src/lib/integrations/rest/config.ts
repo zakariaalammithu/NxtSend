@@ -1,5 +1,6 @@
 /**
- * Shared REST platform config (Zapier + n8n).
+ * Shared REST platform config (Zapier + n8n + Make + Pabbly +
+ * Albato + Activepieces).
  *
  * NOTE (Worker B): Worker A was contracted to deliver
  * `src/lib/integrations/rest/` alongside the n8n v1 API, but no
@@ -18,7 +19,7 @@
  * authorization always goes through `grantHasTier`.
  */
 
-export type RestPlatform = "zapier" | "n8n";
+export type RestPlatform = "zapier" | "n8n" | "make" | "pabbly" | "albato" | "activepieces";
 
 export interface PlatformConfig {
   platform: RestPlatform;
@@ -52,6 +53,42 @@ export const N8N_PLATFORM: PlatformConfig = {
   auditPrefix: "n8n",
 };
 
+export const MAKE_PLATFORM: PlatformConfig = {
+  platform: "make",
+  resourcePath: "/api/integrations/make",
+  scopePrefix: "make",
+  enabledEnv: "MAKE_ENABLED",
+  baseUrlEnv: "MAKE_API_BASE_URL",
+  auditPrefix: "make",
+};
+
+export const PABBLY_PLATFORM: PlatformConfig = {
+  platform: "pabbly",
+  resourcePath: "/api/integrations/pabbly",
+  scopePrefix: "pabbly",
+  enabledEnv: "PABBLY_ENABLED",
+  baseUrlEnv: "PABBLY_API_BASE_URL",
+  auditPrefix: "pabbly",
+};
+
+export const ALBATO_PLATFORM: PlatformConfig = {
+  platform: "albato",
+  resourcePath: "/api/integrations/albato",
+  scopePrefix: "albato",
+  enabledEnv: "ALBATO_ENABLED",
+  baseUrlEnv: "ALBATO_API_BASE_URL",
+  auditPrefix: "albato",
+};
+
+export const ACTIVEPIECES_PLATFORM: PlatformConfig = {
+  platform: "activepieces",
+  resourcePath: "/api/integrations/activepieces",
+  scopePrefix: "activepieces",
+  enabledEnv: "ACTIVEPIECES_ENABLED",
+  baseUrlEnv: "ACTIVEPIECES_API_BASE_URL",
+  auditPrefix: "activepieces",
+};
+
 export const N8N_API_VERSION = "1.0.0";
 
 /** Contract alias for the platform id type. */
@@ -60,6 +97,10 @@ export type PlatformId = RestPlatform;
 export const PLATFORM_CONFIGS: Record<RestPlatform, PlatformConfig> = {
   zapier: ZAPIER_PLATFORM,
   n8n: N8N_PLATFORM,
+  make: MAKE_PLATFORM,
+  pabbly: PABBLY_PLATFORM,
+  albato: ALBATO_PLATFORM,
+  activepieces: ACTIVEPIECES_PLATFORM,
 };
 
 /** Config for a platform; throws on an unknown platform name. Accepts a config object as-is. */
@@ -71,7 +112,14 @@ export function getPlatformConfig(platform: RestPlatform | PlatformConfig): Plat
 }
 
 export function isRestPlatform(value: unknown): value is RestPlatform {
-  return value === "zapier" || value === "n8n";
+  return (
+    value === "zapier" ||
+    value === "n8n" ||
+    value === "make" ||
+    value === "pabbly" ||
+    value === "albato" ||
+    value === "activepieces"
+  );
 }
 
 export type PlatformEnv = Record<string, string | undefined>;
@@ -133,8 +181,21 @@ export function getPlatformResourceUrl(
   return `${origin.replace(/\/+$/, "")}${config.resourcePath}`;
 }
 
-/** Display name used in user-facing messages ("Zapier" / "n8n"). */
+/** Display name used in user-facing messages ("Zapier" / "n8n" / "Make" / …). */
 export function platformDisplayName(platform: RestPlatform | PlatformConfig): string {
   const id = typeof platform === "string" ? platform : platform.platform;
-  return id === "n8n" ? "n8n" : "Zapier";
+  switch (id) {
+    case "n8n":
+      return "n8n";
+    case "make":
+      return "Make";
+    case "pabbly":
+      return "Pabbly Connect";
+    case "albato":
+      return "Albato";
+    case "activepieces":
+      return "Activepieces";
+    default:
+      return "Zapier";
+  }
 }

@@ -1,0 +1,23 @@
+{
+  "label": "Delete Lead",
+  "description": "Permanently delete a lead. Requires the write tier.",
+  "type": "action",
+  "connection": "nxtsend-oauth2",
+  "endpoint": {
+    "method": "DELETE",
+    "path": "/leads/{id}"
+  },
+  "parameters": [
+    {
+      "name": "id",
+      "label": "Lead ID",
+      "type": "text",
+      "required": true
+    }
+  ],
+  "output": "{deleted: true}.",
+  "notes": [
+    "SKELETON — part of the Make custom-app spec (see integrations/make/app.json). Build this module in Make's web UI / VS Code from this spec; the endpoint (method + path) is the contract the module must call.",
+    "No secrets in this file."
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "label": "Make an API Call",
+  "description": "Call any NxtSend REST API v1 endpoint (relative path under /api/integrations/make/v1). Required for Make review — must use a relative path. The endpoint is chosen at scenario time, so this module has no fixed operation.",
+  "type": "action",
+  "connection": "nxtsend-oauth2",
+  "endpoint": null,
+  "parameters": [
+    {
+      "name": "method",
+      "label": "Method (GET, POST, PATCH, PUT, DELETE)",
+      "type": "select",
+      "required": true,
+      "options": [
+        "GET",
+        "POST",
+        "PATCH",
+        "PUT",
+        "DELETE"
+      ]
+    },
+    {
+      "name": "path",
+      "label": "Relative path (e.g. /leads, /campaigns/abc/performance)",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "body",
+      "label": "JSON body (for POST/PATCH/PUT)",
+      "type": "text",
+      "required": false
+    }
+  ],
+  "output": "The endpoint's response body.",
+  "notes": [
+    "SKELETON — part of the Make custom-app spec (see integrations/make/app.json). Build this module in Make's web UI / VS Code from this spec; the endpoint (method + path) is the contract the module must call.",
+    "No secrets in this file."
+  ]
+}

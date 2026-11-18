@@ -53,7 +53,7 @@ import type {
   ZapierWebhookSubscription,
 } from "@/lib/integrations/zapier/outbox";
 import { isWebhookEventType, type WebhookEnvelope, type WebhookEventType } from "./events";
-import type { RestPlatform } from "./config";
+import { isRestPlatform, platformDisplayName, type RestPlatform } from "./config";
 
 /** Max delivery attempts before a delivery dead-letters. */
 export const DELIVERY_MAX_ATTEMPTS = 3;
@@ -216,7 +216,7 @@ export function validatePlatformTargetUrl(
   if (host === "zapier.com" || host === "hooks.zapier.com") {
     return {
       ok: false,
-      error: "target_url must be an n8n webhook URL, not a Zapier hook URL.",
+      error: `target_url must be a ${platformDisplayName(platform)} webhook URL, not a Zapier hook URL.`,
     };
   }
   if (isPrivateOrLoopbackHost(host)) {
@@ -389,7 +389,10 @@ function rowToSubscription(row: Row): PlatformWebhookSubscription {
     target_url: String(row.target_url),
     secret: String(row.secret ?? ""),
     active: Boolean(row.active),
-    platform: row.platform === "n8n" ? "n8n" : "zapier",
+    // Preserve the stored platform (Zapier, n8n, Make, Pabbly,
+    // Albato, Activepieces); legacy rows without a platform fall
+    // back to Zapier, the original writer of this table.
+    platform: isRestPlatform(row.platform) ? row.platform : "zapier",
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
   };

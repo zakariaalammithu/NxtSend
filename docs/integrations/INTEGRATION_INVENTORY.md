@@ -1,131 +1,287 @@
-# NxtSend — Integration Inventory (Stage 0 Audit)
+# NxtSend — Integration Inventory
 
-- **Base commit:** `b96a6233dd155322936085f47daba0765b9a4cbc` (main)
-- **Date of audit:** 2026-11-19
-- **Method:** read-only source inspection only. No files modified, no commits, no pushes, no tests run, no live calls made. Every claim below is grounded in a file present at this commit; where a doc/registry claim could not be confirmed from code it is flagged, not repeated as fact.
-- **Status classes used:** LIVE = real backend code exists AND evidence of a successful live run was found in-repo (none of the platform surfaces meet this bar in this audit — see note); PARTIAL = real backend implemented, incomplete in some named way (env-gated, not submitted/published/approved, or a live step still pending); UI-ONLY = card/page exists with no backend; MISSING = named in docs/prompts/registry but no adapter/backend exists.
-- **Important:** no integration is classified LIVE here. The code is real for most providers, but this read-only audit performed no live verification run, and the registry/docs themselves record every platform grant flow as still pending live verification. "PARTIAL" below therefore means "implemented backend, not yet proven live end-to-end", not "broken".
+- **Base commit:** `f8dea22` (main, Wave 2 complete)
+- **Date of inventory:** 2026-11-19
+- **Method:** source inspection of the tree at `f8dea22`, plus re-running
+  the test suite (2,293 passing), the n8n package tests (126/126), and
+  `npx tsc --noEmit` (clean). No live calls were made; no provider was
+  authenticated against real credentials.
+- **Status classes used:** LIVE = real backend code exists AND evidence of
+  a successful live run was found in-repo; PARTIAL = real backend
+  implemented, incomplete in some named way (config-gated, not
+  submitted/published/approved, or a live step still pending); UI-ONLY =
+  card/page exists with no backend; MISSING = named in docs/prompts/
+  registry but no adapter/backend exists.
+- **Important:** no integration is classified LIVE here. The code is real
+  for most providers, but no live verification run has been performed and
+  every platform grant flow is recorded as still pending live verification.
+  "PARTIAL" below therefore means "implemented backend, not yet proven
+  live end-to-end", not "broken".
 
-## 0. How status is derived (Integration Center)
+## 0. Counts (all verified by grep/wc on the tree at `f8dea22`)
 
-- Registry: `src/lib/integrations-center/registry.ts` — 19 entries, pure data, no env access. `INTEGRATION_REGISTRY`, `getIntegrationDescriptor(id)`.
-- Types/status: `src/lib/integrations-center/types.ts` (`IntegrationDescriptor`, `CenterStatus`, `CENTER_STATUSES`, `IntegrationKind`, `VerificationRecord`, `VerifyOutcome`), `status.ts` (`getIntegrationStatuses()`, `mapProviderState()`, `applyVerification()`, `isN8nEnabled()`, `getN8nBaseUrl()`), `server.ts` (`resolveCenterContext()`, `isWorkspaceAdminRole()`), `verify.ts` (`verifyIntegration()`), `verification-store.ts`.
-- Status vocabulary (from `status.ts`/`verify.ts`): `connected`, `not_connected`, `configuration_required`, `demo`, `error` (plus verification outcomes "Demo Mode" / "Configuration Required" / "Not Connected"). Statuses are computed from env-derived state modules; the registry itself claims no connection.
-- `verifySupported` per registry entry (line numbers in `registry.ts`): true for supabase (51), resend (93), gmail (130), microsoft (167), stripe (211), openai (239), anthropic (264), meta-model (292), webhooks (470); false for muse-ai (331), chatgpt (373), claude (414), meta-pixel (442), zapier (514), n8n (561), jobs (588), linkedin (624), google-sheets (642), crm (660), email-verification (678). In Demo Mode `verifyIntegration()` makes no outbound call for any entry (webhooks test event is recorded as simulated only).
-- Dashboard UI: `src/app/(dashboard)/dashboard/integrations/page.tsx`, `src/app/(dashboard)/dashboard/integrations/[id]/page.tsx`; status API `src/app/api/integrations/status/route.ts`; per-id verify `src/app/api/integrations/[id]/verify/route.ts`.
-- Admin UI: `src/app/(admin)/admin/integrations/{ai,chatbot,email,muse-ai,n8n,other,sheets,zapier}/page.tsx` (all render via `src/components/admin/AdminIntegrationView`). `chatbot` page redirects — superseded by the real Support section. `sheets` renders only the `google-sheets` registry entry; `other` renders the remaining info entries.
+| Count | Value | Source |
+| --- | --- | --- |
+| Integration Center entries | 83 | `src/lib/integrations-center/registry.ts` (`id:` occurrences) |
+| Provider definitions | 69 | `src/lib/integrations/providers/registry.ts` = 5 live + 61 Milestone 2 + 3 Category J |
+| Milestone 2 raw definitions | 63 | CRM 9, email outreach 10, enrichment 15, verification 5, automation 4, communication 5, productivity 12, AI MCP clients 3 |
+| Milestone 2 unique | 61 | 63 raw minus the 2 providers defined twice (Snov.io: email outreach + enrichment; Monday.com: CRM + productivity), merged into one entry each |
+| Per-provider operator guides | 63 | `docs/integrations/providers/*.md` |
+| `.env.example` variables | 108 | non-comment, non-empty lines; `CONFIG_CATALOG` and `scripts/check-config.mjs` both list the same 108 |
+| Migrations on disk | 33 files | `supabase/migrations/`: 001–031, 036, 038 (see §7) |
+| REST route files | Zapier 29, n8n 41, Make/Pabbly/Albato/Activepieces 35 each | `src/app/api/integrations/<platform>/` |
 
-## 1. Full inventory table
+## 1. The 5 live platforms (PARTIAL — implemented, not live-verified)
 
-| Provider / integration | Class | Auth | API routes | DB tables | Webhooks / events | Settings UI | Tests | Docs |
-|---|---|---|---|---|---|---|---|---|
-| Supabase (Database & Auth) | PARTIAL | Supabase Auth (email/password); anon key + service-role key | All data routes via Supabase client; health via Auth endpoint | 001: `profiles`, `workspaces`, `workspace_members`, `campaigns`, `campaign_steps`, `leads`, `campaign_enrollments`, `messages`, `integrations`, `subscriptions`, `suppression_list`, `audit_logs` (+ all later migrations) | — | Integration Center card | `src/lib/integrations-center/__tests__/` (2 files) | `SETUP.md` §2–3 |
-| Resend (Email) | PARTIAL | API key (`RESEND_API_KEY`); Svix-signed inbound webhook (`RESEND_WEBHOOK_SECRET`) | `POST /api/webhooks/resend`; sends via `src/lib/email/resend.ts` `ResendEmailAdapter` | `email_events` (004), `suppression_list` (001) | Inbound: delivery/bounce/complaint + `email.received` (signed, Svix, 300 s tolerance; 503 if secret unset) | Integration Center card; `src/components/integrations/EmailAuthPanel.tsx`, `EmailRoutingPanel.tsx` | `src/lib/email/__tests__/` | `SETUP.md` §6; registry `webhook.urlPath=/api/webhooks/resend` |
-| Gmail | PARTIAL | OAuth 2.0 auth-code (`GOOGLE_CLIENT_ID/SECRET`); tokens AES-256-GCM in `oauth_connections` | `GET /api/oauth/google/connect`, `GET /api/oauth/google/callback`, `GET /api/oauth/connections`, `POST /api/oauth/disconnect` | `oauth_connections` (014) | — (sends only) | Integration Center card + `OAuthMailboxPanel.tsx` (Connected mailbox panel) | `src/lib/oauth/__tests__/` (2 files) | `SETUP.md` §15 |
-| Outlook / Microsoft 365 | PARTIAL | OAuth 2.0 auth-code, tenant `common` (`MICROSOFT_CLIENT_ID/SECRET`); same token vault | `GET /api/oauth/microsoft/connect`, `GET /api/oauth/microsoft/callback`, same connections/disconnect routes | `oauth_connections` (014) | — (sends only) | Integration Center card + `OAuthMailboxPanel.tsx` | `src/lib/oauth/__tests__/` (2 files) | `SETUP.md` §15 |
-| Stripe (Billing) | PARTIAL | Secret key + webhook signing secret (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`); Price IDs per plan | `POST /api/billing/checkout`, `/api/billing/portal`, `/api/billing/invoices`, `POST /api/webhooks/stripe` | `subscriptions` (001 + Stripe cols 004), `billing_events` (004), `billing_webhook_failures` (017) | Inbound Stripe webhook: signature-verified, idempotent by event ID; plan changes ONLY in webhook, never checkout | Integration Center card | `src/lib/billing/__tests__/` | `SETUP.md` §7 |
-| OpenAI (AI drafting) | PARTIAL | API key (`OPENAI_API_KEY`, optional `OPENAI_MODEL`, default `gpt-4o-mini`) | `POST /api/ai/draft` → `src/lib/ai/handler.ts` `handleDraftRequest()` | — | — | Admin integrations/ai page | `src/lib/ai/__tests__/` | Registry only |
-| Anthropic / Claude (AI drafting) | PARTIAL | API key (`ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL`, default `claude-sonnet-4-5`) | `POST /api/ai/draft` (fallback provider order OpenAI → Anthropic → Meta) | — | — | Admin integrations/ai page | `src/lib/ai/__tests__/` | Registry only |
-| Meta Model API / Muse Spark (AI drafting) | PARTIAL | Bearer `MODEL_API_KEY`, `https://api.meta.ai/v1`, default model `muse-spark-1.3` | `POST /api/ai/draft` (third provider) | — | — | Admin integrations/ai page | `src/lib/ai/__tests__/` | Registry notes endpoint details came from secondary sources; Test Connection is the first primary confirmation |
-| Muse.ai (Meta Muse) — NxtSend is the server | PARTIAL | NxtSend-issued OAuth 2.1: auth-code + PKCE S256, DCR (RFC 7591), refresh rotation w/ reuse detection, RFC 7009 revocation; scopes `muse.read/write/send` | `POST /api/muse/oauth/authorize`, `/register`, `/token`, `/revoke`; `GET /api/muse/grants`, `/api/muse/activity`; MCP `POST /api/mcp`; `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource/api/mcp` | `muse_oauth_clients`, `muse_oauth_codes`, `muse_oauth_tokens` (023; RLS on, zero policies, service-role only) | — (no outbound webhooks; MCP only) | Integration Center card + admin integrations/muse-ai page; per-user grant list/revoke | `src/lib/muse-connector/__tests__/` (15 files), `src/lib/muse-connector/oauth/__tests__/` (1 file), `src/app/api/mcp/__tests__/`, `src/app/api/muse/*/__tests__/` | `docs/muse-integration/` (10 files) + `NxtSend_Muse_Integration_Final_Report.md` |
-| ChatGPT (OpenAI) — NxtSend is the server | PARTIAL | Same shared OAuth 2.1 server; CIMD client docs + DCR; scopes `nxtsend.read/write/send`; RFC 8707 resource binding (024) | MCP `POST /api/mcp/chatgpt`; same `/api/muse/oauth/*` + grants routes; `/.well-known/oauth-protected-resource/api/mcp/chatgpt` | Same 023 tables + `resource` column (024) | — | Integration Center card | Same muse-connector suites + `src/app/api/mcp/chatgpt/__tests__/` | `docs/chatgpt-integration/` (13 files) + final report |
-| Claude.ai (Anthropic) — NxtSend is the server | PARTIAL | Same shared OAuth 2.1 server; DCR + CIMD; scopes `claude.read/write/send`; callbacks `claude.ai` + `claude.com` allowlisted | MCP `POST /api/mcp/claude`; same OAuth/grants routes; `/.well-known/oauth-protected-resource/api/mcp/claude` | Same 023 + 024 tables | — | Integration Center card | Same suites + `src/app/api/mcp/claude/__tests__/` | `docs/claude-integration/` (13 files) + final report |
-| Meta Pixel | PARTIAL | Public numeric Pixel ID (`NEXT_PUBLIC_META_PIXEL_ID`); consent-gated, marketing pages only | None server-side (client loader only) | — | Client events: PageView (deduped per route) + CompleteRegistration on signup | Integration Center card (verifySupported=false; no server test — verify in Events Manager) | None found for Pixel | `SETUP.md` §8 |
-| Outbound Webhooks (generic n8n/Zapier Catch Hook) | PARTIAL | Per-subscription HMAC-SHA256 secret (shown once); `X-NxtSend-Signature` | `GET/POST /api/webhooks/config`, `POST /api/webhooks/emit` (test dispatch); delivery via jobs worker | `webhook_deliveries` (004, generic) + shared `zapier_webhook_subscriptions` / `zapier_webhook_deliveries` (025, platform-discriminated by 029) | 8 events (see §3): `lead.created`, `lead.updated`, `lead.added_to_campaign`, `lead.removed_from_campaign`, `campaign.created`, `campaign.status_changed`, `conversation.reply_created`, `subscription.changed`; retry 5 min → 30 min, max 3 attempts, then dead; 10 s receiver timeout; 410 deactivates subscription | Integration Center card (webhooks section) | `src/lib/integrations/rest/__tests__/` | Registry only (no dedicated docs folder) |
-| Zapier — NxtSend is the server | PARTIAL | NxtSend OAuth 2.0 (shared server), scopes `zapier.read/write` only (no `.send`); PKCE optional for confidential clients only (026); 10-min refresh-reuse grace for Zapier grants; RFC 8707 resource `/api/integrations/zapier` | REST `src/app/api/integrations/zapier/v1/*` — 26 v1 route files + `health`, `emit`, `subscriptions` (29 route files total); `/.well-known/oauth-protected-resource/api/integrations/zapier` | `zapier_webhook_subscriptions`, `zapier_webhook_deliveries` (025); `leads.updated_at` (027); OAuth tables 023/026 | REST Hooks: same 8 events; per-subscription HMAC; best-effort immediate + daily 06:00 cron retry | Integration Center card + admin integrations/zapier page + `src/app/api/admin/zapier/route.ts` | `src/lib/integrations/zapier/__tests__/` (4 files); `integrations/zapier/test/*.js` — counted 60 `test()` blocks (7 auth + 14 creates + 12 definitions + 11 errors + 16 triggers), matching the 60/60 claim; `zapier-platform validate` claimed exit 0 (not re-run) | `docs/zapier-integration/` (15 files) + final report |
-| n8n — NxtSend is the server | PARTIAL | NxtSend OAuth 2.0 (shared server), scopes `n8n.read/write` (no `.send`); OR scoped API keys (`nxt_live…`, SHA-256 hash only, shown once, expirable/revocable) | REST `src/app/api/integrations/n8n/v1/*` — 33 v1 route files + `api-keys`, `health`, `subscriptions`, `webhooks/{retry,subscribe,subscriptions,test,unsubscribe}` (41 route files total); `/.well-known/oauth-protected-resource/api/integrations/n8n` | `nxtsend_api_keys` (028); shared Zapier webhook tables + `platform` discriminator (029) | Same 8 events via shared outbox; Trigger node (webhook + polling) | Integration Center card + admin integrations/n8n page + `src/app/api/admin/n8n/route.ts`; API-key management on the n8n card page | `src/lib/integrations/n8n/__tests__/` (2 files: `api-keys.test.ts`, `routes.test.ts`); `src/app/api/integrations/n8n/**/__tests__/` (2 files); node package `integrations/n8n-nodes-nxtsend/test/` — counted 66 `it()` blocks (25 node + 9 credentials + 8 loadOptions + 21 trigger + 3 workflows), NOT the 120 claimed in registry/docs (see §5) | `docs/n8n-integration/` (16 files) + final report |
-| Background Jobs / Vercel Cron | PARTIAL | `CRON_SECRET` Bearer on `/api/jobs/run` (503 if unset); `vercel.json` cron `0 6 * * *` → `/api/jobs/run` (daily 06:00 only) | `GET/POST /api/jobs/run`, `POST /api/jobs/enqueue`, `GET /api/cron/scheduled-replies` | `jobs`, `job_runs` (004), `usage_records` (004) | Retries Zapier + n8n webhook deliveries; usage rollups; scheduled-reply scans | Integration Center card (jobs entry) | `src/lib/jobs/__tests__/` | `SETUP.md` §10 |
-| LinkedIn | MISSING | Reserved env only (`LINKEDIN_PROVIDER`, `LINKEDIN_PROVIDER_API_KEY`, `LINKEDIN_CLIENT_ID/SECRET`, `LINKEDIN_REDIRECT_URI`) — setting them connects nothing; callback route does NOT exist | None (no `/api/integrations/linkedin/callback`) | `connected_accounts` health cols only (013: `provider_account_id`, `auth_status`, `last_sync_at`, `last_error`) | None. LinkedIn steps are recorded SKIPPED by the executor; LinkedIn replies refused HTTP 422 `linkedin_unavailable` | Integration Center card (kind `info`, verifySupported=false); demo data labelled simulated | `src/lib/linkedin/__tests__/` (adapter refusal tests) | `SETUP.md` §11 |
-| Google Sheets | MISSING | None — no adapter, no OAuth flow, no env vars | None | None | None | Admin integrations/sheets page renders only the `google-sheets` registry entry (not-implemented note) | None | Registry only; workaround documented: CSV export from Leads |
-| CRM (HubSpot) | MISSING | None — legacy HubSpot entry is a demo stub, no API wiring | None | None | None | Admin integrations/other page renders the `crm` entry | None | Registry only; built-in alternative is Leads (CSV import/export) |
-| Email Verification | MISSING | None — no provider adapter, no env config | None | None | None | Admin integrations/other page renders the entry | None | Registry only; CSV import validates format + duplicates only, never deliverability |
-| Integration Hub (admin-only; NOT in the 19-entry registry) | PARTIAL | Dedicated vault key `INTEGRATION_HUB_ENCRYPTION_KEY` (AES-256-GCM, separate from `TOKEN_ENCRYPTION_KEY`); credential create/reveal/copy refuse 503 if unset/malformed | `src/app/api/admin/integration-hub/**` (integrations, credentials incl. `[id]/copy` + `[id]/reveal`, documents, checklists, test-accounts, status/refresh, copy-package) | `hub_integrations`, `hub_credentials`, `hub_test_accounts`, `hub_checklist_items`, `hub_checklist_state`, `hub_documents` (016) | None | `src/app/(admin)/admin/integration-hub/page.tsx`, `[slug]/page.tsx` | `src/lib/integration-hub/__tests__/` | Seeded content is BizReviewRadar only (`src/lib/integration-hub/seed-content.ts`: slug `brr-muse-connector`, manifest/setup/privacy docs as placeholders — real BRR OAuth client ID NOT entered) |
+These five have a full backend: shared OAuth 2.1 server, v1 REST API,
+webhooks, and (where applicable) an MCP server or native app. None has
+been live-verified; no submission or publication is claimed.
 
-## 2. MCP surface (shared by Muse / ChatGPT / Claude)
+| Provider | What exists | Status | Not yet |
+| --- | --- | --- | --- |
+| **Zapier** | OAuth 2.1 (shared server) + REST API v1; 5 polling triggers, 8 instant (REST Hook) triggers, 12 actions, 5 searches in `integrations/zapier/` (Zapier Platform CLI app); webhooks with HMAC + outbox + cron retry | PARTIAL | Not published on Zapier; live grant flow not verified |
+| **n8n** | OAuth 2.1 + scoped API keys (`nxt_live_`) + REST API v1; community node `n8n-nodes-nxtsend` v0.1.0 (NxtSend node + Trigger, 12 workflow templates); webhooks | PARTIAL | Not published on npm; not verified by n8n; live grant flow not verified |
+| **Muse (Meta)** | OAuth 2.1 server + hosted MCP server at `/api/mcp` | PARTIAL | Not submitted to Meta; live grant flow not verified. **Discrepancy:** the provider registry capability text says "18 tools", but the Stage 0 audit found `adapter.listTools()` returns the full 54-tool manifest on every flavor with no slicing — the live `/api/mcp` therefore serves 54 tools (36 Read / 14 Write / 4 Sensitive), not 18. The first 18 are only the *original* Muse set. |
+| **ChatGPT (OpenAI)** | OAuth 2.1 server (DCR + CIMD) + hosted MCP server at `/api/mcp/chatgpt`, 54 tools | PARTIAL | Not submitted to OpenAI; live grant flow not verified; Apps SDK widget render still pending |
+| **Claude (Anthropic)** | OAuth 2.1 server (DCR + CIMD) + hosted MCP server at `/api/mcp/claude`, 54 tools + 4 text-only MCP prompts + read-only `nxtsend://account` resource | PARTIAL | Not submitted to Anthropic; live grant flow not verified |
 
-- Manifest (DO NOT MODIFY per brief): `src/lib/muse-connector/manifest.ts` — `NXTSEND_TOOL_MANIFEST`, 54 tools; `MUSE_CONNECTOR_MANIFEST_STATUS = "draft — pre-classified for a future submission; not submitted, not approved"`. Classification counts: **36 Read / 14 Write / 4 Sensitive write**. The 54 names: list_leads, get_lead, list_campaigns, get_campaign_activity, list_conversations, get_conversation, get_usage_summary, get_integration_statuses, create_lead, update_lead, create_campaign, pause_campaign, resume_campaign, archive_campaign, draft_outreach_message, send_email, send_inbox_reply, delete_lead, list_linkedin_accounts, get_linkedin_account, get_subscription_info, get_account_limits, search_campaigns, stop_campaign, delete_campaign, get_campaign_performance, get_campaign_execution_status, search_leads, import_leads, add_leads_to_campaign, remove_leads_from_campaign, detect_duplicate_leads, get_lead_activity_history, list_leads_by_campaign, get_campaign_sequence, create_sequence_step, update_sequence_step, reorder_sequence_steps, get_scheduled_follow_ups, get_sequence_execution_status, get_pending_actions, get_failed_actions, get_automation_execution_report, search_conversations, get_message_execution_status, get_failed_messages, compare_campaigns, get_date_range_report, get_performance_summary, get_usage_report, get_profile, search, fetch, render_campaigns_widget.
-- Handler: `src/lib/muse-connector/mcp.ts` — `handleMcpRequest()`, `buildToolsList()`, `buildResourcesList()`, `MCP_PROTOCOL_VERSION="2025-06-18"`, `MCP_SERVER_NAME="nxtsend-mcp"`, `MCP_RATE_LIMIT_PER_MINUTE=120`, `MCP_BODY_LIMIT_BYTES=64 KiB`; flavors `McpFlavor = "muse" | "chatgpt" | "claude"`; routes `/api/mcp`, `/api/mcp/chatgpt`, `/api/mcp/claude`, `/api/mcp/health`.
-- **Correction to the brief/registry:** the Muse flavor does NOT serve only the first 18 tools. `adapter.listTools()` (`src/lib/muse-connector/adapter.ts:241`) returns the full 54-tool manifest and `mcp.ts` applies no per-flavor slicing — the live `/api/mcp` serves all 54. The "18 tools (8 Read / 7 Write / 3 Sensitive)" figure in the registry/docs is the *original* Muse set (first 18 names); the code serves 54 on every flavor. Submission scope must be re-checked against this.
-- Flavor differences (real, in `mcp.ts`): ChatGPT pre-auth discovery — `initialize` / `tools/list` / `resources/list` work without a token (static metadata only, `_meta.requiresOAuth`); Claude advertises `prompts/list` + `prompts/get` and `resources` capability, other flavors answer "method not found" for prompts; ChatGPT/Claude include server instructions, Muse does not.
-- Adapter: `src/lib/muse-connector/adapter.ts` — `createMuseConnectorAdapter()`, class `NxtSendMuseConnectorAdapter` (54 `case` branches). `get_date_range_report` returns **501 BLOCKED on all flavors** (`date_range_not_supported`: stats are all-time, loaders cannot filter by date) — not ChatGPT/Claude-only as the brief phrased it.
-- Prompts (Claude-only): `src/lib/muse-connector/prompts.ts` — `NXTSEND_MCP_PROMPTS` (4, text-only templates, never send/delete): `campaign-performance-summary`, `lead-follow-up-draft`, `weekly-performance-report`, `duplicate-lead-cleanup`; `listMcpPrompts()`, `getMcpPrompt()`.
-- Widget: `src/lib/muse-connector/widget.ts` — `render_campaigns_widget` → `buildCampaignsWidgetHtml()`, `renderWidgetCampaignCard()`; resource `ui://widget/campaigns.html`, MIME `text/html;profile=mcp-app`. Read-only account resource `nxtsend://account` (Claude + shared `buildResourcesList()`; no secrets/token values).
-- Schemas/context/audit: `schemas.ts` (`TOOL_INPUT_SCHEMAS`), `context.ts`, `interface.ts`, `activity-filter.ts`, `readiness.ts`, `tokens.ts` (`isMuseOAuthConfigured()`), `audit.ts` (every MCP tool call → one `audit_logs` row).
-- No LinkedIn-send tool exists in the manifest or adapter, on any flavor.
+Scopes: `muse.read/write/send`, `nxtsend.read/write/send`,
+`claude.read/write/send`, `zapier.read/write`, `n8n.read/write`.
+There is no `.send` tier on Zapier or n8n. LinkedIn-send/accept is
+NOT SUPPORTED on any platform.
 
-## 3. Shared OAuth 2.1 server + REST layer
+## 2. The 64 config-ready adapters (PARTIAL — mock-tested only)
 
-- OAuth server: `src/lib/muse-connector/oauth/` — `authorize.ts` (`validateAuthorizeRequest()`, `issueAuthorizationCode()`, `buildOAuthErrorRedirect/SuccessRedirect()`), `handlers.ts` (`handleMuseTokenRequest()`, `handleMuseRevokeRequest()`, `handleMuseRegisterRequest()`, `authenticateMuseClient()`, `createDcrRateLimiter()`), `tokens.ts` (`issueMuseTokens()`, `verifyMuseAccessToken()`, `rotateRefreshToken()`, `revokeMuseToken()`, `hashToken()`; access 1 h, refresh 60 d, code 10 min; `REFRESH_REUSE_GRACE_MS=10 min`, `ZAPIER_REFRESH_GRACE_MS` same), `store.ts` (`createMemoryMuseOAuthStore()`, `createSupabaseMuseOAuthStore()`), `clients.ts` (`registerMuseClient()`, `verifyClientSecret()`, redirect-URI allowlists incl. `MUSE_OAUTH_CALLBACK=https://agent.meta.ai/api/hatch/oauth/callback`, ChatGPT `https://chatgpt.com/connector_platform_oauth_redirect`, Claude `claude.ai` + `claude.com` `/api/mcp/auth_callback`; `isZapierRedirectUri()`, `isN8nRedirectUri()`), `scopes.ts` (see below), `pkce.ts` (`computeCodeChallenge()`, `verifyCodeChallenge()`, S256 only), `cimd.ts` (`fetchCimdDocument()`, `resolveCimdClient()`, 5 s timeout, 64 KiB cap, 5-min cache), `config.ts` (`isMuseMcpEnabled()`, `isChatGptMcpEnabled()`, `isClaudeMcpEnabled()`, `getMusePublicUrl()`, `getChatGptPublicUrl()`, `getClaudePublicUrl()`, `getZapierResourceUrl()`, `getN8nResourceUrl()`, `resourcePlatform()`), `state.ts` (`signMuseAuthorizeState()`, `verifyMuseAuthorizeState()`, 10-min TTL, signed with `TOKEN_ENCRYPTION_KEY`), `audit.ts` (`recordMuseOAuthEvent()`).
-- Scopes (`scopes.ts`): `MUSE_SCOPES=[muse.read/write/send]`, `NXT_SEND_SCOPES=[nxtsend.read/write/send]`, `CLAUDE_SCOPES=[claude.read/write/send]`, `ZAPIER_SCOPES=[zapier.read/write]` (no send), `N8N_SCOPES=[n8n.read/write]` (no send); `ALL_OAUTH_SCOPES`; `grantHasTier()` (tier check, never prefix check; `send` does NOT imply `write`/`read`); `defaultScopeForPlatform()`.
-- Mailbox OAuth (separate, provider-facing): `src/lib/oauth/` — `google.ts` (`buildGoogleAuthUrl()`, `exchangeGoogleCode()`, `refreshGoogleToken()`, `fetchGoogleProfile()`, `revokeGoogleToken()`), `microsoft.ts` (`buildMicrosoftAuthUrl()`, …), `handlers.ts` (`handleOAuthConnect()`, `handleOAuthCallbackRoute()`), `config.ts` (`GOOGLE_SCOPES` incl. `gmail.send` + `gmail.readonly`, `MICROSOFT_SCOPES` incl. `Mail.Send`, `Mail.Read`, `offline_access`; `getOAuthConfigStatus()`), `crypto.ts` (`getTokenEncryptionKey()`, `isTokenEncryptionConfigured()`, `encryptToken()`, `decryptToken()` — AES-256-GCM), `store.ts`, `tokens.ts`, `state.ts`, `service.ts`.
-- Shared REST layer: `src/lib/integrations/rest/` — `api.ts` (1271 lines; `restAuthTest()`, `restListLeads/Get/Create/Update/DeleteLead`, `restImportLeads()` max 100, `restList/Get/Create/UpdateCampaign`, `restCampaignAction()`, `restCampaignPerformance()`, `restAddLeadsToCampaign()`, `restRemoveLeadFromCampaign()`, `restList/GetConversation`, `restSendReply()`, `restList/Get/GetStatusAccount(s)`, `restGetUsage()`, `restSearchLeads/Campaigns/Conversations/Accounts`, `restDropdownCampaigns/Accounts/Sequences/LeadStatuses()`, `restSubscribe/Unsubscribe/ListWebhookSubscriptions()`, `restDeleteLead()`, `restGetCampaignSequence()`, `restReplaceCampaignSteps()`, `restListScheduledFollowUps()`, `restScheduleFollowUp()`, `restCancelFollowUp()`, `restGetSequenceExecutionStatus()`, `parseListParams()`), `auth.ts` (`resolvePlatformContext()`, `resolveRestContext()`, `platformError`/`restError`, `REST_RATE_LIMIT_PER_MINUTE=120`), `config.ts` (`ZAPIER_PLATFORM`, `N8N_PLATFORM`, `N8N_API_VERSION="1.0.0"`, `PLATFORM_CONFIGS`, `getPlatformConfig()`, `isPlatformEnabled()`, `getPlatformBaseUrl/ResourceUrl()`), `emit.ts` (`emitPlatformEvent()`, `emitZapierEvent()`), `events.ts` (8 `WEBHOOK_EVENT_TYPES` + `buildEventEnvelope()`), `outbox.ts` (see §4), `audit.ts` (`recordPlatformAudit()`), `route-helpers.ts` (`readRestJsonBody()`, `buildRestApiDeps()`, `withRestRoute()`).
-- Zapier thin layer: `src/lib/integrations/zapier/` — `api.ts` (`zapierAuthTest()` … `zapierDropdownSequences()`, all delegating to rest), `auth.ts` (re-exports `resolveRestContext`, `REST_RATE_LIMIT_PER_MINUTE` as `ZAPIER_RATE_LIMIT_PER_MINUTE`), `config.ts`, `client.ts`, `emit.ts`, `events.ts` (re-exports rest events), `outbox.ts` (wraps rest outbox), `audit.ts`, `route-helpers.ts`.
-- n8n layer: `src/lib/integrations/n8n/` contains ONLY `api-keys.ts` (+ `__tests__/` + `README.md`) — there is NO `src/lib/integrations/n8n/{config,api,outbox,emit,audit}.ts`; n8n routes call the shared rest layer directly. `api-keys.ts`: `API_KEY_SCOPES=[n8n.read, n8n.write]`, `API_KEY_PREFIX="nxt_live"`, `generateApiKey()`, `hashApiKey()` (SHA-256), `createSupabaseApiKeyStore()`, `createMemoryApiKeyStore()`, `createApiKey()`, `listApiKeys()`, `revokeApiKey()`, `resolveApiKey()`, `apiKeyHasTier()`, `toPublicApiKey()`.
+Every adapter below is implemented from the provider's official docs and
+mock-tested. None has made a live call. Each works once the owner stores
+a real credential in the Integration Hub vault (migration 016,
+`INTEGRATION_HUB_ENCRYPTION_KEY`); until then its marketplace status is
+"Not Connected". Per-provider auth method and credential names are in
+[PROVIDER_SETUP.md](./PROVIDER_SETUP.md); operator guides are in
+[`providers/`](./providers/).
 
-## 4. Webhooks / outbox / jobs / health / audit (reusable services)
+### 2.1 CRM (9)
 
-- Emit: `src/lib/integrations/rest/emit.ts` — `emitPlatformEvent()` (builds envelope, enqueues to every platform subscription via outbox), `emitZapierEvent()` (alias). Wired to real mutations via `src/lib/data/webhook-emission.ts` (`withLeadWebhookEvents()`, `withCampaignWebhookEvents()` decorators on the repositories).
-- Outbox: `src/lib/integrations/rest/outbox.ts` (913 lines) — `DELIVERY_MAX_ATTEMPTS=3`, `RETRY_DELAYS_MS=[5 min, 30 min]`, `DELIVERY_TIMEOUT_MS=8000`, `STALE_SUBSCRIPTION_DAYS=30`; `generateWebhookSecret()`, `validatePlatformTargetUrl()` / `validateZapierTargetUrl()`, `createPlatformStore()`, `asPlatformStore()`, `subscribePlatformWebhook()`, `unsubscribePlatformWebhook()`, `enqueuePlatformEvent()` (dedup on `(event_id, subscription_id)`), `attemptPlatformDelivery()` (HMAC-SHA256 `X-NxtSend-Signature`), `retryDuePlatformDeliveries()`, `publicPlatformSubscription()`, `getDemoPlatformStore()` (in-memory demo store). Zapier wrapper: `src/lib/integrations/zapier/outbox.ts` (`enqueue…`/`retry…` delegating to rest).
-- Cron/jobs: `src/lib/jobs/` — `types.ts` (`JOB_TYPES=[follow_up_due, webhook_retry, zapier_webhook_retry, n8n_webhook_retry, usage_rollup]`), `handlers.ts` (`createJobHandlers()`; `usage_rollup` real; `webhook_retry`/`zapier_webhook_retry`/`n8n_webhook_retry` real via `retryDuePlatformDeliveries()`; `followUpDue` REAL in live mode — calls `executeDueSteps()` when `ctx.getSequenceExecutor()` exists, skipped only when no executor (demo)), `runner.ts` (`runDueJobs()`), `store.ts` (`createSupabaseJobStore()`, `InMemoryJobStore`), `context.ts` (`createSupabaseJobsContext()`), `producer.ts` (`enqueueFollowUpScan()`, `enqueueDailyPlatformWebhookRetries()`, `platformWebhookRetryKey()`). Route `src/app/api/jobs/run/route.ts` (CRON_SECRET-gated, 503 if unset). `vercel.json`: one cron, `0 6 * * *` → `/api/jobs/run`.
-- Health: `src/lib/admin/platform-server.ts:1023` — `getSystemHealth(mode)` → `HealthSummary` (route `src/app/api/admin/health/route.ts`); `src/lib/admin/health-core.ts` — `aggregateHealth()`, `HealthCheck` / `HealthSummary` types (no `getSystemHealth` there — the brief's implied location is wrong). MCP health: `src/app/api/mcp/health/route.ts`.
-- Audit: `src/lib/muse-connector/audit.ts` (MCP tool calls → `audit_logs`), `src/lib/integrations/rest/audit.ts` (`recordPlatformAudit()` → `audit_logs`), `src/lib/integrations/zapier/audit.ts`, `src/lib/muse-connector/oauth/audit.ts` (`recordMuseOAuthEvent()`), `src/lib/admin/audit-core.ts` (`filterAuditEntries()`, `shapeAuditRow()`); table `audit_logs` (001; admin-only select per 021). Admin audit UI: `src/app/api/admin/audit-logs/route.ts`.
-- Rate limiting: `src/lib/admin/submissions-core.ts` — `createRateLimiter()` (shared primitive); used by MCP (`MCP_RATE_LIMIT_PER_MINUTE=120`/grant, 429 + `Retry-After: 60`) and REST (`REST_RATE_LIMIT_PER_MINUTE=120`/token); DCR limiter `createDcrRateLimiter()` in `oauth/handlers.ts`.
-- Credential encryption: `TOKEN_ENCRYPTION_KEY` (AES-256-GCM, base64 32 bytes) via `src/lib/oauth/crypto.ts` (`encryptToken()`/`decryptToken()`) for mailbox tokens; reused to sign OAuth authorize-state (`oauth/state.ts`) — no separate Muse/ChatGPT/Claude/Zapier/n8n client secrets exist (DCR-issued). Separate vault key `INTEGRATION_HUB_ENCRYPTION_KEY` (AES-256-GCM) via `src/lib/integration-hub/crypto.ts` (`encryptHubSecret()`/`decryptHubSecret()`); rotation/loss = stored Hub credentials undecryptable, must be re-entered.
-- Demo-mode guards: `src/lib/data/mode.ts` — `DataMode="demo"|"supabase"`, `isSupabaseConfigured()`, `getDataMode()` (placeholder env = demo). In demo: MCP refuses all tokens (503 `not_configured`, never serves demo data); Zapier/n8n REST refuse 503; `verifyIntegration()` makes no outbound calls; jobs worker reports in-memory only; LinkedIn data labelled simulated; email/Stripe adapters have `src/lib/integrations/email/demo.ts`, `src/lib/integrations/stripe/demo.ts` demo shims. `src/lib/email/demo-events.ts`, `src/lib/ai/demo.ts` (`demoDraft()`).
-- Generic webhook config/emit routes: `src/app/api/webhooks/config/route.ts`, `src/app/api/webhooks/emit/route.ts` (test dispatch).
+| Provider | Auth | Notes |
+| --- | --- | --- |
+| HubSpot | OAuth 2.0 (private-app token also accepted) | Import/export via lead repository, email dedupe |
+| Salesforce | OAuth 2.0 (web-server flow; `instance_url` stored with credential) | |
+| Pipedrive | OAuth 2.0 | |
+| Close | API key | |
+| GoHighLevel | Bearer token | |
+| Zoho CRM | OAuth 2.0 | |
+| Attio | Bearer token | |
+| Breakcold | API key | |
+| Monday.com | API key | Merged CRM + productivity definition (one entry) |
 
-## 5. Repositories / capabilities (what each exposes)
+### 2.2 Email outreach (10)
 
-- Leads — `src/lib/data/leads.ts`: `LeadsRepository` (`listLeads`, `createLead`, `updateLead`, `deleteLead`, `deleteLeads`, `importLeads`); helpers `getLeadById()`, `searchLeads()`, `createLeadsRepository()` (demo + Supabase impls); CSV `src/lib/data/csv.ts` (`parseCsv()`, `processCsvImport()`, `validateLeadRow()`, `leadsToCsv()`, `campaignsToCsv()`, `LEAD_EXPORT_HEADERS`, `CAMPAIGN_EXPORT_HEADERS`).
-- Campaigns — `src/lib/data/campaigns.ts`: `CampaignsRepository` (`listCampaigns`, `getCampaign`, `getCampaignSteps`, `createCampaign`, `updateCampaign`, `replaceCampaignSteps`, `setCampaignStatus`, `duplicateCampaign`, `deleteCampaign`, `listActivity`, `appendActivity`, `enrollLeads`, `removeEnrollment`, `listEnrollments`, `updateEnrollment`); `createCampaignsRepository()`.
-- Inbox — `src/lib/data/inbox.ts`: `InboxRepository` (`listConversations`, `getThread`, `markConversationRead`, `getUnreadConversationCount`, `findMessageByIdempotencyKey`, `findOrCreateConversation`, `insertMessage`, `updateMessage`, `touchConversation`); `createInboxRepository()`; inbound `src/lib/inbox/` (`inbound.ts`, `reply.ts`, `inbound-store.ts`, `demo-inbound-store.ts`).
-- Campaign stats — `src/lib/data/campaign-stats.ts`: `computeCampaignStats()`, `aggregateCampaignStats()`, `countEmailEvents()`, `countMeetingsBooked()`, `loadCampaignExecutions()`, `loadCampaignStats()` (all-time only — hence the 501 on date-range reports).
-- Accounts — `src/lib/data/accounts.ts`: `AccountsRepository` (`createAccountsRepository()`), `rowToAccount()`, warmup `startWarmup()/pauseWarmup()/resumeWarmup()/restartWarmup()/editWarmupSchedule()/setWarmupOverride()/markWarmupReady()/recordWarmupGraduation()`, `warmupStateOf()`, `resolveSenderVars()`; demo IDs `acc_demo_linkedin`, `acc_demo_email`.
-- Usage — `src/lib/data/usage.ts`: `UsageRepository` (`createUsageRepository()`), `USAGE_METRICS=[leads, campaigns, emailsPerMonth]`, `buildWorkspaceUsage()`, `buildUsageChecks()`, `currentPeriodStart()`.
-- Integrations (legacy) — `src/lib/data/integrations.ts`: `IntegrationsRepository` (`listIntegrations` only; Supabase impl reads `integrations_status` view — note: no `integrations_status` table/view is created by migrations 001–029; verify before relying on it).
-- Lead Finder — `src/lib/data/lead-finder.ts`: `filterLeads()`, `matchesLead()`, `parseIcpDescription()`, `suggestListName()` (in-app filtering over existing leads, no external source).
-- Executor — `src/lib/executor/`: `core.ts` (`executeDueSteps()`, `evaluateStopRules()`, `stepDueAt()`, `isStepDue()`, `claimAccountId()`), `safety.ts` (`evaluateSafetyGate()`, `effectiveConnectionCap()`, `isWithinWorkingWindow()`), `supabase-store.ts`, `demo-runner.ts`/`demo-executions.ts` (demo only). LinkedIn steps: SKIPPED, never simulated as sent.
-- AI — `src/lib/ai/`: `draftOutreachMessage()`, `draftReply()` (`index.ts`), `handler.ts` (`handleDraftRequest()`, `parseDraftRequest()`), `state.ts` (`getAIState()` — OpenAI preferred, then Anthropic, then Meta; Meta provider is NOT in `getAIState()`'s first two branches — check `state.ts` before assuming Meta is reachable via the state module), adapters `OpenAIAdapter`, `AnthropicAdapter`, `MetaModelAdapter`, `prompt.ts` (`buildDraftUserPrompt()`, `DRAFT_SYSTEM_PROMPT`), `translate.ts`.
-- Email — `src/lib/email/`: `resend.ts` (`ResendEmailAdapter`), `gmail.ts` (`deliverViaGmail()`, `buildMimeMessage()`, `GmailEmailAdapter`), `microsoft.ts` (`deliverViaGraph()`, `buildGraphMessage()`, `MicrosoftGraphEmailAdapter`), `mailbox-router.ts` (`decideSendRoute()`, `MailboxRoutingAdapter` — refuses send for a disconnected mailbox, no silent Resend fallback), `mailbox-server.ts`/`mailbox-core.ts`, `suppression.ts` (`checkSuppression()`, `addSuppression()` — fails closed if service role missing), `unsubscribe.ts`/`unsubscribe-service.ts` (RFC 8058), `webhook.ts` (`verifySvixSignature()`, `handleResendWebhook()`), `state.ts` (`getEmailState()`), `deliverability-server.ts`, `dns-check.ts`, `domains.ts`, `receiving.ts`.
-- LinkedIn — `src/lib/linkedin/`: `LinkedInProviderAdapter` interface (`types.ts`); sole implementation `NotConfiguredLinkedInAdapter` (`not-configured.ts`, `createLinkedInAdapter()` returns it) — every capability refuses honestly; `state.ts` (`getLinkedInProviderState()`, `describeLinkedInProvider()`), `activity.ts`, `health.ts` (`accountHealthView()`), `warmup.ts` (warm-up limits/schedules exist as data, but no provider executes them).
-- Billing — `src/lib/billing/`: `plans.ts`, `limits.ts`, `entitlement.ts`, `stripe-client.ts`, `webhook.ts`, `checkout-return.ts`, `invoices.ts`, `store.ts`, `state.ts`.
-- Admin — `src/lib/admin/`: `platform-server.ts` (`getSystemHealth()`), `health-core.ts`, `audit-core.ts`, `settings-core.ts`, `usage-core.ts`, `records.ts`, `server-auth.ts`, `notifications-core.ts`, `submissions-core.ts` (`createRateLimiter()`), `demo-server-store.ts`.
-- Support chatbot — admin integrations/chatbot page redirects to the real Support section (`src/app/api/support/*`, migrations 019 `support_conversations`, `support_messages`, `support_knowledge`, `support_saved_replies`, `support_settings`, `support_agents`, `support_conversation_events`); there is no separate chatbot integration backend.
+Suppression-respecting: every adapter refuses to send without a
+suppression checker (`isSuppressed`), and qualifies leads into
+qualified / suppressed / no-email / duplicates before sending. The
+skipped count (suppressed + no-email + duplicates) is computed in the
+adapter and persisted on the sync job (`integration_sync_jobs.skipped_count`,
+migration 030) and returned in the `SyncResult` — but there is no UI
+page or API route that lists sync jobs, so an operator cannot see it
+without querying the database directly (see
+[KNOWN_LIMITATIONS.md](./KNOWN_LIMITATIONS.md)).
 
-## 6. Migrations 001–029 (tables that exist)
+| Provider | Auth | Notes |
+| --- | --- | --- |
+| Instantly | Bearer token | |
+| Smartlead | API key (`api_key` query parameter — the provider rejects header auth) | Add-leads response reports `added_count` / `skipped_count`; max 400 leads per call |
+| EmailBison | Bearer token | |
+| Masterinbox | API key | Some endpoints unverified against the live API (config-ready only) |
+| SmartReach | API key | |
+| Reply.io | API key | |
+| Lemlist | API key | |
+| Snov.io | OAuth 2.0 (client ID + secret) | Merged email-outreach + enrichment definition (one entry) |
+| Mailshake | API key | |
+| Woodpecker | API key | |
 
-- 001: `profiles`, `workspaces`, `workspace_members`, `campaigns`, `campaign_steps`, `leads`, `campaign_enrollments`, `messages`, `integrations`, `subscriptions`, `suppression_list`, `audit_logs` (+ enums `user_role`, `plan_type`, `campaign_type`, `campaign_status`, `step_type`, `enrollment_status`, `message_channel`, `message_direction`, `integration_status`).
-- 002: security hardening (RLS policies; `guard_profile_privileged_columns()`).
-- 003: `campaign_activity`.
-- 004: `billing_events`, `email_events`, `webhook_deliveries`, `jobs`, `job_runs`, `usage_records`; `messages.provider` / `provider_message_id`; Stripe cols on `subscriptions`.
-- 005: `conversations`; `messages.conversation_id`, `read_at`, `idempotency_key`, `error`.
-- 006: verification columns on `integrations` (no new table).
-- 007: `admin_settings`, `submissions`.
-- 008: `referrals`. 009: `user_preferences`. 010: `campaign_step_executions`. 011: `connected_accounts`. 012: `notifications`. 013: health columns on `connected_accounts`. 014: `oauth_connections`. 015: voice-note storage policies (no table). 016: `hub_integrations`, `hub_credentials`, `hub_test_accounts`, `hub_checklist_items`, `hub_checklist_state`, `hub_documents`. 017: `billing_webhook_failures`. 018: index on `submissions`. 019: `support_conversations`, `support_messages`, `support_knowledge_categories`, `support_knowledge`, `support_saved_replies`, `support_settings`, `support_agents`, `support_conversation_events`. 020: index. 021: audit-log select policy. 022: `prompt_snippets`, `scheduled_replies`, `workspace_safety_settings`. 023: `muse_oauth_clients`, `muse_oauth_codes`, `muse_oauth_tokens`. 024: `resource` column + index on `muse_oauth_tokens`. 025: `zapier_webhook_subscriptions`, `zapier_webhook_deliveries`. 026: `muse_oauth_codes.code_challenge` nullable (PKCE optional). 027: `leads.updated_at` + trigger. 028: `nxtsend_api_keys`. 029: `platform` discriminator indexes on the shared Zapier webhook tables (no separate n8n webhook tables).
-- No migration creates `integrations_status` (read by `src/lib/data/integrations.ts` Supabase impl) — flag for the implementers.
+### 2.3 Lead enrichment (15)
 
-## 7. Zapier app & n8n node package (counts verified from files)
+| Provider | Auth | Status / notes |
+| --- | --- | --- |
+| Apollo | API key (`X-API-KEY` header) | |
+| Hunter | API key (`X-API-KEY` header) | |
+| ZoomInfo | OAuth 2.0 | |
+| ContactOut | API key | |
+| SalesQL | Bearer token | |
+| Snov.io | OAuth 2.0 | Enrichment side of the merged Snov.io entry |
+| Dropcontact | API key | |
+| Persana | API key | **Config-ready stub** — minimal implementation, verify before relying on it |
+| Clearbit | API key | **PROVIDER-BLOCKED** — standalone API deprecated after the HubSpot acquisition; cannot be connected |
+| Clay | API key | |
+| Apify | API key (`APIFY_TOKEN`) | |
+| RB2B | Webhook (inbound webhook secret) | |
+| Factors.ai | API key | **Config-ready stub** — minimal implementation, verify before relying on it |
+| Trigify | API key | **PROVIDER-BLOCKED** — Trigify shut down 22 Oct 2026 |
+| Weezly | API key | **PROVIDER-BLOCKED** — no public API exists |
 
-- Zapier app `integrations/zapier/` (`nxtsend-zapier` v1.0.0, `zapier-platform-core` 18.6.0, `private: true`): `index.js` registers 5 polling triggers (`newLead`, `updatedLead`, `newCampaign`, `campaignStatusChanged`, `newConversation`), 4 hidden dropdown triggers (`listCampaigns`, `listAccounts`, `listLeadStatuses`, `listSequences`), 8 instant REST-hook triggers (`triggers/instant/`: `leadCreated`, `leadUpdated`, `leadAddedToCampaign`, `leadRemovedFromCampaign`, `campaignCreated`, `campaignStatusChanged`, `replyCreated`, `subscriptionChanged`), 12 creates (`creates/`: `createLead`, `updateLead`, `importLeads`, `createCampaign`, `updateCampaign`, `pauseCampaign`, `resumeCampaign`, `stopCampaign`, `archiveCampaign`, `addLeadsToCampaign`, `removeLeadFromCampaign`, `sendReply`), 5 searches (`findLead`, `findCampaign`, `findConversation`, `findAccount`, `getCampaignPerformance`) + 2 search-or-create pairings. `authentication.js` (OAuth2), `lib/api.js`, `lib/hookTrigger.js`, `lib/dropdownTrigger.js`, `lib/fields.js`, `lib/samples.js`, `lib/campaignAction.js`. Tests: 60 `test()` blocks (see §1). Build artifacts `build/build.zip`, `build/source.zip` present. NOT published on Zapier; no submission claimed.
-- n8n node `integrations/n8n-nodes-nxtsend/` (`n8n-nodes-nxtsend` v0.1.0, MIT, `private` not set — but NOT published on npm, NOT verified by n8n): 2 nodes — `nodes/NxtSend/NxtSend.node.ts` (+ `properties.ts`, 6 resources: lead, campaign, sequence, linkedinAccount, conversation, analytics) and `nodes/NxtSendTrigger/NxtSendTrigger.node.ts` (webhook + polling); 2 credentials — `credentials/NxtSendApi.credentials.ts` (API key) + `NxtSendOAuth2Api.credentials.ts`; `nodes/shared/api.ts`, `constants.ts`; `dist/` build output present; 12 workflow templates in `workflows/` (01 google-sheets-row-to-create-lead … 12 schedule-to-pause-campaign). Tests: 5 files, counted 66 `it()` blocks (see §1). Docs claim 39 operations / 120 tests — the 39 was not independently recounted per operation; the 120 test claim does NOT match the 66 counted `it()` blocks.
+### 2.4 Email verification (5)
 
-## 8. Env / deploy surface
+| Provider | Auth | Notes |
+| --- | --- | --- |
+| MillionVerifier | API key | |
+| ZeroBounce | API key (`api_key` query parameter) | |
+| NeverBounce | API key | |
+| Bouncer | API key | |
+| Hunter Verifier | API key (shares `HUNTER_API_KEY`) | |
 
-- `.env.example`: Supabase (3), `ADMIN_BOOTSTRAP_SECRET`, Resend (5 + `CONTACT_NOTIFICATION_EMAIL`), Gmail/Outlook OAuth + `TOKEN_ENCRYPTION_KEY`, `INTEGRATION_HUB_ENCRYPTION_KEY`, Stripe (secret + webhook secret + publishable + 6 Price IDs), Meta Pixel, OpenAI/Anthropic, Meta Model API, `CRON_SECRET`, LinkedIn reserved (5), Muse (`MUSE_MCP_ENABLED`, `MUSE_MCP_PUBLIC_URL`), ChatGPT (`CHATGPT_MCP_ENABLED`, `CHATGPT_MCP_PUBLIC_URL`), Claude (`CLAUDE_MCP_ENABLED`, `CLAUDE_MCP_PUBLIC_URL`), Zapier (`ZAPIER_ENABLED`, `ZAPIER_APP_BASE_URL`), n8n (`N8N_INTEGRATION_ENABLED`, `N8N_API_BASE_URL`). No `*_OAUTH_CLIENT_SECRET` env var exists for Muse/ChatGPT/Claude/Zapier/n8n (DCR-issued); no `N8N_API_KEY` env var (keys are created in-app).
+### 2.5 Automation platforms (4) — full REST surfaces
+
+Make, Pabbly Connect, Albato, and Activepieces each have the same
+shared-REST-layer v1 API as Zapier/n8n (35 route files each), OAuth 2.0
+on the shared server with platform-prefixed scopes (`make.read/write`,
+`pabbly.read/write`, `albato.read/write`, `activepieces.read/write` —
+no `.send` tier), and webhook subscriptions. Native artefacts:
+a Make app manifest + scenario blueprints in `integrations/make/`, and
+an Activepieces piece in `integrations/activepieces/` (dependencies
+installed, piece `tsc` clean). None is submitted to its platform;
+live grant flows are not verified.
+
+### 2.6 Communication (5)
+
+| Provider | Auth | Notes |
+| --- | --- | --- |
+| Slack | OAuth 2.0 | Bot token + channel; incoming-webhook URL also accepted |
+| Microsoft Teams | Webhook | Incoming-webhook URL |
+| Discord | Webhook | Channel webhook URL |
+| Telegram | Bearer token | Bot token |
+| WhatsApp Business | Bearer token | |
+
+### 2.7 Productivity (12)
+
+| Provider | Auth | Notes |
+| --- | --- | --- |
+| Google Sheets | OAuth 2.0 | Now requests the Sheets scope via `GOOGLE_SCOPES`; stored Gmail-only grants must re-connect |
+| Google Drive | OAuth 2.0 | Requests `drive.file` scope |
+| Google Calendar | OAuth 2.0 | Requests `calendar.events` scope |
+| Airtable | API key | Base + table IDs stored with the credential |
+| Notion | API key | Internal integration secret; database must be shared with the integration |
+| Monday.com | API key | Productivity side of the merged Monday.com entry |
+| Asana | OAuth 2.0 | |
+| Trello | API key | |
+| ClickUp | API key | |
+| Jira | API key | |
+| Linear | API key | |
+| Calendly | OAuth 2.0 | |
+
+### 2.8 AI MCP clients (3) — guides only, no new MCP servers
+
+Gemini, Cursor, and Claude Code have operator guides
+(`providers/mcp-client-*.md`) for connecting those clients to NxtSend's
+existing MCP servers. No new MCP server was built for any of them.
+
+### 2.9 Category J (3) — implemented, mock-tested
+
+| Provider | Auth | Notes |
+| --- | --- | --- |
+| GetLeads | API key (`GETLEADS_API_KEY`, `X-API-Key` header) | Fair-use response shape unread — credit-balance calls return null (see KNOWN_LIMITATIONS) |
+| Cornersight | API key (`CORNERSIGHT_API_KEY`, `X-API-Key` header) | |
+| HotHawk | Bearer token (`HOTHAWK_API_KEY`) | Campaign enrolment + campaign creation request bodies are **unverified** — no live call has been made |
+
+**No Category J operator guides exist yet** under
+`docs/integrations/providers/`; their setup steps reference the official
+provider docs only.
+
+## 3. Category J evaluation table — evaluated, NOT implemented (7)
+
+Evaluated in Wave 2, Phase 1 (commit `fa2199a`). The grouped reason
+recorded in that commit message is "no public API / unverifiable /
+no fit". Per-provider specifics are given only where the evaluation
+established them; nothing further is claimed.
+
+| Provider | Decision | Reason |
+| --- | --- | --- |
+| Saava | NOT IMPLEMENTED | No public API / no fit (per `fa2199a` evaluation) |
+| Jungler | NOT IMPLEMENTED | No public API / no fit (per `fa2199a` evaluation) |
+| Cargo | NOT IMPLEMENTED | No public API / no fit (per `fa2199a` evaluation) |
+| Alysio | NOT IMPLEMENTED | No public API / no fit (per `fa2199a` evaluation) |
+| IntentStream | NOT IMPLEMENTED | No public API / no fit (per `fa2199a` evaluation) |
+| Twain | NOT IMPLEMENTED | Docs are JavaScript-rendered and unverifiable |
+| Loopster | NOT IMPLEMENTED | API base host unverified |
+
+Already covered (not duplicated): **Masterinbox** and **SmartReach**
+already had email-outreach adapters (§2.2).
+
+## 4. Integration Center registry (83 entries) — what the extra 14 are
+
+The Center registry holds the 69 provider definitions plus 14
+platform-own surfaces: Supabase, Resend, Gmail, Microsoft (Outlook),
+Stripe, OpenAI, Anthropic, Meta Model API, Meta Pixel, webhooks, jobs,
+LinkedIn (documented demo — no vendor adapter exists), Google Sheets
+(also a provider adapter), and the generic info entries `crm` and
+`email-verification`. The two generic entries are **placeholders**:
+`verify.ts` has no case for them (nor for any of the 60+ new adapter
+ids), the status service returns "Unknown integration." for them, and
+the display layer rewrites that message. See
+[KNOWN_LIMITATIONS.md](./KNOWN_LIMITATIONS.md).
+
+## 5. What "MOCK TESTED" means here
+
+- The repo suite (2,293 tests, 224 files) and the n8n package suite
+  (126 tests, 5 files) run against mocks, fixtures, and in-memory
+  stores. They prove the code paths behave as coded — they do not prove
+  any provider's live API accepts the requests.
+- Adapter tests stub the provider HTTP layer; a passing test means
+  "the adapter builds the request the docs describe", not "the provider
+  answered".
+- The only live checks ever performed were read-only HTTP checks of
+  NxtSend's own deployed site (health/metadata endpoints), not of any
+  provider. See [TESTING_REPORT.md](./TESTING_REPORT.md) and
+  [DEPLOYMENT.md](./DEPLOYMENT.md).
+
+## 6. Env / deploy surface
+
+- `.env.example`: 108 variables. No `*_OAUTH_CLIENT_SECRET` env var
+  exists for Muse/ChatGPT/Claude/Zapier/n8n/Make/Pabbly/Albato/
+  Activepieces (DCR-issued credentials); no `N8N_API_KEY` env var
+  (keys are created in-app). Provider API keys for the 64 adapters are
+  stored per-connection in the Integration Hub vault, not in env —
+  except the enrichment/verification/Category J adapters, whose configs
+  also name an env var (e.g. `APOLLO_API_KEY`, `GETLEADS_API_KEY`) as
+  the seeding source. See [PROVIDER_SETUP.md](./PROVIDER_SETUP.md).
 - `vercel.json`: single cron `0 6 * * *` → `/api/jobs/run`. No other crons.
-- Docs: `docs/{muse,chatgpt,claude,zapier,n8n}-integration/` (10/13/13/15/16 files respectively); root final reports `NxtSend_{Muse,ChatGPT,Claude,Zapier,n8n}_Integration_Final_Report.md` + `NxtSend_Full_Website_Audit_Report.md`, `PRODUCTION.md`, `SETUP.md`, `README.md`.
 
-## 9. Contradictions with the brief's assumptions (must be resolved before Stage 1)
+## 7. Migrations (022–038 requested; what actually exists)
 
-1. **Muse serves 54 tools, not 18.** Brief/registry/docs say Muse = 18 tools (8 Read / 7 Write / 3 Sensitive). Code: `adapter.listTools()` returns the full 54-tool `NXTSEND_TOOL_MANIFEST` on every flavor with no slicing in `mcp.ts`. The live `/api/mcp` therefore exposes 54 tools (36 Read / 14 Write / 4 Sensitive). The first 18 are only the *original* Muse set. Any submission, scope, or "do not change the first 18" work must account for the extra 36 already being served.
-2. **n8n v1 + API keys HAVE landed.** The registry's n8n entry (and its `notImplementedNote`) says migration 028 / Worker A "had NOT landed at the time of writing" and v1/API-key routes return 404. At base `b96a623` they exist: 33 v1 route files + `api-keys` + `health` routes under `src/app/api/integrations/n8n/`, `src/lib/integrations/n8n/api-keys.ts`, and migration `028_nxtsend_api_keys.sql`. The registry text is stale; do not plan around the 404 claim.
-3. **`get_date_range_report` 501 is shared, not ChatGPT/Claude-only.** The 501 BLOCKED lives in the shared adapter (`adapter.ts:449`), so it applies on Muse too.
-4. **No `src/lib/integrations/n8n/{config,api,outbox,emit,audit}.ts` exist.** The registry's n8n troubleshooting lists those files; only `api-keys.ts` exists there — n8n reuses the shared rest layer directly.
-5. **`follow_up_due` is NOT a stub anymore.** The registry's jobs entry calls it "an honest stub … it logs 'not implemented'". `src/lib/jobs/handlers.ts` shows it is real in live mode (runs `executeDueSteps()` via the sequence executor) and only skipped when no executor exists (demo). The registry jobs text is stale.
-6. **`getSystemHealth` lives in `src/lib/admin/platform-server.ts:1023`, not `health-core.ts`.** `health-core.ts` only has `aggregateHealth()` + types.
-7. **n8n test-count claim does not reconcile.** Registry/docs claim the node package tests are "120/120". Counted `it()` blocks in `integrations/n8n-nodes-nxtsend/test/*.ts` total 66. Do not cite 120 without re-running the suite.
-8. **Zapier route count in registry ("30 routes") is approximate.** Counted 29 route files under `src/app/api/integrations/zapier/` (26 v1 + health + emit + subscriptions). n8n has 41 route files — the larger surface, because it adds accounts/[id]/status, execution-status, follow-ups, sequence/steps endpoints Zapier lacks.
-9. **Integration Hub is a real second integration surface the brief did not list.** It is not in the 19-entry registry, has its own vault key and 6 tables (016), and its only seeded integration (BizReviewRadar) still has placeholder credentials.
-10. **`integrations_status` is read but never created.** `src/lib/data/integrations.ts` (Supabase impl) selects from `integrations_status`; no migration 001–029 creates a table or view of that name. Treat as a latent bug until checked.
-11. **Meta provider reachability via `getAIState()` is unverified.** `src/lib/ai/state.ts` documents OpenAI → Anthropic ordering; the Meta adapter exists (`meta.ts`) but whether `getAIState()` returns it as third fallback was not confirmed in this pass — verify before wiring Meta drafting through the state module.
-12. **Nothing here is "live" in the marketplace sense.** Muse/ChatGPT/Claude not submitted/approved; Zapier not published; n8n package not on npm / not verified by n8n. All five platform surfaces are implemented + unit-tested, with their in-platform grant flows and one live run per trigger/action/search still pending per their own docs. No live verification was performed in this audit.
+| Range | On disk |
+| --- | --- |
+| 022 Flow AI features | `022_flow_ai_features.sql` |
+| 023 Muse OAuth | `023_muse_oauth.sql` |
+| 024 ChatGPT OAuth resource | `024_chatgpt_oauth_resource.sql` |
+| 025 Zapier webhooks | `025_zapier_webhooks.sql` |
+| 026 OAuth PKCE optional | `026_oauth_pkce_optional.sql` |
+| 027 Leads `updated_at` | `027_leads_updated_at.sql` |
+| 028 n8n API keys | `028_nxtsend_api_keys.sql` |
+| 029 n8n webhook platform | `029_n8n_webhook_platform.sql` |
+| 030 Integration engine | `030_integration_engine.sql` |
+| 031 Automation platforms | `031_automation_platforms.sql` |
+| **032–035** | **MISSING — no files exist for these numbers** |
+| 036 Notification preferences | `036_notification_preferences.sql` |
+| **037** | **MISSING — no file exists for this number** |
+| 038 Provider disable flags | `038_provider_disabled_flags.sql` |
+
+The owner must apply migrations 022–031, 036, and 038. The gaps
+(032–035, 037) are numbering gaps, not missing functionality that
+anyone has described — but they mean "apply 022–038" is not a
+contiguous instruction, and any apply script that expects a file per
+number will fail on the gaps. Flagged here so the owner is not
+surprised.
+
+## 8. Known contradictions with earlier docs (resolved in favour of code)
+
+1. **Muse serves 54 tools, not 18** (see §1). The registry capability
+   text still says 18; the code serves the full manifest. Any
+   submission, scope, or "do not change the first 18" work must account
+   for the extra 36 already being served.
+2. **The n8n deploy had not landed** on the live site as of the
+   2026-11-18 ~07:25 +06 check (see [DEPLOYMENT.md](./DEPLOYMENT.md)).
+   Docs written before that check that imply the n8n surface is live
+   are wrong.
+3. **`628a825` was pushed while `npm run build` was failing** (masked
+   by a piped grep in the verification command); fixed in `f8dea22`.
+   Process lesson: verify build exit codes directly, never through a
+   pipe.
